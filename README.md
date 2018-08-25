@@ -12,33 +12,23 @@ Read htsjdk Tribble indexes (e.g. \*.vcf.idx files) using pure JavaScript. Suppo
 ## Usage
 
 ```js
-import fs from 'fs'
-import read from 'example'
-// or without ES6
-var fs = require('fs')
-var read = require('example').default.read
+const {TabixIndexedFile} = require('@gmod/tabix')
 
-fs.readFile('path/to/data.vcf.idx', (err, buffer) => {
-  const index = read(buffer);
+const tbiIndexed = new TabixIndexedFile({ path: 'path/to/my/file.gz' })
+// assumes tabix index at path/to/my/file.gz.tbi. can also provide `tbiPath`
+// if the TBI is not named according to that pattern
 
-  console.log(index.header)
-  const blocks = index.getBlocks("ctgA",123000,456000)
-
-  // can now use these blocks from the index to read the file
-  // regions of interest
-  fs.open('path/to/data.vcf', 'r', (err, fd) => {
-    if (err) throw err
-    blocks.forEach(({ length, offset }) => {
-      const buffer = Buffer.alloc(length)
-      fs.read(fd, buffer, 0, length, offset, (err, buffer) => {
-        console.log('got file data', buffer)
-      })
-    })
-    fs.close(fd, (err) => {
-      if (err) throw err
-    })
-  })
+// can also open tabix files that have a .csi index
+const csiIndexed = new TabixIndexedFile({
+  path: 'path/to/my/file.gz',
+  csiPath: 'path/to/my/file.gz.csi'
 })
+
+// get an array of lines in the specified region
+const lines = await tbiIndexed.getLines('ctgA',200,300)
+
+// get the number of lines in the file (header, comment, and whitespace lines excluded)
+const numLines = await tbiIndex.lineCount()
 ```
 
 ## API
