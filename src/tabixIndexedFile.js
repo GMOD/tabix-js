@@ -81,6 +81,7 @@ class TabixIndexedFile {
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
     const newLineByte = '\n'.charCodeAt(0)
+    let foundStart = false
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       const chunkData = await this.readChunk(chunks[chunkNum])
       // go through the data and parse out lines
@@ -90,8 +91,15 @@ class TabixIndexedFile {
           if (currentLineStart < i) {
             const line = chunkData.toString('utf8', currentLineStart, i).trim()
             // filter the line for whether it is within the requested range
-            if (this.lineOverlapsRegion(metadata, refName, start, end, line))
+            if (this.lineOverlapsRegion(metadata, refName, start, end, line)) {
+              foundStart = true
               lineCallback(line)
+            } else if (foundStart) {
+              // the lines were overlapping the region, but now have stopped, so
+              // we must be at the end of the relevant data and we can stop
+              // processing data now
+              return
+            }
 
             // yield if we have emitted beyond the yield limit
             linesSinceLastYield += 1
