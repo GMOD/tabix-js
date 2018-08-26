@@ -146,16 +146,38 @@ class TabixIndex {
     }
   }
 
-  // async _parseIndexes() {
-  //   const data = await this.filehandle.readFile()
-  //   const indexData = (await this._getParser('file')).parse(data)
+  async lineCount(refName) {
+    const indexData = await this.parse()
+    if (!indexData) return []
+    const refId = indexData.refNameToId[refName]
+    const indexes = indexData.indices[refId]
+    if (!indexes) return -1
+    const depth = 5
+    const binLimit = ((1 << ((depth + 1) * 3)) - 1) / 7
+    const ret = indexes.binIndex[binLimit + 1]
+    return ret ? ret[ret.length - 1].minv.dataPosition : -1
+  }
 
-  //   // TODO: unpack the index data, format virtual offsets, etc
-  //   // unpack the 'format' flags
-  //   const binIndex = {}
-  //   const linearIndex = {}
-  //   return { binIndex, linearIndex }
-  // }
+  /**
+   * @returns {Promise} for an object like
+   * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId }`
+   */
+  async getMetadata() {
+    const {
+      columnNumbers,
+      metaChar,
+      skipLines,
+      refIdToName,
+      refNameToId,
+    } = await this.parse()
+    return {
+      columnNumbers,
+      metaChar,
+      skipLines,
+      refIdToName,
+      refNameToId,
+    }
+  }
 
   // memoize
   // fetch and parse the index
