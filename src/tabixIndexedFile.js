@@ -1,6 +1,5 @@
 const promisify = require('util.promisify')
 const gunzip = promisify(require('zlib').gunzip)
-const LRU = require('lru-cache')
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
 // const CSI = require('./csi')
@@ -52,8 +51,6 @@ class TabixIndexedFile {
 
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
-
-    this.chunkLinesCache = LRU({ max: cacheLines })
   }
 
   /**

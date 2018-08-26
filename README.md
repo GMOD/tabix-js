@@ -25,10 +25,15 @@ const csiIndexed = new TabixIndexedFile({
 })
 
 // get an array of lines in the specified region
-const lines = await tbiIndexed.getLines('ctgA',200,300)
+const lines = []
+await tbiIndexed.getLines('ctgA',200,300, line => lines.push(line))
+// lines is now an array of strings, which are data lines.
+// commented (meta) lines are skipped.
+// line strings do not include any trailing whitespace characters.
 
-// get the number of lines in the file (header, comment, and whitespace lines excluded)
-const numLines = await tbiIndex.lineCount()
+// get the approximate number of data lines in the
+// file for the given reference sequence, excluding header, commenat, and whitespace lines
+const numLines = await tbiIndex.lineCount('ctgA')
 ```
 
 ## API
