@@ -195,7 +195,7 @@ class TabixIndexedFile {
       throw new Error(
         `failed to read block at ${
           chunk.minv.blockPosition
-        } (length ${compressedSize})`,
+        } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
       )
     return gunzip(compressedData).catch(e => {
       throw new Error(
