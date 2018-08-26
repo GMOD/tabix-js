@@ -1,13 +1,13 @@
 # example
 
-[![NPM version](https://img.shields.io/npm/v/example.svg?style=flat-square)](https://npmjs.org/package/example)
-[![Build Status](https://img.shields.io/travis/rbuels/example/master.svg?style=flat-square)](https://travis-ci.org/rbuels/example) 
+[![NPM version](https://img.shields.io/npm/v/@gmod/tabix.svg?style=flat-square)](https://npmjs.org/package/@gmod/tabix)
+[![Build Status](https://img.shields.io/travis/GMOD/tabix-js/master.svg?style=flat-square)](https://travis-ci.org/GMOD/tabix-js) 
 
-Read htsjdk Tribble indexes (e.g. \*.vcf.idx files) using pure JavaScript. Supports only Tribble version 3 linear indexes right now.
+Read Tabix-indexed files using either .tbi or .csi indexes.
 
 ## Install
 
-    $ npm install --save example
+    $ npm install --save @gmod/tabix
 
 ## Usage
 
