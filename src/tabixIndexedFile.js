@@ -21,7 +21,6 @@ class TabixIndexedFile {
    * @param {filehandle} [args.csiFilehandle]
    * @param {number} [args.chunkSizeLimit] maximum number of bytes to fetch in a single `getLines` call.
    * default 2MiB
-   * @param {number} [args.cacheLines] maximum number of lines to cache. default 50000.
    * @param {number} [args.yieldLimit] maximum number of lines to parse without yielding.
    * this avoids having a large read prevent any other work getting done on the thread.  default 300 lines.
    */
@@ -33,7 +32,6 @@ class TabixIndexedFile {
     csiPath,
     csiFilehandle,
     chunkSizeLimit = 2000000,
-    cacheLines = 50000,
     yieldLimit = 300,
   }) {
     if (filehandle) this.filehandle = filehandle
