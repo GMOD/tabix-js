@@ -185,7 +185,7 @@ class TabixIndexedFile {
   async readChunk(chunk) {
     const compressedSize = chunk.maxv.blockPosition - chunk.minv.blockPosition
     const compressedData = Buffer.allocUnsafe(compressedSize)
-    const bytesRead = await this.filehandle.read(
+    let bytesRead = await this.filehandle.read(
       compressedData,
       0,
       compressedSize,

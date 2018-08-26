@@ -21,7 +21,9 @@ class LocalFile {
       readPosition = this.position
       this.position += length
     }
-    return fsRead(await this.fd, buffer, offset, length, position)
+    const ret = await fsRead(await this.fd, buffer, offset, length, position)
+    if (typeof ret === 'object') return ret.bytesRead
+    return ret
   }
 
   async readFile() {
