@@ -183,7 +183,7 @@ class TabixIndexedFile {
   async readChunk(chunk) {
     const compressedSize = chunk.maxv.blockPosition - chunk.minv.blockPosition
     const compressedData = Buffer.allocUnsafe(compressedSize)
-    let bytesRead = await this.filehandle.read(
+    const bytesRead = await this.filehandle.read(
       compressedData,
       0,
       compressedSize,
@@ -195,7 +195,7 @@ class TabixIndexedFile {
           chunk.minv.blockPosition
         } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
       )
-    return gunzip(compressedData).catch(e => {
+    const uncompressed = await gunzip(compressedData).catch(e => {
       throw new Error(
         `error decompressing block at ${
           chunk.minv.blockPosition
@@ -203,6 +203,7 @@ class TabixIndexedFile {
         e,
       )
     })
+    return uncompressed.slice(chunk.minv.dataPosition)
   }
 }
 
