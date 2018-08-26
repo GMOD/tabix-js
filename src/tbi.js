@@ -271,4 +271,18 @@ class TabixIndex {
   }
 }
 
+// this is the stupidest possible memoization, ignores arguments.
+function tinyMemoize(_class, methodName) {
+  const method = _class.prototype[methodName]
+  if (!method)
+    throw new Error(`no method ${methodName} found in class ${_class.name}`)
+  const memoAttrName = `_memo_${methodName}`
+  _class.prototype[methodName] = function _tinyMemoized() {
+    if (!(memoAttrName in this)) this[memoAttrName] = method.call(this)
+    return this[memoAttrName]
+  }
+}
+// memoize index.parse()
+tinyMemoize(TabixIndex, 'parse')
+
 module.exports = TabixIndex
