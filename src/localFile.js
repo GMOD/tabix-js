@@ -27,13 +27,6 @@ class LocalFile {
   }
 
   async readFile() {
-    // const fd = await this.fd
-    // return new Promise((resolve,reject) => {
-    //   fs.readFile(fd, null, (err,buffer) => {
-    //     if (err) reject(err)
-    //     else resolve(buffer)
-    //   })
-    // })
     return fsReadFile(this.filename)
   }
 
