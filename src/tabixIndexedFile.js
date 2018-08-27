@@ -218,8 +218,9 @@ class TabixIndexedFile {
     //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
     //   // )
     // }
+    const constantsObject = zlib.constants || zlib
     const uncompressed = await gunzip(compressedData, {
-      finishFlush: zlib.constants.Z_SYNC_FLUSH,
+      finishFlush: constantsObject.Z_SYNC_FLUSH,
     }).catch(e => {
       throw new Error(
         `error decompressing block ${e.code} at ${
