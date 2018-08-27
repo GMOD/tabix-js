@@ -1,5 +1,7 @@
 const promisify = require('util.promisify')
-const gunzip = promisify(require('zlib').gunzip)
+const zlib = require('zlib')
+
+const gunzip = promisify(zlib.gunzip)
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
 // const CSI = require('./csi')
@@ -59,6 +61,14 @@ class TabixIndexedFile {
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
   async getLines(refName, start, end, lineCallback) {
+    if (refName === undefined)
+      throw new TypeError('must provide a reference sequence name')
+    if (!(start < end))
+      throw new TypeError(
+        'invalid start and end coordinates. must be provided, and start must be less than end',
+      )
+    if (!lineCallback) throw new TypeError('line callback must be provided')
+
     const chunks = await this.index.blocksForRange(refName, start, end)
     const metadata = await this.index.getMetadata()
     metadata.maxColumn = Math.max(
@@ -111,6 +121,7 @@ class TabixIndexedFile {
           currentLineStart = i + 1
         }
       }
+      // any partial line at the end of the chunk will be discarded
     }
   }
 
@@ -189,26 +200,31 @@ class TabixIndexedFile {
    * @returns {Promise} for a Buffer of uncompressed data
    */
   async readChunk(chunk) {
-    const compressedSize = chunk.maxv.blockPosition - chunk.minv.blockPosition
-    const compressedData = Buffer.allocUnsafe(compressedSize)
+    const compressedSize = chunk.fetchedSize()
+    const compressedData = Buffer.alloc(compressedSize)
     const bytesRead = await this.filehandle.read(
       compressedData,
       0,
       compressedSize,
       chunk.minv.blockPosition,
     )
-    if (bytesRead !== compressedSize)
+    // if (bytesRead !== compressedSize) {
+    //   debugger
+    //   // throw new Error(
+    //   //   `failed to read block at ${
+    //   //     chunk.minv.blockPosition
+    //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
+    //   // )
+    // }
+    const uncompressed = await gunzip(compressedData, {
+      finishFlush: zlib.constants.Z_SYNC_FLUSH,
+    }).catch(e => {
       throw new Error(
-        `failed to read block at ${
-          chunk.minv.blockPosition
-        } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
-      )
-    const uncompressed = await gunzip(compressedData).catch(e => {
-      throw new Error(
-        `error decompressing block at ${
+        `error decompressing block ${e.code} at ${
           chunk.minv.blockPosition
         } (length ${compressedSize})`,
         e,
+        compressedData,
       )
     })
     return uncompressed.slice(chunk.minv.dataPosition)

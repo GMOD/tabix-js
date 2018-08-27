@@ -1,7 +1,10 @@
 // const { Parser } = require('binary-parser')
 const promisify = require('util.promisify')
+const zlib = require('zlib')
+
 const VirtualOffset = require('./virtualOffset')
-const gunzip = promisify(require('zlib').gunzip)
+
+const gunzip = promisify(zlib.gunzip)
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
@@ -27,14 +30,18 @@ class Chunk {
    * @param {VirtualOffset} minv
    * @param {VirtualOffset} maxv
    * @param {number} bin
+   * @param {number} [fetchedSize]
    */
-  constructor(minv, maxv, bin) {
+  constructor(minv, maxv, bin, fetchedSize) {
     this.minv = minv
     this.maxv = maxv
     this.bin = bin
+    this._fetchedSize = fetchedSize
   }
   toUniqueString() {
-    return `${this.minv}..${this.maxv} (bin ${this.bin})`
+    return `${this.minv}..${this.maxv} (bin ${this.bin}, fetchedSize ${
+      this.fetchedSize
+    })`
   }
   toString() {
     return this.toUniqueString()
@@ -47,7 +54,8 @@ class Chunk {
     )
   }
   fetchedSize() {
-    return this.maxv.blockPosition + (1 << 16) - this.minv.blockPosition + 1
+    if (this._fetchedSize !== undefined) return this._fetchedSize
+    return this.maxv.blockPosition + (1 << 16) - this.minv.blockPosition
   }
 }
 
