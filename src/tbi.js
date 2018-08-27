@@ -92,12 +92,14 @@ class TabixIndex {
 
   /**
    * @returns {Promise} for an object like
-   * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId }`
+   * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId, coordinateType, format }`
    */
   async getMetadata() {
     const {
       columnNumbers,
       metaChar,
+      format,
+      coordinateType,
       skipLines,
       refIdToName,
       refNameToId,
@@ -105,6 +107,8 @@ class TabixIndex {
     return {
       columnNumbers,
       metaChar,
+      format,
+      coordinateType,
       skipLines,
       refIdToName,
       refNameToId,
@@ -124,8 +128,13 @@ class TabixIndex {
     }
 
     // number of reference sequences in the index
-    const refCount = bytes.readInt32LE(4)
-    data.presetType = bytes.readInt32LE(8)
+    data.refCount = bytes.readInt32LE(4)
+    data.formatFlags = bytes.readInt32LE(8)
+    data.coordinateType =
+      data.formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
+    data.format = { 0: 'generic', 1: 'SAM', 2: 'VCF' }[data.formatFlags & 0xf]
+    if (!data.format)
+      throw new Error(`invalid Tabix preset format flags ${data.formatFlags}`)
     data.columnNumbers = {
       ref: bytes.readInt32LE(12),
       start: bytes.readInt32LE(16),
@@ -141,9 +150,9 @@ class TabixIndex {
     Object.assign(data, names)
 
     // read the indexes for each reference sequence
-    data.indices = new Array(refCount)
+    data.indices = new Array(data.refCount)
     let currOffset = 36 + nameSectionLength
-    for (let i = 0; i < refCount; i += 1) {
+    for (let i = 0; i < data.refCount; i += 1) {
       // the binning index
       const binCount = bytes.readInt32LE(currOffset)
       currOffset += 4

@@ -16,6 +16,16 @@ describe('tabix file', () => {
       expect(parseInt(item[1], 10)).toBeGreaterThan(999)
       expect(parseInt(item[1], 10)).toBeLessThan(4001)
     })
+
+    items.length = 0
+    await f.getLines('contigA', 3000, 3000, items.push.bind(items))
+    expect(items.length).toEqual(0)
+    items.length = 0
+    await f.getLines('contigA', 2999, 3000, items.push.bind(items))
+    expect(items.length).toEqual(1)
+    items.length = 0
+    await f.getLines('contigA', 3000, 3001, items.push.bind(items))
+    expect(items.length).toEqual(0)
   })
   it('can count lines', async () => {
     const f = new TabixIndexedFile({
@@ -62,5 +72,36 @@ describe('tabix file', () => {
     lines.length = 0
     await f.getLines('ctgA', 0, Infinity, l => lines.push(l))
     expect(lines.length).toEqual(237)
+    lines.length = 0
+    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    expect(lines.length).toEqual(4)
+    lines.length = 0
+    await f.getLines('ctgB', 0, 4715, l => lines.push(l))
+    expect(lines.length).toEqual(4)
+    lines.length = 0
+    await f.getLines('ctgB', 1, 4714, l => lines.push(l))
+    expect(lines.length).toEqual(3)
+  })
+  it('can query gvcf.vcf.gz', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/gvcf.vcf.gz'),
+    })
+
+    const lines = []
+    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    expect(lines.length).toEqual(0)
+
+    await f.getLines('ctgA', -2, 3000, lines.push.bind(lines))
+    expect(lines.length).toEqual(0)
+    await f.getLines('ctgA', -50, -20, lines.push.bind(lines))
+    expect(lines.length).toEqual(0)
+    await f.getLines('ctgA', 4000, 5000, lines.push.bind(lines))
+    expect(lines.length).toEqual(7)
+    lines.length = 0
+    await f.getLines('ctgA', 4370, 4371, lines.push.bind(lines))
+    expect(lines.length).toEqual(0)
+    lines.length = 0
+    await f.getLines('ctgA', 4369, 4370, lines.push.bind(lines))
+    expect(lines.length).toEqual(1)
   })
 })

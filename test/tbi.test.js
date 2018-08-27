@@ -16,5 +16,16 @@ describe('tbi index', () => {
     expect(blocks[0].minv.blockPosition).toEqual(0)
     expect(blocks[0].minv.dataPosition).toEqual(10431)
     // console.log( blocks );
+
+    const metadata = await ti.getMetadata()
+    expect(metadata).toEqual({
+      columnNumbers: { end: 0, ref: 1, start: 2 },
+      coordinateType: '1-based-closed',
+      format: 'VCF',
+      metaChar: '#',
+      refIdToName: ['contigA'],
+      refNameToId: { contigA: 0 },
+      skipLines: 0,
+    })
   })
 })

@@ -44,10 +44,13 @@ class TabixIndexedFile {
     else if (csiFilehandle) this.index = new CSI(csiFilehandle)
     else if (tbiPath) this.index = new TBI(new LocalFile(tbiPath))
     else if (csiPath) this.index = new CSI(new LocalFile(csiPath))
-    else
+    else if (path) {
+      this.index = new TBI(new LocalFile(`${path}.tbi`))
+    } else {
       throw new TypeError(
         'must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath',
       )
+    }
 
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
@@ -55,17 +58,17 @@ class TabixIndexedFile {
 
   /**
    * @param {string} refName name of the reference sequence
-   * @param {number} start start of the region (in native coordinates for the file)
-   * @param {number} end end of the region (in native coordinates for the file)
+   * @param {number} start start of the region (in 0-based half-open coordinates)
+   * @param {number} end end of the region (in 0-based half-open coordinates)
    * @param {function} lineCallback callback called for each line in the region
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
   async getLines(refName, start, end, lineCallback) {
     if (refName === undefined)
       throw new TypeError('must provide a reference sequence name')
-    if (!(start < end))
+    if (!(start <= end))
       throw new TypeError(
-        'invalid start and end coordinates. must be provided, and start must be less than end',
+        'invalid start and end coordinates. must be provided, and start must be less than or equal to end',
       )
     if (!lineCallback) throw new TypeError('line callback must be provided')
 
@@ -129,13 +132,13 @@ class TabixIndexedFile {
    * @param {object} metadata metadata object from the parsed index,
    * containing columnNumbers, metaChar, and maxColumn
    * @param {string} regionRefName
-   * @param {number} regionStart
-   * @param {number} regionEnd
+   * @param {number} regionStart region start coordinate (0-based-half-open)
+   * @param {number} regionEnd region end coordinate (0-based-half-open)
    * @param {string} line
    * @returns {boolean} whether the line is a data line that overlaps the given region
    */
   lineOverlapsRegion(
-    { columnNumbers, metaChar, maxColumn },
+    { columnNumbers, metaChar, maxColumn, coordinateType },
     regionRefName,
     regionStart,
     regionEnd,
@@ -163,10 +166,9 @@ class TabixIndexedFile {
           const refName = line.slice(currentColumnStart, i)
           if (refName !== regionRefName) return false
         } else if (currentColumnNumber === start) {
-          const startCoordinate = parseInt(
-            line.slice(currentColumnStart, i),
-            10,
-          )
+          let startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
+          // we convert to 0-based-half-open
+          if (coordinateType === '1-based-closed') startCoordinate -= 1
           if (startCoordinate >= regionEnd) return false
           if (end === 0) {
             // if we have no end, we assume the feature is 1 bp long
