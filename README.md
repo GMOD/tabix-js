@@ -1,4 +1,4 @@
-# example
+# @gmod/tabix
 
 [![NPM version](https://img.shields.io/npm/v/@gmod/tabix.svg?style=flat-square)](https://npmjs.org/package/@gmod/tabix)
 [![Build Status](https://img.shields.io/travis/GMOD/tabix-js/master.svg?style=flat-square)](https://travis-ci.org/GMOD/tabix-js) 
@@ -32,7 +32,7 @@ await tbiIndexed.getLines('ctgA',200,300, line => lines.push(line))
 // line strings do not include any trailing whitespace characters.
 
 // get the approximate number of data lines in the
-// file for the given reference sequence, excluding header, commenat, and whitespace lines
+// file for the given reference sequence, excluding header, comment, and whitespace lines
 const numLines = await tbiIndex.lineCount('ctgA')
 ```
 
