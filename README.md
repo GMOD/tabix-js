@@ -15,8 +15,8 @@ Read Tabix-indexed files using either .tbi or .csi indexes.
 const {TabixIndexedFile} = require('@gmod/tabix')
 
 const tbiIndexed = new TabixIndexedFile({ path: 'path/to/my/file.gz' })
-// assumes tabix index at path/to/my/file.gz.tbi. can also provide `tbiPath`
-// if the TBI is not named according to that pattern
+// by default, assumes tabix index at path/to/my/file.gz.tbi.
+// can also provide `tbiPath` if the TBI is named differently
 
 // can also open tabix files that have a .csi index
 const csiIndexed = new TabixIndexedFile({
