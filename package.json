@@ -1,9 +1,9 @@
 {
-  "name": "tabix",
+  "name": "@gmod/tabix",
   "version": "0.0.1-alpha.0",
   "description": "Read Tabix-indexed files, supports both .tbi and .csi indexes",
   "license": "MIT",
-  "repository": "GMOD/tabix",
+  "repository": "GMOD/tabix-js",
   "main": "dist/index.js",
   "author": {
     "name": "Robert Buels",
