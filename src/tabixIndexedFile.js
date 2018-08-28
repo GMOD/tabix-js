@@ -4,7 +4,7 @@ const zlib = require('zlib')
 const gunzip = promisify(zlib.gunzip)
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
-// const CSI = require('./csi')
+const CSI = require('./csi')
 
 function timeout(time) {
   return new Promise(resolve => {

@@ -2,31 +2,48 @@
 const promisify = require('util.promisify')
 const zlib = require('zlib')
 
+const TabixIndex = require('./tbi')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
 const gunzip = promisify(zlib.gunzip)
 
-const TBI_MAGIC = 21578324 // TBI\1
-const TAD_LIDX_SHIFT = 14
+const CSI1_MAGIC = 21582659 // CSI\1
+const CSI2_MAGIC = 38359875 // CSI\2
+const MAX_BINS = 1000000
 
+function lshift(num, bits) {
+  return num * 2 ** bits
+}
+function rshift(num, bits) {
+  return Math.floor(num / 2 ** bits)
+}
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
  * @returns {Array[number]}
  */
-function reg2bins(beg, end) {
-  beg += 1 // < convert to 1-based closed
+function reg2bins(beg, end, minShift, depth) {
+  beg -= 1 // < convert to 1-based closed
+  if (beg < 1) beg = 1
+  if (end > 2 ** 50) end = 2 ** 34 // 17 GiB ought to be enough for anybody
   end -= 1
-  const list = [0]
-  for (let k = 1 + (beg >> 26); k <= 1 + (end >> 26); k += 1) list.push(k)
-  for (let k = 9 + (beg >> 23); k <= 9 + (end >> 23); k += 1) list.push(k)
-  for (let k = 73 + (beg >> 20); k <= 73 + (end >> 20); k += 1) list.push(k)
-  for (let k = 585 + (beg >> 17); k <= 585 + (end >> 17); k += 1) list.push(k)
-  for (let k = 4681 + (beg >> 14); k <= 4681 + (end >> 14); k += 1) list.push(k)
-  return list
+  let l = 0
+  let t = 0
+  let s = minShift + depth * 3
+  const bins = []
+  for (; l <= depth; s -= 3, t += lshift(1, l * 3), l += 1) {
+    const b = t + rshift(beg, s)
+    const e = t + rshift(end, s)
+    if (e - b + bins.length > MAX_BINS)
+      throw new Error(
+        `query ${beg}-${end} is too large for current binning scheme (shift ${minShift}, depth ${depth}), try a smaller query or a coarser index binning scheme`,
+      )
+    for (let i = b; i <= e; i += 1) bins.push(i)
+  }
+  return bins
 }
 
-class TabixIndex {
+class CSI {
   /**
    * @param {filehandle} filehandle
    */
@@ -81,76 +98,31 @@ class TabixIndex {
     }
   }
 
-  // memoize
-  // fetch and parse the index
-  async parse() {
-    const data = { depth: 5 }
-    const bytes = await gunzip(await this.filehandle.readFile())
-
-    // check TBI magic numbers
-    if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
-      throw new Error('Not a TBI file')
-      // TODO: do we need to support big-endian TBI files?
-    }
-
-    // number of reference sequences in the index
-    data.refCount = bytes.readInt32LE(4)
-    data.formatFlags = bytes.readInt32LE(8)
+  parseAuxData(bytes, offset, auxLength) {
+    // TODO
+    const data = {}
+    data.formatFlags = bytes.readInt32LE(offset)
     data.coordinateType =
       data.formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
     data.format = { 0: 'generic', 1: 'SAM', 2: 'VCF' }[data.formatFlags & 0xf]
     if (!data.format)
       throw new Error(`invalid Tabix preset format flags ${data.formatFlags}`)
     data.columnNumbers = {
-      ref: bytes.readInt32LE(12),
-      start: bytes.readInt32LE(16),
-      end: bytes.readInt32LE(20),
+      ref: bytes.readInt32LE(offset + 4),
+      start: bytes.readInt32LE(offset + 8),
+      end: bytes.readInt32LE(offset + 12),
     }
-    data.metaValue = bytes.readInt32LE(24)
-    data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : null
-    data.skipLines = bytes.readInt32LE(28)
+    data.metaValue = bytes.readInt32LE(offset + 16)
+    data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : ''
+    data.skipLines = bytes.readInt32LE(offset + 20)
+    const nameSectionLength = bytes.readInt32LE(offset + 24)
 
-    // read sequence dictionary
-    const nameSectionLength = bytes.readInt32LE(32)
-    const names = this._parseNameBytes(bytes.slice(36, 36 + nameSectionLength))
-    Object.assign(data, names)
-
-    // read the indexes for each reference sequence
-    data.indices = new Array(data.refCount)
-    let currOffset = 36 + nameSectionLength
-    for (let i = 0; i < data.refCount; i += 1) {
-      // the binning index
-      const binCount = bytes.readInt32LE(currOffset)
-      currOffset += 4
-      const binIndex = {}
-      for (let j = 0; j < binCount; j += 1) {
-        const bin = bytes.readUInt32LE(currOffset)
-        const chunkCount = bytes.readInt32LE(currOffset + 4)
-        const chunks = new Array(chunkCount)
-        currOffset += 8
-        for (let k = 0; k < chunkCount; k += 1) {
-          const u = VirtualOffset.fromBytes(bytes, currOffset)
-          const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
-          currOffset += 16
-          this._findFirstData(u)
-          chunks[k] = new Chunk(u, v, bin)
-        }
-        binIndex[bin] = chunks
-      }
-
-      // the linear index
-      const linearCount = bytes.readInt32LE(currOffset)
-      currOffset += 4
-      const linearIndex = new Array(linearCount)
-      for (let k = 0; k < linearCount; k += 1) {
-        linearIndex[k] = VirtualOffset.fromBytes(bytes, currOffset)
-        currOffset += 8
-        this._findFirstData(linearIndex[k])
-      }
-
-      data.indices[i] = { binIndex, linearIndex }
-    }
-
+    Object.assign(
+      data,
+      this._parseNameBytes(
+        bytes.slice(offset + 28, offset + 28 + nameSectionLength),
+      ),
+    )
     return data
   }
 
@@ -173,6 +145,60 @@ class TabixIndex {
     return { refNameToId, refIdToName }
   }
 
+  // memoize
+  // fetch and parse the index
+  async parse() {
+    const data = { csi: true }
+    const bytes = await gunzip(await this.filehandle.readFile())
+
+    // check TBI magic numbers
+    if (bytes.readUInt32LE(0) === CSI1_MAGIC) {
+      data.csiVersion = 1
+    } else if (bytes.readUInt32LE(0) === CSI2_MAGIC) {
+      data.csiVersion = 2
+    } else {
+      throw new Error('Not a CSI file')
+      // TODO: do we need to support big-endian CSI files?
+    }
+
+    data.minShift = bytes.readInt32LE(4)
+    data.depth = bytes.readInt32LE(8)
+    const auxLength = bytes.readInt32LE(12)
+    if (auxLength) {
+      Object.assign(data, this.parseAuxData(bytes, 16, auxLength))
+    }
+    data.refCount = bytes.readInt32LE(16 + auxLength)
+
+    // read the indexes for each reference sequence
+    data.indices = new Array(data.refCount)
+    let currOffset = 16 + auxLength + 4
+    for (let i = 0; i < data.refCount; i += 1) {
+      // the binning index
+      const binCount = bytes.readInt32LE(currOffset)
+      currOffset += 4
+      const binIndex = {}
+      for (let j = 0; j < binCount; j += 1) {
+        const bin = bytes.readUInt32LE(currOffset)
+        const loffset = VirtualOffset.fromBytes(bytes, currOffset + 4)
+        const chunkCount = bytes.readInt32LE(currOffset + 12)
+        currOffset += 16
+        const chunks = new Array(chunkCount)
+        for (let k = 0; k < chunkCount; k += 1) {
+          const u = VirtualOffset.fromBytes(bytes, currOffset)
+          const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
+          currOffset += 16
+          this._findFirstData(u)
+          chunks[k] = new Chunk(u, v, bin)
+        }
+        binIndex[bin] = chunks
+      }
+
+      data.indices[i] = { binIndex }
+    }
+
+    return data
+  }
+
   async blocksForRange(refName, beg, end) {
     if (beg < 0) beg = 0
 
@@ -182,17 +208,9 @@ class TabixIndex {
     const indexes = indexData.indices[refId]
     if (!indexes) return []
 
-    const { linearIndex, binIndex } = indexes
+    const { binIndex } = indexes
 
-    const bins = reg2bins(beg, end)
-
-    const minOffset = linearIndex.length
-      ? linearIndex[
-          beg >> TAD_LIDX_SHIFT >= linearIndex.length
-            ? linearIndex.length - 1
-            : beg >> TAD_LIDX_SHIFT
-        ]
-      : new VirtualOffset(0, 0)
+    const bins = reg2bins(beg, end, indexData.minShift, indexData.depth)
 
     let l
     let numOffsets = 0
@@ -207,15 +225,14 @@ class TabixIndex {
     for (let i = 0; i < bins.length; i += 1) {
       const chunks = binIndex[bins[i]]
       if (chunks)
-        for (let j = 0; j < chunks.length; j += 1)
-          if (minOffset.compareTo(chunks[j].maxv) < 0) {
-            off[numOffsets] = new Chunk(
-              chunks[j].minv,
-              chunks[j].maxv,
-              chunks[j].bin,
-            )
-            numOffsets += 1
-          }
+        for (let j = 0; j < chunks.length; j += 1) {
+          off[numOffsets] = new Chunk(
+            chunks[j].minv,
+            chunks[j].maxv,
+            chunks[j].bin,
+          )
+          numOffsets += 1
+        }
     }
 
     if (!off.length) return []
@@ -266,6 +283,6 @@ function tinyMemoize(_class, methodName) {
   }
 }
 // memoize index.parse()
-tinyMemoize(TabixIndex, 'parse')
+tinyMemoize(CSI, 'parse')
 
-module.exports = TabixIndex
+module.exports = CSI
