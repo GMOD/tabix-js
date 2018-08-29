@@ -27,6 +27,16 @@ class VirtualOffset {
       this.blockPosition - b.blockPosition || this.dataPosition - b.dataPosition
     )
   }
+
+  static min(...args) {
+    let min
+    let i = 0
+    for (; !min; i += 1) min = args[i]
+    for (; i < args.length; i += 1) {
+      if (min.compareTo(args[i]) > 0) min = args[i]
+    }
+    return min
+  }
 }
 
 module.exports = VirtualOffset

@@ -102,7 +102,12 @@ class TabixIndexedFile {
       for (let i = 0; i < chunkData.length; i += 1) {
         if (chunkData[i] === newLineByte) {
           if (currentLineStart < i) {
-            const line = chunkData.toString('utf8', currentLineStart, i).trim()
+            // eslint-disable-next-line no-new-wrappers
+            const line = new String(
+              chunkData.toString('utf8', currentLineStart, i).trim(),
+            )
+            line.fileOffset =
+              (chunks[chunkNum].minv.blockPosition << 16) + currentLineStart
             // filter the line for whether it is within the requested range
             if (this.lineOverlapsRegion(metadata, refName, start, end, line)) {
               foundStart = true
@@ -126,6 +131,10 @@ class TabixIndexedFile {
       }
       // any partial line at the end of the chunk will be discarded
     }
+  }
+
+  async getMetadata() {
+    return this.index.getMetadata()
   }
 
   /**
@@ -202,9 +211,16 @@ class TabixIndexedFile {
    * @returns {Promise} for a Buffer of uncompressed data
    */
   async readChunk(chunk) {
-    const compressedSize = chunk.fetchedSize()
+    let compressedSize = chunk.fetchedSize()
+
+    // prevent reading beyond the end of the file, pako does not
+    // like trailing zeroes in the buffer
+    const { size: fileSize } = await this.filehandle.stat()
+    if (compressedSize > fileSize) compressedSize = fileSize
+
     const compressedData = Buffer.alloc(compressedSize)
-    const bytesRead = await this.filehandle.read(
+
+    /* const bytesRead = */ await this.filehandle.read(
       compressedData,
       0,
       compressedSize,
@@ -220,6 +236,8 @@ class TabixIndexedFile {
     // }
     const constantsObject = zlib.constants || zlib
     const uncompressed = await gunzip(compressedData, {
+      // this finishFlush option keeps gunzip from throwing
+      // an error if the data has a partial block
       finishFlush: constantsObject.Z_SYNC_FLUSH,
     }).catch(e => {
       throw new Error(

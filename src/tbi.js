@@ -34,16 +34,6 @@ class TabixIndex {
     this.filehandle = filehandle
   }
 
-  _findFirstData(virtualOffset) {
-    const currentFdl = this.firstDataLine
-    if (currentFdl) {
-      this.firstDataLine =
-        currentFdl.compareTo(virtualOffset) > 0 ? virtualOffset : currentFdl
-    } else {
-      this.firstDataLine = virtualOffset
-    }
-  }
-
   async lineCount(refName) {
     const indexData = await this.parse()
     if (!indexData) return -1
@@ -69,6 +59,8 @@ class TabixIndex {
       skipLines,
       refIdToName,
       refNameToId,
+      firstDataLine,
+      maxBlockSize,
     } = await this.parse()
     return {
       columnNumbers,
@@ -78,13 +70,15 @@ class TabixIndex {
       skipLines,
       refIdToName,
       refNameToId,
+      firstDataLine,
+      maxBlockSize,
     }
   }
 
   // memoize
   // fetch and parse the index
   async parse() {
-    const data = { depth: 5 }
+    const data = { depth: 5, maxBlockSize: 1<<16 }
     const bytes = await gunzip(await this.filehandle.readFile())
 
     // check TBI magic numbers
@@ -132,7 +126,7 @@ class TabixIndex {
           const u = VirtualOffset.fromBytes(bytes, currOffset)
           const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
           currOffset += 16
-          this._findFirstData(u)
+          data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
           chunks[k] = new Chunk(u, v, bin)
         }
         binIndex[bin] = chunks
@@ -145,7 +139,10 @@ class TabixIndex {
       for (let k = 0; k < linearCount; k += 1) {
         linearIndex[k] = VirtualOffset.fromBytes(bytes, currOffset)
         currOffset += 8
-        this._findFirstData(linearIndex[k])
+        data.firstDataLine = VirtualOffset.min(
+          data.firstDataLine,
+          linearIndex[k],
+        )
       }
 
       data.indices[i] = { binIndex, linearIndex }

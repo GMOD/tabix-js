@@ -30,6 +30,8 @@ await tbiIndexed.getLines('ctgA',200,300, line => lines.push(line))
 // lines is now an array of strings, which are data lines.
 // commented (meta) lines are skipped.
 // line strings do not include any trailing whitespace characters.
+// additionally, each line string has a special `fileOffset` property,
+// which gives a virtual file offset where the line is found in the file
 
 // get the approximate number of data lines in the
 // file for the given reference sequence, excluding header, comment, and whitespace lines

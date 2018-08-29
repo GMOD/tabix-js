@@ -51,13 +51,13 @@ class CSI {
     this.filehandle = filehandle
   }
 
-  _findFirstData(virtualOffset) {
-    const currentFdl = this.firstDataLine
+  _findFirstData(data, virtualOffset) {
+    const currentFdl = data.firstDataLine
     if (currentFdl) {
-      this.firstDataLine =
+      data.firstDataLine =
         currentFdl.compareTo(virtualOffset) > 0 ? virtualOffset : currentFdl
     } else {
-      this.firstDataLine = virtualOffset
+      data.firstDataLine = virtualOffset
     }
   }
 
@@ -85,7 +85,9 @@ class CSI {
       coordinateType,
       skipLines,
       refIdToName,
+      maxBlockSize,
       refNameToId,
+      firstDataLine,
     } = await this.parse()
     return {
       columnNumbers,
@@ -93,13 +95,16 @@ class CSI {
       format,
       coordinateType,
       skipLines,
+      maxBlockSize,
       refIdToName,
       refNameToId,
+      firstDataLine,
     }
   }
 
   parseAuxData(bytes, offset, auxLength) {
-    // TODO
+    if (auxLength < 30) return {}
+
     const data = {}
     data.formatFlags = bytes.readInt32LE(offset)
     data.coordinateType =
@@ -148,7 +153,7 @@ class CSI {
   // memoize
   // fetch and parse the index
   async parse() {
-    const data = { csi: true }
+    const data = { csi: true, maxBlockSize: 1 << 16 }
     const bytes = await gunzip(await this.filehandle.readFile())
 
     // check TBI magic numbers
@@ -180,6 +185,7 @@ class CSI {
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
         const loffset = VirtualOffset.fromBytes(bytes, currOffset + 4)
+        this._findFirstData(data, loffset)
         const chunkCount = bytes.readInt32LE(currOffset + 12)
         currOffset += 16
         const chunks = new Array(chunkCount)
@@ -187,7 +193,7 @@ class CSI {
           const u = VirtualOffset.fromBytes(bytes, currOffset)
           const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
           currOffset += 16
-          this._findFirstData(u)
+          this._findFirstData(data, u)
           chunks[k] = new Chunk(u, v, bin)
         }
         binIndex[bin] = chunks

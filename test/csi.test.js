@@ -1,3 +1,4 @@
+const VirtualOffset = require('../src/virtualOffset')
 const CSI = require('../src/csi')
 const LocalFile = require('../src/localFile')
 
@@ -24,10 +25,12 @@ describe('csi index', () => {
       columnNumbers: { end: 5, ref: 1, start: 4 },
       coordinateType: '1-based-closed',
       format: 'generic',
+      firstDataLine: new VirtualOffset(0, 109),
       metaChar: '#',
       refIdToName: ['1', 'ctgB'],
       refNameToId: { 1: 0, ctgB: 1 },
       skipLines: 0,
+      maxBlockSize: 1 << 16,
     })
   })
   it('loads test.gff3.gz.csi', async () => {
@@ -53,8 +56,10 @@ describe('csi index', () => {
       coordinateType: '1-based-closed',
       format: 'VCF',
       metaChar: '#',
+      firstDataLine: new VirtualOffset(0, 109),
       refIdToName: ['1'],
       refNameToId: { 1: 0 },
+      maxBlockSize: 1 << 16,
       skipLines: 0,
     })
   })

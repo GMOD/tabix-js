@@ -1,4 +1,5 @@
 const TabixIndexedFile = require('../src/tabixIndexedFile')
+const VirtualOffset = require('../src/virtualOffset')
 
 describe('tabix file', () => {
   it('can read ctgA:1000..4000', async () => {
@@ -26,6 +27,18 @@ describe('tabix file', () => {
     items.length = 0
     await f.getLines('contigA', 3000, 3001, items.push.bind(items))
     expect(items.length).toEqual(0)
+
+    expect(await f.getMetadata()).toEqual({
+      columnNumbers: { end: 0, ref: 1, start: 2 },
+      coordinateType: '1-based-closed',
+      maxBlockSize: 1 << 16,
+      format: 'VCF',
+      metaChar: '#',
+      firstDataLine: new VirtualOffset(0, 109),
+      refIdToName: ['contigA'],
+      refNameToId: { contigA: 0 },
+      skipLines: 0,
+    })
   })
   it('can count lines', async () => {
     const f = new TabixIndexedFile({

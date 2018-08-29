@@ -1,3 +1,4 @@
+const VirtualOffset = require('../src/virtualOffset')
 const TabixIndex = require('../src/tbi')
 const LocalFile = require('../src/localFile')
 
@@ -23,8 +24,10 @@ describe('tbi index', () => {
       coordinateType: '1-based-closed',
       format: 'VCF',
       metaChar: '#',
+      firstDataLine: new VirtualOffset(0, 109),
       refIdToName: ['contigA'],
       refNameToId: { contigA: 0 },
+      maxBlockSize: 1 << 16,
       skipLines: 0,
     })
   })
