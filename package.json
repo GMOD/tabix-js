@@ -37,7 +37,7 @@
   "jest": {
     "testEnvironment": "node"
   },
-  "keywords": [],
+  "keywords": ["bionode", "biojs", "genomics"],
   "dependencies": {
     "util.promisify": "^1.0.0"
   },
