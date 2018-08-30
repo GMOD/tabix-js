@@ -254,7 +254,8 @@ class TabixIndexedFile {
     // prevent reading beyond the end of the file, pako does not
     // like trailing zeroes in the buffer
     const { size: fileSize } = await this.filehandle.stat()
-    if (compressedSize > fileSize) compressedSize = fileSize
+    if (position + compressedSize > fileSize)
+      compressedSize = fileSize - position
 
     const compressedData = Buffer.alloc(compressedSize)
 
