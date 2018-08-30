@@ -28,6 +28,10 @@ describe('tabix file', () => {
     await f.getLines('contigA', 3000, 3001, items.push.bind(items))
     expect(items.length).toEqual(0)
 
+    const headerString = await f.getHeader()
+    expect(headerString.length).toEqual(10431)
+    expect(headerString[headerString.length - 1]).toEqual('\n')
+
     expect(await f.getMetadata()).toEqual({
       columnNumbers: { end: 0, ref: 1, start: 2 },
       coordinateType: '1-based-closed',
@@ -73,6 +77,10 @@ describe('tabix file', () => {
       tbiPath: require.resolve('./data/volvox.sort.gff3.gz.tbi'),
     })
 
+    const headerString = await f.getHeader()
+    expect(headerString[headerString.length - 1]).toEqual('\n')
+    expect(headerString.length).toEqual(130)
+
     const lines = []
     await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
     expect(lines.length).toEqual(4)
@@ -100,6 +108,10 @@ describe('tabix file', () => {
       path: require.resolve('./data/gvcf.vcf.gz'),
     })
 
+    const headerString = await f.getHeader()
+    expect(headerString.length).toEqual(53)
+    expect(headerString[headerString.length - 1]).toEqual('\n')
+
     const lines = []
     await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
     expect(lines.length).toEqual(0)
@@ -123,6 +135,10 @@ describe('tabix file', () => {
       path: require.resolve('./data/test.vcf.gz'),
       csiPath: require.resolve('./data/test.vcf.gz.csi'),
     })
+
+    const headerString = await f.getHeader()
+    expect(headerString.length).toEqual(2560)
+    expect(headerString[headerString.length - 1]).toEqual('\n')
 
     const lines = []
     await f.getLines('ctgB', 0, Infinity, l => lines.push(l))

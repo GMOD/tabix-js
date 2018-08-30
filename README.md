@@ -35,7 +35,11 @@ await tbiIndexed.getLines('ctgA',200,300, line => lines.push(line))
 
 // get the approximate number of data lines in the
 // file for the given reference sequence, excluding header, comment, and whitespace lines
-const numLines = await tbiIndex.lineCount('ctgA')
+const numLines = await tbiIndexed.lineCount('ctgA')
+
+// get the "header text" from the file, which is the first contiguous set of lines
+// in the file that all start with a "meta" character (usually #)
+const headerText = await tbiIndexed.getHeader()
 ```
 
 ## API

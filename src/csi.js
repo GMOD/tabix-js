@@ -2,7 +2,6 @@
 const promisify = require('util.promisify')
 const zlib = require('zlib')
 
-const TabixIndex = require('./tbi')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
@@ -193,7 +192,7 @@ class CSI {
           const u = VirtualOffset.fromBytes(bytes, currOffset)
           const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
           currOffset += 16
-          //this._findFirstData(data, u)
+          // this._findFirstData(data, u)
           chunks[k] = new Chunk(u, v, bin)
         }
         binIndex[bin] = chunks

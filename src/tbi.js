@@ -78,7 +78,7 @@ class TabixIndex {
   // memoize
   // fetch and parse the index
   async parse() {
-    const data = { depth: 5, maxBlockSize: 1<<16 }
+    const data = { depth: 5, maxBlockSize: 1 << 16 }
     const bytes = await gunzip(await this.filehandle.readFile())
 
     // check TBI magic numbers

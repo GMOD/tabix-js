@@ -138,6 +138,38 @@ class TabixIndexedFile {
   }
 
   /**
+   * get the "header" region of the file, which are the
+   * bytes up to the first non-meta line
+   */
+  async getHeader() {
+    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata()
+    const maxFetch =
+      firstDataLine && firstDataLine.blockPosition
+        ? firstDataLine.blockPosition + maxBlockSize
+        : maxBlockSize
+    // TODO: what if we don't have a firstDataLine, and the header
+    // actually takes up more than one block? this case is not covered here
+
+    let bytes = await this._readRegion(0, maxFetch)
+    // trim off lines after the last non-meta line
+    if (metaChar) {
+      // trim backward from the end
+      let lastNewline = -1
+      const newlineByte = '\n'.charCodeAt(0)
+      const metaByte = metaChar.charCodeAt(0)
+      for (let i = 0; i < bytes.length; i += 1) {
+        if (bytes[i] === newlineByte) {
+          lastNewline = i
+          i += 1
+          if (bytes[i] !== metaByte) break
+        }
+      }
+      bytes = bytes.slice(0, lastNewline + 1)
+    }
+    return bytes.toString('utf8')
+  }
+
+  /**
    * @param {object} metadata metadata object from the parsed index,
    * containing columnNumbers, metaChar, and maxColumn
    * @param {string} regionRefName
@@ -204,15 +236,7 @@ class TabixIndexedFile {
     return this.index.lineCount(refSeq)
   }
 
-  /**
-   * read and uncompress the data in a chunk (composed of one or more
-   * contiguous bgzip blocks) of the file
-   * @param {Chunk} chunk
-   * @returns {Promise} for a Buffer of uncompressed data
-   */
-  async readChunk(chunk) {
-    let compressedSize = chunk.fetchedSize()
-
+  async _readRegion(position, compressedSize) {
     // prevent reading beyond the end of the file, pako does not
     // like trailing zeroes in the buffer
     const { size: fileSize } = await this.filehandle.stat()
@@ -224,7 +248,7 @@ class TabixIndexedFile {
       compressedData,
       0,
       compressedSize,
-      chunk.minv.blockPosition,
+      position,
     )
     // if (bytesRead !== compressedSize) {
     //   debugger
@@ -234,20 +258,34 @@ class TabixIndexedFile {
     //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
     //   // )
     // }
-    const constantsObject = zlib.constants || zlib
     const uncompressed = await gunzip(compressedData, {
       // this finishFlush option keeps gunzip from throwing
       // an error if the data has a partial block
-      finishFlush: constantsObject.Z_SYNC_FLUSH,
+      finishFlush: (zlib.constants || zlib).Z_SYNC_FLUSH,
     }).catch(e => {
       throw new Error(
-        `error decompressing block ${e.code} at ${
-          chunk.minv.blockPosition
-        } (length ${compressedSize})`,
+        `error decompressing block ${
+          e.code
+        } at ${position} (length ${compressedSize})`,
         e,
         compressedData,
       )
     })
+    return uncompressed
+  }
+
+  /**
+   * read and uncompress the data in a chunk (composed of one or more
+   * contiguous bgzip blocks) of the file
+   * @param {Chunk} chunk
+   * @returns {Promise} for a Buffer of uncompressed data
+   */
+  async readChunk(chunk) {
+    const compressedSize = chunk.fetchedSize()
+    const uncompressed = await this._readRegion(
+      chunk.minv.blockPosition,
+      compressedSize,
+    )
     return uncompressed.slice(chunk.minv.dataPosition)
   }
 }
