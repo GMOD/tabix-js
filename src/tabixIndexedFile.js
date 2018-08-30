@@ -138,10 +138,13 @@ class TabixIndexedFile {
   }
 
   /**
-   * get the "header" region of the file, which are the
-   * bytes up to the first non-meta line
+   * get a buffer containing the "header" region of
+   * the file, which are the bytes up to the first
+   * non-meta line
+   *
+   * @returns {Promise} for a buffer
    */
-  async getHeader() {
+  async getHeaderBuffer() {
     const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata()
     const maxFetch =
       firstDataLine && firstDataLine.blockPosition
@@ -166,6 +169,17 @@ class TabixIndexedFile {
       }
       bytes = bytes.slice(0, lastNewline + 1)
     }
+    return bytes
+  }
+
+  /**
+   * get a string containing the "header" region of the
+   * file, is the portion up to the first non-meta line
+   *
+   * @returns {Promise} for a string
+   */
+  async getHeader() {
+    const bytes = await this.getHeaderBuffer()
     return bytes.toString('utf8')
   }
 
