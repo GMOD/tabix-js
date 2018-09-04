@@ -37,8 +37,13 @@
   "jest": {
     "testEnvironment": "node"
   },
-  "keywords": ["bionode", "biojs", "genomics"],
+  "keywords": [
+    "bionode",
+    "biojs",
+    "genomics"
+  ],
   "dependencies": {
+    "@gmod/bgzf-filehandle": "^1.2.1",
     "util.promisify": "^1.0.0"
   },
   "devDependencies": {

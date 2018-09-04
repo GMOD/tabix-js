@@ -4,9 +4,9 @@ const LocalFile = require('../src/localFile')
 
 describe('csi index', () => {
   it('loads test.gff3.gz.csi', async () => {
-    const ti = new CSI(
-      new LocalFile(require.resolve('./data/test.gff3.gz.csi')),
-    )
+    const ti = new CSI({
+      filehandle: new LocalFile(require.resolve('./data/test.gff3.gz.csi')),
+    })
     const indexData = await ti.parse()
     expect(indexData.columnNumbers.start).toEqual(4)
     expect(indexData.columnNumbers.ref).toEqual(1)
@@ -34,7 +34,9 @@ describe('csi index', () => {
     })
   })
   it('loads test.gff3.gz.csi', async () => {
-    const ti = new CSI(new LocalFile(require.resolve('./data/test.vcf.gz.csi')))
+    const ti = new CSI({
+      filehandle: new LocalFile(require.resolve('./data/test.vcf.gz.csi')),
+    })
     const indexData = await ti.parse()
     expect(indexData.columnNumbers.start).toEqual(2)
     expect(indexData.columnNumbers.ref).toEqual(1)

@@ -1,7 +1,5 @@
-const promisify = require('util.promisify')
-const zlib = require('zlib')
+const { unzip } = require('@gmod/bgzf-filehandle')
 
-const gunzip = promisify(zlib.gunzip)
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
 const CSI = require('./csi')
@@ -25,6 +23,9 @@ class TabixIndexedFile {
    * default 2MiB
    * @param {number} [args.yieldLimit] maximum number of lines to parse without yielding.
    * this avoids having a large read prevent any other work getting done on the thread.  default 300 lines.
+   * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
+   * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
+   * not altered, just the names of the reference sequences that are used for querying.
    */
   constructor({
     path,
@@ -35,17 +36,28 @@ class TabixIndexedFile {
     csiFilehandle,
     chunkSizeLimit = 2000000,
     yieldLimit = 300,
+    renameRefSeqs = n => n,
   }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
     else throw new TypeError('must provide either filehandle or path')
 
-    if (tbiFilehandle) this.index = new TBI(tbiFilehandle)
-    else if (csiFilehandle) this.index = new CSI(csiFilehandle)
-    else if (tbiPath) this.index = new TBI(new LocalFile(tbiPath))
-    else if (csiPath) this.index = new CSI(new LocalFile(csiPath))
+    if (tbiFilehandle)
+      this.index = new TBI({ filehandle: tbiFilehandle, renameRefSeqs })
+    else if (csiFilehandle)
+      this.index = new CSI({ filehandle: csiFilehandle, renameRefSeqs })
+    else if (tbiPath)
+      this.index = new TBI({
+        filehandle: new LocalFile(tbiPath),
+        renameRefSeqs,
+      })
+    else if (csiPath)
+      this.index = new CSI({
+        filehandle: new LocalFile(csiPath),
+        renameRefSeqs,
+      })
     else if (path) {
-      this.index = new TBI(new LocalFile(`${path}.tbi`))
+      this.index = new TBI({ filehandle: new LocalFile(`${path}.tbi`) })
     } else {
       throw new TypeError(
         'must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath',
@@ -54,6 +66,7 @@ class TabixIndexedFile {
 
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
+    this.renameRefSeq = renameRefSeqs
   }
 
   /**
@@ -218,7 +231,8 @@ class TabixIndexedFile {
       if (line[i] === '\t') {
         if (currentColumnNumber > maxColumn) break
         if (currentColumnNumber === ref) {
-          const refName = line.slice(currentColumnStart, i)
+          let refName = line.slice(currentColumnStart, i)
+          refName = this.renameRefSeq(refName)
           if (refName !== regionRefName) return false
         } else if (currentColumnNumber === start) {
           let startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
@@ -273,11 +287,7 @@ class TabixIndexedFile {
     //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
     //   // )
     // }
-    const uncompressed = await gunzip(compressedData, {
-      // this finishFlush option keeps gunzip from throwing
-      // an error if the data has a partial block
-      finishFlush: (zlib.constants || zlib).Z_SYNC_FLUSH,
-    }).catch(e => {
+    const uncompressed = await unzip(compressedData).catch(e => {
       throw new Error(
         `error decompressing block ${
           e.code

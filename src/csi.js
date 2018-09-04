@@ -45,9 +45,11 @@ function reg2bins(beg, end, minShift, depth) {
 class CSI {
   /**
    * @param {filehandle} filehandle
+   * @param {function} [renameRefSeqs]
    */
-  constructor(filehandle) {
+  constructor({ filehandle, renameRefSeqs = n => n }) {
     this.filehandle = filehandle
+    this.renameRefSeq = renameRefSeqs
   }
 
   _findFirstData(data, virtualOffset) {

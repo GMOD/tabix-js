@@ -4,9 +4,11 @@ const LocalFile = require('../src/localFile')
 
 describe('tbi index', () => {
   it('loads', async () => {
-    const ti = new TabixIndex(
-      new LocalFile(require.resolve('./data/volvox.test.vcf.gz.tbi')),
-    )
+    const ti = new TabixIndex({
+      filehandle: new LocalFile(
+        require.resolve('./data/volvox.test.vcf.gz.tbi'),
+      ),
+    })
     const indexData = await ti.parse()
     expect(indexData.columnNumbers.start).toEqual(2)
     expect(indexData.columnNumbers.ref).toEqual(1)

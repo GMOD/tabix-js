@@ -7,9 +7,10 @@ describe('tabix file', () => {
       path: require.resolve('./data/volvox.test.vcf.gz'),
       tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
       yieldLimit: 10,
+      renameRefSeqs: n => n.replace('contig', 'ctg'),
     })
     const items = []
-    await f.getLines('contigA', 1000, 4000, items.push.bind(items))
+    await f.getLines('ctgA', 1000, 4000, items.push.bind(items))
     expect(items.length).toEqual(8)
     items.forEach(item => {
       item = item.split('\t')
@@ -19,13 +20,13 @@ describe('tabix file', () => {
     })
 
     items.length = 0
-    await f.getLines('contigA', 3000, 3000, items.push.bind(items))
+    await f.getLines('ctgA', 3000, 3000, items.push.bind(items))
     expect(items.length).toEqual(0)
     items.length = 0
-    await f.getLines('contigA', 2999, 3000, items.push.bind(items))
+    await f.getLines('ctgA', 2999, 3000, items.push.bind(items))
     expect(items.length).toEqual(1)
     items.length = 0
-    await f.getLines('contigA', 3000, 3001, items.push.bind(items))
+    await f.getLines('ctgA', 3000, 3001, items.push.bind(items))
     expect(items.length).toEqual(0)
 
     const headerString = await f.getHeader()
@@ -39,8 +40,8 @@ describe('tabix file', () => {
       format: 'VCF',
       metaChar: '#',
       firstDataLine: new VirtualOffset(0, 109),
-      refIdToName: ['contigA'],
-      refNameToId: { contigA: 0 },
+      refIdToName: ['ctgA'],
+      refNameToId: { ctgA: 0 },
       skipLines: 0,
     })
   })

@@ -29,9 +29,11 @@ function reg2bins(beg, end) {
 class TabixIndex {
   /**
    * @param {filehandle} filehandle
+   * @param {function} [renameRefSeqs]
    */
-  constructor(filehandle) {
+  constructor({ filehandle, renameRefSeqs = n => n }) {
     this.filehandle = filehandle
+    this.renameRefSeq = renameRefSeqs
   }
 
   async lineCount(refName) {
@@ -159,7 +161,8 @@ class TabixIndex {
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
-          const refName = namesBytes.toString('utf8', currNameStart, i)
+          let refName = namesBytes.toString('utf8', currNameStart, i)
+          refName = this.renameRefSeq(refName)
           refIdToName[currRefId] = refName
           refNameToId[refName] = currRefId
         }
