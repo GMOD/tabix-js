@@ -310,7 +310,9 @@ class TabixIndexedFile {
    */
   async readChunk(chunk) {
     const compressedSize = chunk.fetchedSize()
-    const cacheKey = `${chunk.minv.blockPosition}-${compressedSize}`
+    const cacheKey = `${chunk.minv.blockPosition}-${
+      chunk.minv.dataPosition
+    }-${compressedSize}`
     const cachedChunk = this.chunkCache.get(cacheKey)
     if (cachedChunk) return cachedChunk
 
