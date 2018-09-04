@@ -1,4 +1,5 @@
 const { unzip } = require('@gmod/bgzf-filehandle')
+const LRU = require('lru-cache')
 
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
@@ -26,6 +27,7 @@ class TabixIndexedFile {
    * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
    * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
    * not altered, just the names of the reference sequences that are used for querying.
+   * @param {number} [args.chunkCacheSize] maximum size in bytes of the chunk cache. default 5MB
    */
   constructor({
     path,
@@ -37,6 +39,7 @@ class TabixIndexedFile {
     chunkSizeLimit = 2000000,
     yieldLimit = 300,
     renameRefSeqs = n => n,
+    chunkCacheSize = 5 * 2 ** 20,
   }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
@@ -67,6 +70,7 @@ class TabixIndexedFile {
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
     this.renameRefSeq = renameRefSeqs
+    this.chunkCache = LRU({ max: chunkCacheSize })
   }
 
   /**
@@ -106,18 +110,17 @@ class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
-    const newLineByte = '\n'.charCodeAt(0)
     let foundStart = false
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
-      const chunkData = await this.readChunk(chunks[chunkNum])
+      const chunkString = await this.readChunk(chunks[chunkNum])
       // go through the data and parse out lines
       let currentLineStart = 0
-      for (let i = 0; i < chunkData.length; i += 1) {
-        if (chunkData[i] === newLineByte) {
+      for (let i = 0; i < chunkString.length; i += 1) {
+        if (chunkString[i] === '\n') {
           if (currentLineStart < i) {
             // eslint-disable-next-line no-new-wrappers
             const line = new String(
-              chunkData.toString('utf8', currentLineStart, i).trim(),
+              chunkString.slice(currentLineStart, i).trim(),
             )
             line.fileOffset =
               (chunks[chunkNum].minv.blockPosition << 16) + currentLineStart
@@ -303,15 +306,23 @@ class TabixIndexedFile {
    * read and uncompress the data in a chunk (composed of one or more
    * contiguous bgzip blocks) of the file
    * @param {Chunk} chunk
-   * @returns {Promise} for a Buffer of uncompressed data
+   * @returns {Promise} for a string chunk of the file
    */
   async readChunk(chunk) {
     const compressedSize = chunk.fetchedSize()
+    const cacheKey = `${chunk.minv.blockPosition}-${compressedSize}`
+    const cachedChunk = this.chunkCache.get(cacheKey)
+    if (cachedChunk) return cachedChunk
+
     const uncompressed = await this._readRegion(
       chunk.minv.blockPosition,
       compressedSize,
     )
-    return uncompressed.slice(chunk.minv.dataPosition)
+    const freshChunk = uncompressed
+      .slice(chunk.minv.dataPosition)
+      .toString('utf8')
+    this.chunkCache.set(cacheKey, freshChunk)
+    return freshChunk
   }
 }
 
