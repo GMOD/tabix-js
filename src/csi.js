@@ -1,11 +1,7 @@
-// const { Parser } = require('binary-parser')
-const promisify = require('util.promisify')
-const zlib = require('zlib')
+const { unzip } = require('@gmod/bgzf-filehandle')
 
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
-
-const gunzip = promisify(zlib.gunzip)
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -155,7 +151,7 @@ class CSI {
   // fetch and parse the index
   async parse() {
     const data = { csi: true, maxBlockSize: 1 << 16 }
-    const bytes = await gunzip(await this.filehandle.readFile())
+    const bytes = await unzip(await this.filehandle.readFile())
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) === CSI1_MAGIC) {

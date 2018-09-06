@@ -13,9 +13,9 @@ class Chunk {
     this._fetchedSize = fetchedSize
   }
   toUniqueString() {
-    return `${this.minv}..${this.maxv} (bin ${this.bin}, fetchedSize ${
-      this.fetchedSize
-    })`
+    return `${this.minv}..${this.maxv} (bin ${
+      this.bin
+    }, fetchedSize ${this.fetchedSize()})`
   }
   toString() {
     return this.toUniqueString()

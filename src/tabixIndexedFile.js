@@ -110,7 +110,7 @@ class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
-    let foundStart = false
+    let previousStartCoordinate
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       const chunkString = await this.readChunk(chunks[chunkNum])
       // go through the data and parse out lines
@@ -125,10 +125,21 @@ class TabixIndexedFile {
             line.fileOffset =
               (chunks[chunkNum].minv.blockPosition << 16) + currentLineStart
             // filter the line for whether it is within the requested range
-            if (this.lineOverlapsRegion(metadata, refName, start, end, line)) {
-              foundStart = true
+            const { startCoordinate, overlaps } = this.checkLine(
+              metadata,
+              refName,
+              start,
+              end,
+              line,
+            )
+            if (overlaps) {
+              if (previousStartCoordinate > startCoordinate)
+                throw new Error(
+                  'Lines not sorted by start coordinate, this file is not usable with Tabix.',
+                )
+              previousStartCoordinate = startCoordinate
               lineCallback(line)
-            } else if (foundStart) {
+            } else if (startCoordinate >= end) {
               // the lines were overlapping the region, but now have stopped, so
               // we must be at the end of the relevant data and we can stop
               // processing data now
@@ -200,15 +211,29 @@ class TabixIndexedFile {
   }
 
   /**
+   * get an array of reference sequence names, in the order in which
+   * they occur in the file.
+   *
+   * reference sequence renaming is not applied to these names.
+   *
+   * @returns {Promise} for an array of string sequence names
+   */
+  async getReferenceSequenceNames() {
+    const metadata = await this.getMetadata()
+    return metadata.refIdToName
+  }
+
+  /**
    * @param {object} metadata metadata object from the parsed index,
    * containing columnNumbers, metaChar, and maxColumn
    * @param {string} regionRefName
    * @param {number} regionStart region start coordinate (0-based-half-open)
    * @param {number} regionEnd region end coordinate (0-based-half-open)
    * @param {string} line
-   * @returns {boolean} whether the line is a data line that overlaps the given region
+   * @returns {object} like `{startCoordinate, overlaps}`. overlaps is boolean,
+   * true if line is a data line that overlaps the given region
    */
-  lineOverlapsRegion(
+  checkLine(
     { columnNumbers, metaChar, maxColumn, coordinateType },
     regionRefName,
     regionStart,
@@ -230,32 +255,33 @@ class TabixIndexedFile {
 
     let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
     let currentColumnStart = 0
+    let startCoordinate
     for (let i = 0; i < line.length; i += 1) {
       if (line[i] === '\t') {
         if (currentColumnNumber > maxColumn) break
         if (currentColumnNumber === ref) {
           let refName = line.slice(currentColumnStart, i)
           refName = this.renameRefSeq(refName)
-          if (refName !== regionRefName) return false
+          if (refName !== regionRefName) return { overlaps: false }
         } else if (currentColumnNumber === start) {
-          let startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
+          startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           // we convert to 0-based-half-open
           if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd) return false
+          if (startCoordinate >= regionEnd) return { overlaps: false }
           if (end === 0) {
             // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart) return false
+            if (startCoordinate + 1 <= regionStart) return { overlaps: false }
           }
         } else if (currentColumnNumber === end) {
           // this will never match if there is no end column
           const endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
-          if (endCoordinate <= regionStart) return false
+          if (endCoordinate <= regionStart) return { overlaps: false }
         }
         currentColumnStart = i + 1
         currentColumnNumber += 1
       }
     }
-    return true
+    return { startCoordinate, overlaps: true }
   }
 
   /**

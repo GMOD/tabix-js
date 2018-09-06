@@ -131,6 +131,28 @@ describe('tabix file', () => {
     expect(lines.length).toEqual(1)
   })
 
+  it('can query out.gff.gz with a TBI index', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/out.gff.gz'),
+    })
+
+    const headerString = await f.getHeader()
+    expect(headerString.length).toEqual(132)
+    expect(headerString[headerString.length - 1]).toEqual('\n')
+
+    expect(await f.getReferenceSequenceNames()).toEqual(['NC_000001.11'])
+
+    const lines = []
+    await f.getLines('NC_000001.11', 30000, 55000, l => lines.push(l))
+    expect(lines.length).toEqual(23)
+    expect(String(lines[0])).toEqual(
+      'NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA',
+    )
+    expect(String(lines[22])).toEqual(
+      'NC_000001.11	Gnomon	exon	53282	53959	.	+	.	Parent=lnc_RNA3;Dbxref=GeneID:105379212,Genbank:XR_948874.1;gbkey=ncRNA;gene=LOC105379212;product=uncharacterized LOC105379212;transcript_id=XR_948874.1',
+    )
+  })
+
   it('can query test.vcf.gz with a CSI index', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./data/test.vcf.gz'),
