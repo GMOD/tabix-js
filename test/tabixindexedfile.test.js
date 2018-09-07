@@ -1,6 +1,22 @@
 const TabixIndexedFile = require('../src/tabixIndexedFile')
 const VirtualOffset = require('../src/virtualOffset')
 
+class RecordCollector {
+  constructor() {
+    this.clear()
+    this.callback = (line, fileOffset) => {
+      this.records.push({ line, fileOffset })
+      this.length += 1
+    }
+  }
+  forEach(cb) {
+    this.records.forEach(cb)
+  }
+  clear() {
+    this.records = []
+    this.length = 0
+  }
+}
 describe('tabix file', () => {
   it('can read ctgA:1000..4000', async () => {
     const f = new TabixIndexedFile({
@@ -9,24 +25,25 @@ describe('tabix file', () => {
       yieldLimit: 10,
       renameRefSeqs: n => n.replace('contig', 'ctg'),
     })
-    const items = []
-    await f.getLines('ctgA', 1000, 4000, items.push.bind(items))
+    const items = new RecordCollector()
+    await f.getLines('ctgA', 1000, 4000, items.callback)
     expect(items.length).toEqual(8)
-    items.forEach(item => {
-      item = item.split('\t')
-      expect(item[0]).toEqual('contigA')
-      expect(parseInt(item[1], 10)).toBeGreaterThan(999)
-      expect(parseInt(item[1], 10)).toBeLessThan(4001)
+    items.forEach(({ line, fileOffset }) => {
+      line = line.split('\t')
+      expect(line[0]).toEqual('contigA')
+      expect(parseInt(line[1], 10)).toBeGreaterThan(999)
+      expect(parseInt(line[1], 10)).toBeLessThan(4001)
+      expect(fileOffset).toBeGreaterThanOrEqual(0)
     })
 
-    items.length = 0
-    await f.getLines('ctgA', 3000, 3000, items.push.bind(items))
+    items.clear()
+    await f.getLines('ctgA', 3000, 3000, items.callback)
     expect(items.length).toEqual(0)
-    items.length = 0
-    await f.getLines('ctgA', 2999, 3000, items.push.bind(items))
+    items.clear()
+    await f.getLines('ctgA', 2999, 3000, items.callback)
     expect(items.length).toEqual(1)
-    items.length = 0
-    await f.getLines('ctgA', 3000, 3001, items.push.bind(items))
+    items.clear()
+    await f.getLines('ctgA', 3000, 3001, items.callback)
     expect(items.length).toEqual(0)
 
     const headerString = await f.getHeader()
@@ -117,17 +134,17 @@ describe('tabix file', () => {
     await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
     expect(lines.length).toEqual(0)
 
-    await f.getLines('ctgA', -2, 3000, lines.push.bind(lines))
+    await f.getLines('ctgA', -2, 3000, l => lines.push(l))
     expect(lines.length).toEqual(0)
-    await f.getLines('ctgA', -50, -20, lines.push.bind(lines))
+    await f.getLines('ctgA', -50, -20, l => lines.push(l))
     expect(lines.length).toEqual(0)
-    await f.getLines('ctgA', 4000, 5000, lines.push.bind(lines))
+    await f.getLines('ctgA', 4000, 5000, l => lines.push(l))
     expect(lines.length).toEqual(7)
     lines.length = 0
-    await f.getLines('ctgA', 4370, 4371, lines.push.bind(lines))
+    await f.getLines('ctgA', 4370, 4371, l => lines.push(l))
     expect(lines.length).toEqual(0)
     lines.length = 0
-    await f.getLines('ctgA', 4369, 4370, lines.push.bind(lines))
+    await f.getLines('ctgA', 4369, 4370, l => lines.push(l))
     expect(lines.length).toEqual(1)
   })
 
@@ -142,13 +159,22 @@ describe('tabix file', () => {
 
     expect(await f.getReferenceSequenceNames()).toEqual(['NC_000001.11'])
 
-    const lines = []
-    await f.getLines('NC_000001.11', 30000, 55000, l => lines.push(l))
-    expect(lines.length).toEqual(23)
-    expect(String(lines[0])).toEqual(
+    let lineCount = 0
+    const lines = new RecordCollector()
+    await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
+    lines.forEach(({ line, fileOffset }) => {
+      const fields = line.split('\t')
+      lineCount += 1
+      expect(fields[0]).toEqual('NC_000001.11')
+      expect(parseInt(fields[3], 10)).toBeLessThan(55000)
+      expect(parseInt(fields[4], 10)).toBeGreaterThan(3000)
+      expect(fileOffset).toBeGreaterThanOrEqual(0)
+    })
+    expect(lineCount).toEqual(23)
+    expect(lines.records[0].line).toEqual(
       'NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA',
     )
-    expect(String(lines[22])).toEqual(
+    expect(lines.records[22].line).toEqual(
       'NC_000001.11	Gnomon	exon	53282	53959	.	+	.	Parent=lnc_RNA3;Dbxref=GeneID:105379212,Genbank:XR_948874.1;gbkey=ncRNA;gene=LOC105379212;product=uncharacterized LOC105379212;transcript_id=XR_948874.1',
     )
   })
@@ -163,35 +189,35 @@ describe('tabix file', () => {
     expect(headerString.length).toEqual(2560)
     expect(headerString[headerString.length - 1]).toEqual('\n')
 
-    const lines = []
-    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    const lines = new RecordCollector()
+    await f.getLines('ctgB', 0, Infinity, lines.callback)
     expect(lines.length).toEqual(0)
 
-    await f.getLines('ctgA', -2, 3000, lines.push.bind(lines))
+    await f.getLines('ctgA', -2, 3000, lines.callback)
     expect(lines.length).toEqual(0)
-    await f.getLines('ctgA', -50, -20, lines.push.bind(lines))
+    await f.getLines('ctgA', -50, -20, lines.callback)
     expect(lines.length).toEqual(0)
-    await f.getLines('1', 4000, 5000, lines.push.bind(lines))
+    await f.getLines('1', 4000, 5000, lines.callback)
     expect(lines.length).toEqual(0)
-    lines.length = 0
-    await f.getLines('1', 1206810423, 1206810423, lines.push.bind(lines))
+    lines.clear()
+    await f.getLines('1', 1206810423, 1206810423, lines.callback)
     expect(lines.length).toEqual(0)
-    lines.length = 0
-    await f.getLines('1', 1206810422, 1206810423, lines.push.bind(lines))
+    lines.clear()
+    await f.getLines('1', 1206810422, 1206810423, lines.callback)
     expect(lines.length).toEqual(1)
-    expect(lines[0]).toEqual(
+    expect(lines.records[0].line).toEqual(
       '1	1206810423	.	T	A	25	.	DP=19;VDB=0.0404;AF1=0.5;AC1=1;DP4=3,7,3,6;MQ=37;FQ=28;PV4=1,1,1,0.27	GT:PL:GQ	0/1:55,0,73:58',
     )
-    lines.length = 0
-    await f.getLines('1', 1206810423, 1206810424, lines.push.bind(lines))
+    lines.clear()
+    await f.getLines('1', 1206810423, 1206810424, lines.callback)
     expect(lines.length).toEqual(0)
-    await f.getLines('1', 1206810423, 1206849288, lines.push.bind(lines))
+    await f.getLines('1', 1206810423, 1206849288, lines.callback)
     expect(lines.length).toEqual(36)
-    expect(lines[35]).toEqual(
+    expect(lines.records[35].line).toEqual(
       '1	1206849288	.	G	A	106	.	DP=23;VDB=0.0399;AF1=1;AC1=2;DP4=0,0,16,7;MQ=35;FQ=-96	GT:PL:GQ	1/1:139,69,0:99',
     )
-    lines.length = 0
-    await f.getLines('1', 1206810423, 1206810424, lines.push.bind(lines))
+    lines.clear()
+    await f.getLines('1', 1206810423, 1206810424, lines.callback)
     expect(lines.length).toEqual(0)
   })
 })

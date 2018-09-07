@@ -70,14 +70,17 @@ class TabixIndexedFile {
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
     this.renameRefSeq = renameRefSeqs
-    this.chunkCache = LRU({ max: chunkCacheSize })
+    this.chunkCache = LRU({
+      max: (chunkCacheSize / 1) << 16,
+      length: () => 1,
+    })
   }
 
   /**
    * @param {string} refName name of the reference sequence
    * @param {number} start start of the region (in 0-based half-open coordinates)
    * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function} lineCallback callback called for each line in the region
+   * @param {function} lineCallback callback called for each line in the region, called as (line, fileOffset)
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
   async getLines(refName, start, end, lineCallback) {
@@ -112,51 +115,47 @@ class TabixIndexedFile {
     let linesSinceLastYield = 0
     let previousStartCoordinate
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
-      const chunkString = await this.readChunk(chunks[chunkNum])
-      // go through the data and parse out lines
-      let currentLineStart = 0
-      for (let i = 0; i < chunkString.length; i += 1) {
-        if (chunkString[i] === '\n') {
-          if (currentLineStart < i) {
-            // eslint-disable-next-line no-new-wrappers
-            const line = new String(
-              chunkString.slice(currentLineStart, i).trim(),
-            )
-            line.fileOffset =
-              (chunks[chunkNum].minv.blockPosition << 16) + currentLineStart
-            // filter the line for whether it is within the requested range
-            const { startCoordinate, overlaps } = this.checkLine(
-              metadata,
-              refName,
-              start,
-              end,
-              line,
-            )
-            if (overlaps) {
-              if (previousStartCoordinate > startCoordinate)
-                throw new Error(
-                  'Lines not sorted by start coordinate, this file is not usable with Tabix.',
-                )
-              previousStartCoordinate = startCoordinate
-              lineCallback(line)
-            } else if (startCoordinate >= end) {
-              // the lines were overlapping the region, but now have stopped, so
-              // we must be at the end of the relevant data and we can stop
-              // processing data now
-              return
-            }
+      const lines = await this.readChunk(chunks[chunkNum])
 
-            // yield if we have emitted beyond the yield limit
-            linesSinceLastYield += 1
-            if (linesSinceLastYield >= this.yieldLimit) {
-              await timeout(1)
-              linesSinceLastYield = 0
-            }
-          }
-          currentLineStart = i + 1
+      let currentLineStart = 0
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i]
+        const fileOffset =
+          chunks[chunkNum].minv.blockPosition * 2 ** 16 + currentLineStart
+        // filter the line for whether it is within the requested range
+        const { startCoordinate, overlaps } = this.checkLine(
+          metadata,
+          refName,
+          start,
+          end,
+          line,
+        )
+
+        // do a small check just to make sure that the lines are really sorted by start coordinate
+        if (previousStartCoordinate > startCoordinate)
+          throw new Error(
+            `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate} < ), this file is not usable with Tabix.`,
+          )
+        previousStartCoordinate = startCoordinate
+
+        if (overlaps) {
+          lineCallback(line, fileOffset)
+        } else if (startCoordinate >= end) {
+          // the lines were overlapping the region, but now have stopped, so
+          // we must be at the end of the relevant data and we can stop
+          // processing data now
+          return
+        }
+
+        currentLineStart += line.length
+
+        // yield if we have emitted beyond the yield limit
+        linesSinceLastYield += 1
+        if (linesSinceLastYield >= this.yieldLimit) {
+          await timeout(1)
+          linesSinceLastYield = 0
         }
       }
-      // any partial line at the end of the chunk will be discarded
     }
   }
 
@@ -241,7 +240,7 @@ class TabixIndexedFile {
     line,
   ) {
     // skip meta lines
-    if (line.charAt(0) === metaChar) return false
+    if (line.charAt(0) === metaChar) return { overlaps: false }
 
     // check ref/start/end using column metadata from index
     let { ref, start, end } = columnNumbers
@@ -334,23 +333,31 @@ class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  async readChunk(chunk) {
+  readChunk(chunk) {
     const compressedSize = chunk.fetchedSize()
     const cacheKey = `${chunk.minv.blockPosition}-${
       chunk.minv.dataPosition
     }-${compressedSize}`
-    const cachedChunk = this.chunkCache.get(cacheKey)
-    if (cachedChunk) return cachedChunk
+    const cachedChunkPromise = this.chunkCache.get(cacheKey)
+    if (cachedChunkPromise) return cachedChunkPromise
 
-    const uncompressed = await this._readRegion(
+    const freshChunkPromise = this._readRegion(
       chunk.minv.blockPosition,
       compressedSize,
-    )
-    const freshChunk = uncompressed
-      .slice(chunk.minv.dataPosition)
-      .toString('utf8')
-    this.chunkCache.set(cacheKey, freshChunk)
-    return freshChunk
+    ).then(uncompressed => {
+      const freshChunk = uncompressed
+        .slice(chunk.minv.dataPosition)
+        .toString('utf8')
+        .split('\n')
+
+      // remove the last line, since it will be either empty or partial
+      freshChunk.pop()
+
+      return freshChunk
+    })
+
+    this.chunkCache.set(cacheKey, freshChunkPromise)
+    return freshChunkPromise
   }
 }
 
