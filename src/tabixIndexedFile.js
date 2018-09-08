@@ -28,6 +28,7 @@ class TabixIndexedFile {
    * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
    * not altered, just the names of the reference sequences that are used for querying.
    * @param {number} [args.chunkCacheSize] maximum size in bytes of the chunk cache. default 5MB
+   * @param {number} [args.blockCacheSize] maximum size in bytes of the block cache. default 5MB
    */
   constructor({
     path,
@@ -40,6 +41,7 @@ class TabixIndexedFile {
     yieldLimit = 300,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
+    blockCacheSize = 5 * 2 ** 20,
   }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
@@ -71,9 +73,10 @@ class TabixIndexedFile {
     this.yieldLimit = yieldLimit
     this.renameRefSeq = renameRefSeqs
     this.chunkCache = LRU({
-      max: (chunkCacheSize / 1) << 16,
+      max: Math.floor(chunkCacheSize / (1 << 16)),
       length: () => 1,
     })
+    this.blockCache = LRU({ max: Math.floor(blockCacheSize / (1 << 16)) })
   }
 
   /**
@@ -228,7 +231,7 @@ class TabixIndexedFile {
    * @param {string} regionRefName
    * @param {number} regionStart region start coordinate (0-based-half-open)
    * @param {number} regionEnd region end coordinate (0-based-half-open)
-   * @param {string} line
+   * @param {array[string]} line
    * @returns {object} like `{startCoordinate, overlaps}`. overlaps is boolean,
    * true if line is a data line that overlaps the given region
    */
@@ -292,39 +295,53 @@ class TabixIndexedFile {
     return this.index.lineCount(refSeq)
   }
 
-  async _readRegion(position, compressedSize) {
-    // prevent reading beyond the end of the file, pako does not
-    // like trailing zeroes in the buffer
-    const { size: fileSize } = await this.filehandle.stat()
-    if (position + compressedSize > fileSize)
-      compressedSize = fileSize - position
+  _cacheWith(cache, cacheKey, fillCallback) {
+    const cachedPromise = cache.get(cacheKey)
+    if (cachedPromise) return cachedPromise
 
-    const compressedData = Buffer.alloc(compressedSize)
+    const freshPromise = fillCallback()
+    cache.set(cacheKey, freshPromise)
+    return freshPromise
+  }
 
-    /* const bytesRead = */ await this.filehandle.read(
-      compressedData,
-      0,
-      compressedSize,
-      position,
+  _readRegion(position, compressedSize) {
+    return this._cacheWith(
+      this.blockCache,
+      `${position}/${compressedSize}`,
+      async () => {
+        // console.log(`reading region ${position} / ${compressedSize}`)
+        const { size: fileSize } = await this.filehandle.stat()
+        if (position + compressedSize > fileSize)
+          compressedSize = fileSize - position
+
+        const compressedData = Buffer.alloc(compressedSize)
+
+        /* const bytesRead = */ await this.filehandle.read(
+          compressedData,
+          0,
+          compressedSize,
+          position,
+        )
+        // if (bytesRead !== compressedSize) {
+        //   debugger
+        //   // throw new Error(
+        //   //   `failed to read block at ${
+        //   //     chunk.minv.blockPosition
+        //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
+        //   // )
+        // }
+        const uncompressed = await unzip(compressedData).catch(e => {
+          throw new Error(
+            `error decompressing block ${
+              e.code
+            } at ${position} (length ${compressedSize})`,
+            e,
+            compressedData,
+          )
+        })
+        return uncompressed
+      },
     )
-    // if (bytesRead !== compressedSize) {
-    //   debugger
-    //   // throw new Error(
-    //   //   `failed to read block at ${
-    //   //     chunk.minv.blockPosition
-    //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
-    //   // )
-    // }
-    const uncompressed = await unzip(compressedData).catch(e => {
-      throw new Error(
-        `error decompressing block ${
-          e.code
-        } at ${position} (length ${compressedSize})`,
-        e,
-        compressedData,
-      )
-    })
-    return uncompressed
   }
 
   /**
@@ -334,30 +351,29 @@ class TabixIndexedFile {
    * @returns {Promise} for a string chunk of the file
    */
   readChunk(chunk) {
-    const compressedSize = chunk.fetchedSize()
-    const cacheKey = `${chunk.minv.blockPosition}-${
-      chunk.minv.dataPosition
-    }-${compressedSize}`
-    const cachedChunkPromise = this.chunkCache.get(cacheKey)
-    if (cachedChunkPromise) return cachedChunkPromise
+    return this._cacheWith(this.chunkCache, chunk.toString(), async () => {
+      const uncompressed = await this._readRegion(
+        chunk.minv.blockPosition,
+        chunk.fetchedSize(),
+      )
 
-    const freshChunkPromise = this._readRegion(
-      chunk.minv.blockPosition,
-      compressedSize,
-    ).then(uncompressed => {
-      const freshChunk = uncompressed
-        .slice(chunk.minv.dataPosition)
+      const lines = uncompressed
+        .slice(
+          chunk.minv.dataPosition,
+          // only have a slice end if the chunk is all in one bgzf block,
+          // because we can't calculate it if they are in different blocks
+          chunk.maxv.blockPosition === chunk.minv.blockPosition
+            ? chunk.maxv.dataPosition
+            : undefined,
+        )
         .toString('utf8')
         .split('\n')
 
       // remove the last line, since it will be either empty or partial
-      freshChunk.pop()
+      lines.pop()
 
-      return freshChunk
+      return lines
     })
-
-    this.chunkCache.set(cacheKey, freshChunkPromise)
-    return freshChunkPromise
   }
 }
 
