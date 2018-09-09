@@ -4,7 +4,7 @@
   "description": "Read Tabix-indexed files, supports both .tbi and .csi indexes",
   "license": "MIT",
   "repository": "GMOD/tabix-js",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "author": {
     "name": "Robert Buels",
     "email": "rbuels@gmail.com",
