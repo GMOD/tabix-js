@@ -71,7 +71,7 @@ class TabixIndexedFile {
 
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
-    this.renameRefSeq = renameRefSeqs
+    this.renameRefSeqCallback = renameRefSeqs
     this.chunkCache = LRU({
       max: Math.floor(chunkCacheSize / (1 << 16)),
       length: () => 1,
@@ -116,8 +116,8 @@ class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
-    let previousStartCoordinate
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
+      let previousStartCoordinate
       const lines = await this.readChunk(chunks[chunkNum])
 
       let currentLineStart = 0
@@ -137,7 +137,7 @@ class TabixIndexedFile {
         // do a small check just to make sure that the lines are really sorted by start coordinate
         if (previousStartCoordinate > startCoordinate)
           throw new Error(
-            `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate} < ), this file is not usable with Tabix.`,
+            `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
           )
         previousStartCoordinate = startCoordinate
 
@@ -225,6 +225,15 @@ class TabixIndexedFile {
     return metadata.refIdToName
   }
 
+  renameRefSeq(refName) {
+    if (this._renameRefSeqCache && this._renameRefSeqCache.from === refName)
+      return this._renameRefSeqCache.to
+
+    const renamed = this.renameRefSeqCallback(refName)
+    this._renameRefSeqCache = { from: refName, to: renamed }
+    return renamed
+  }
+
   /**
    * @param {object} metadata metadata object from the parsed index,
    * containing columnNumbers, metaChar, and maxColumn
@@ -260,7 +269,6 @@ class TabixIndexedFile {
     let startCoordinate
     for (let i = 0; i < line.length; i += 1) {
       if (line[i] === '\t') {
-        if (currentColumnNumber > maxColumn) break
         if (currentColumnNumber === ref) {
           let refName = line.slice(currentColumnStart, i)
           refName = this.renameRefSeq(refName)
@@ -281,6 +289,7 @@ class TabixIndexedFile {
         }
         currentColumnStart = i + 1
         currentColumnNumber += 1
+        if (currentColumnNumber > maxColumn) break
       }
     }
     return { startCoordinate, overlaps: true }
