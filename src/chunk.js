@@ -7,8 +7,16 @@ class Chunk {
    * @param {number} [fetchedSize]
    */
   constructor(minv, maxv, bin, fetchedSize) {
-    this.minv = minv
-    this.maxv = maxv
+    if (minv.compareTo(maxv) < 0) {
+      // this is the normal case
+      this.minv = minv
+      this.maxv = maxv
+    } else {
+      // min and max are reversed for some reason
+      this.minv = maxv
+      this.maxv = minv
+    }
+
     this.bin = bin
     this._fetchedSize = fetchedSize
   }
