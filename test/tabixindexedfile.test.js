@@ -71,6 +71,14 @@ describe('tabix file', () => {
     expect(await f.lineCount('contigA')).toEqual(109)
     expect(await f.lineCount('nonexistent')).toEqual(-1)
   })
+  it("can't count lines without pseudo-bin", async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/volvox.test.vcf.gz'),
+      tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi.no_pseudo'),
+      yieldLimit: 10,
+    })
+    expect(await f.lineCount('contigA')).toEqual(-1)
+  })
   it('handles invalid input', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./data/volvox.test.vcf.gz'),
