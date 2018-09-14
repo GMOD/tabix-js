@@ -62,10 +62,19 @@ describe('tabix file', () => {
       skipLines: 0,
     })
   })
-  it('can count lines', async () => {
+  it('can count lines with TBI', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./data/volvox.test.vcf.gz'),
       tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
+      yieldLimit: 10,
+    })
+    expect(await f.lineCount('contigA')).toEqual(109)
+    expect(await f.lineCount('nonexistent')).toEqual(-1)
+  })
+  it('can count lines with CSI', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/volvox.test.vcf.gz'),
+      csiPath: require.resolve('./data/volvox.test.vcf.gz.csi'),
       yieldLimit: 10,
     })
     expect(await f.lineCount('contigA')).toEqual(109)
