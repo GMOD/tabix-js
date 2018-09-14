@@ -33,7 +33,7 @@ describe('csi index', () => {
       maxBlockSize: 1 << 16,
     })
   })
-  it('loads test.gff3.gz.csi', async () => {
+  it('loads test.vcf.gz.csi', async () => {
     const ti = new CSI({
       filehandle: new LocalFile(require.resolve('./data/test.vcf.gz.csi')),
     })
