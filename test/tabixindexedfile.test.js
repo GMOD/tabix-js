@@ -220,6 +220,10 @@ describe('tabix file', () => {
     await f.getLines('1', 1206810423, 1206810423, lines.callback)
     expect(lines.length).toEqual(0)
     lines.clear()
+    await expect(
+      f.getLines('1', 1206808844, 12068500000, lines.callback),
+    ).rejects.toThrow(/query .* is too large for current binning scheme/)
+    lines.clear()
     await f.getLines('1', 1206810422, 1206810423, lines.callback)
     expect(lines.length).toEqual(1)
     expect(lines.records[0].line).toEqual(
