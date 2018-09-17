@@ -136,7 +136,8 @@ class CSI {
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
-          const refName = namesBytes.toString('utf8', currNameStart, i)
+          let refName = namesBytes.toString('utf8', currNameStart, i)
+          refName = this.renameRefSeq(refName)
           refIdToName[currRefId] = refName
           refNameToId[refName] = currRefId
         }
