@@ -5,7 +5,6 @@ const Chunk = require('./chunk')
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
-const MAX_BINS = 1000000
 
 function lshift(num, bits) {
   return num * 2 ** bits
@@ -26,10 +25,11 @@ function reg2bins(beg, end, minShift, depth) {
   let t = 0
   let s = minShift + depth * 3
   const bins = []
+  const binLimit = ((1 << ((depth + 1) * 3)) - 1) / 7
   for (; l <= depth; s -= 3, t += lshift(1, l * 3), l += 1) {
     const b = t + rshift(beg, s)
     const e = t + rshift(end, s)
-    if (e - b + bins.length > MAX_BINS)
+    if (e - b + bins.length > binLimit)
       throw new Error(
         `query ${beg}-${end} is too large for current binning scheme (shift ${minShift}, depth ${depth}), try a smaller query or a coarser index binning scheme`,
       )

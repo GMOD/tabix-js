@@ -9,6 +9,7 @@ class Chunk {
   constructor(minv, maxv, bin, fetchedSize) {
     this.minv = minv
     this.maxv = maxv
+
     this.bin = bin
     this._fetchedSize = fetchedSize
   }

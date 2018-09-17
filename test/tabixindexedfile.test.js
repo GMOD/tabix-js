@@ -62,7 +62,7 @@ describe('tabix file', () => {
       skipLines: 0,
     })
   })
-  it('can count lines', async () => {
+  it('can count lines with TBI', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./data/volvox.test.vcf.gz'),
       tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
@@ -70,6 +70,23 @@ describe('tabix file', () => {
     })
     expect(await f.lineCount('contigA')).toEqual(109)
     expect(await f.lineCount('nonexistent')).toEqual(-1)
+  })
+  it('can count lines with CSI', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/volvox.test.vcf.gz'),
+      csiPath: require.resolve('./data/volvox.test.vcf.gz.csi'),
+      yieldLimit: 10,
+    })
+    expect(await f.lineCount('contigA')).toEqual(109)
+    expect(await f.lineCount('nonexistent')).toEqual(-1)
+  })
+  it("can't count lines without pseudo-bin", async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/volvox.test.vcf.gz'),
+      tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi.no_pseudo'),
+      yieldLimit: 10,
+    })
+    expect(await f.lineCount('contigA')).toEqual(-1)
   })
   it('handles invalid input', async () => {
     const f = new TabixIndexedFile({
@@ -202,6 +219,10 @@ describe('tabix file', () => {
     lines.clear()
     await f.getLines('1', 1206810423, 1206810423, lines.callback)
     expect(lines.length).toEqual(0)
+    lines.clear()
+    await expect(
+      f.getLines('1', 1206808844, 12068500000, lines.callback),
+    ).rejects.toThrow(/query .* is too large for current binning scheme/)
     lines.clear()
     await f.getLines('1', 1206810422, 1206810423, lines.callback)
     expect(lines.length).toEqual(1)
