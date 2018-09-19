@@ -243,21 +243,21 @@ describe('tabix file', () => {
     expect(lines.length).toEqual(0)
   })
 
-  xit('can fetch the entire header for a very large vcf header', async () => {
+  it('can fetch the entire header for a very large vcf header', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./data/large_vcf_header.vcf.gz'),
     })
 
     const headerString = await f.getHeader()
-    const lastHeaderLine =
-      '##bcftools_callCommand=call -A -m -v 350_LcChr1.bcf\n'
+    const lastBitOfLastHeaderLine =
+      'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
     expect(
       headerString.slice(
-        headerString.length - lastHeaderLine.length,
+        headerString.length - lastBitOfLastHeaderLine.length,
         headerString.length,
       ),
-    ).toEqual(lastHeaderLine)
+    ).toEqual(lastBitOfLastHeaderLine)
     expect(headerString[headerString.length - 1]).toEqual('\n')
-    expect(headerString.length).toEqual(700000)
+    expect(headerString.length).toEqual(5315655)
   })
 })
