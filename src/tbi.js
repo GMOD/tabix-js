@@ -1,3 +1,4 @@
+const Long = require('long')
 // const { Parser } = require('binary-parser')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
@@ -6,6 +7,8 @@ const { unzip } = require('@gmod/bgzf-filehandle')
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
+
+const { longToNumber } = require('./util')
 
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
@@ -37,12 +40,11 @@ class TabixIndex {
     const indexData = await this.parse()
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
-    const indexes = indexData.indices[refId]
-    if (!indexes) return -1
-    const { depth } = indexData
-    const binLimit = ((1 << ((depth + 1) * 3)) - 1) / 7
-    const ret = indexes.binIndex[binLimit + 1]
-    return ret ? ret[ret.length - 1].minv.dataPosition : -1
+    const idx = indexData.indices[refId]
+    if (!idx) return -1
+    const stats = indexData.indices[refId].stats
+    if (stats) return stats.lineCount
+    return -1
   }
 
   /**
@@ -71,6 +73,7 @@ class TabixIndex {
       refNameToId,
       firstDataLine,
       maxBlockSize,
+      maxBinNumber: ((1 << 18) - 1) / 7,
     }
   }
 
@@ -100,6 +103,8 @@ class TabixIndex {
       end: bytes.readInt32LE(20),
     }
     data.metaValue = bytes.readInt32LE(24)
+    data.depth = 5
+    data.maxBinNumber = ((1 << ((data.depth + 1) * 3)) - 1) / 7
     data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : null
     data.skipLines = bytes.readInt32LE(28)
 
@@ -116,19 +121,25 @@ class TabixIndex {
       const binCount = bytes.readInt32LE(currOffset)
       currOffset += 4
       const binIndex = {}
+      let stats
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
-        const chunkCount = bytes.readInt32LE(currOffset + 4)
-        const chunks = new Array(chunkCount)
-        currOffset += 8
-        for (let k = 0; k < chunkCount; k += 1) {
-          const u = VirtualOffset.fromBytes(bytes, currOffset)
-          const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
-          currOffset += 16
-          data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
-          chunks[k] = new Chunk(u, v, bin)
+        if (bin > data.maxBinNumber) {
+          stats = this.parsePseudoBin(bytes, currOffset + 4)
+          currOffset += 8 + 2 * 16
+        } else {
+          const chunkCount = bytes.readInt32LE(currOffset + 4)
+          const chunks = new Array(chunkCount)
+          currOffset += 8
+          for (let k = 0; k < chunkCount; k += 1) {
+            const u = VirtualOffset.fromBytes(bytes, currOffset)
+            const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
+            currOffset += 16
+            data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
+            chunks[k] = new Chunk(u, v, bin)
+          }
+          binIndex[bin] = chunks
         }
-        binIndex[bin] = chunks
       }
 
       // the linear index
@@ -144,10 +155,20 @@ class TabixIndex {
         )
       }
 
-      data.indices[i] = { binIndex, linearIndex }
+      data.indices[i] = { binIndex, linearIndex, stats }
     }
 
     return data
+  }
+
+  parsePseudoBin(bytes, offset) {
+    // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
+    // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
+    const lineCount = longToNumber(
+      Long.fromBytesLE(bytes.slice(offset + 20, offset + 28), true),
+    )
+    // const four = Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true)
+    return { lineCount }
   }
 
   _parseNameBytes(namesBytes) {

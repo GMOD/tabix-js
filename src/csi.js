@@ -1,7 +1,11 @@
+const Long = require('long')
+
 const { unzip } = require('@gmod/bgzf-filehandle')
 
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
+
+const { longToNumber } = require('./util')
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -12,11 +16,12 @@ function lshift(num, bits) {
 function rshift(num, bits) {
   return Math.floor(num / 2 ** bits)
 }
+
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
  * @returns {Array[number]}
  */
-function reg2bins(beg, end, minShift, depth) {
+function reg2bins(beg, end, minShift, depth, binLimit) {
   beg -= 1 // < convert to 1-based closed
   if (beg < 1) beg = 1
   if (end > 2 ** 50) end = 2 ** 34 // 17 GiB ought to be enough for anybody
@@ -25,7 +30,6 @@ function reg2bins(beg, end, minShift, depth) {
   let t = 0
   let s = minShift + depth * 3
   const bins = []
-  const binLimit = ((1 << ((depth + 1) * 3)) - 1) / 7
   for (; l <= depth; s -= 3, t += lshift(1, l * 3), l += 1) {
     const b = t + rshift(beg, s)
     const e = t + rshift(end, s)
@@ -62,12 +66,11 @@ class CSI {
     const indexData = await this.parse()
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
-    const indexes = indexData.indices[refId]
-    if (!indexes) return -1
-    const { depth } = indexData
-    const binLimit = ((1 << ((depth + 1) * 3)) - 1) / 7
-    const ret = indexes.binIndex[binLimit + 1]
-    return ret ? ret[ret.length - 1].minv.dataPosition : -1
+    const idx = indexData.indices[refId]
+    if (!idx) return -1
+    const stats = indexData.indices[refId].stats
+    if (stats) return stats.lineCount
+    return -1
   }
 
   /**
@@ -166,6 +169,7 @@ class CSI {
 
     data.minShift = bytes.readInt32LE(4)
     data.depth = bytes.readInt32LE(8)
+    data.maxBinNumber = ((1 << ((data.depth + 1) * 3)) - 1) / 7
     const auxLength = bytes.readInt32LE(12)
     if (auxLength) {
       Object.assign(data, this.parseAuxData(bytes, 16, auxLength))
@@ -180,27 +184,47 @@ class CSI {
       const binCount = bytes.readInt32LE(currOffset)
       currOffset += 4
       const binIndex = {}
+      let stats // < provided by parsing a pseudo-bin, if present
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
-        const loffset = VirtualOffset.fromBytes(bytes, currOffset + 4)
-        this._findFirstData(data, loffset)
-        const chunkCount = bytes.readInt32LE(currOffset + 12)
-        currOffset += 16
-        const chunks = new Array(chunkCount)
-        for (let k = 0; k < chunkCount; k += 1) {
-          const u = VirtualOffset.fromBytes(bytes, currOffset)
-          const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
+        if (bin > data.maxBinNumber) {
+          // this is a fake bin that actually has stats information
+          // about the reference sequence in it
+          stats = this.parsePseudoBin(bytes, currOffset + 4)
+          currOffset += 4 + 8 + 4 + 16 + 16
+        } else {
+          const loffset = VirtualOffset.fromBytes(bytes, currOffset + 4)
+          this._findFirstData(data, loffset)
+          const chunkCount = bytes.readInt32LE(currOffset + 12)
           currOffset += 16
-          // this._findFirstData(data, u)
-          chunks[k] = new Chunk(u, v, bin)
+          const chunks = new Array(chunkCount)
+          for (let k = 0; k < chunkCount; k += 1) {
+            const u = VirtualOffset.fromBytes(bytes, currOffset)
+            const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
+            currOffset += 16
+            // this._findFirstData(data, u)
+            chunks[k] = new Chunk(u, v, bin)
+          }
+          binIndex[bin] = chunks
         }
-        binIndex[bin] = chunks
       }
 
-      data.indices[i] = { binIndex }
+      data.indices[i] = { binIndex, stats }
     }
 
     return data
+  }
+
+  parsePseudoBin(bytes, offset) {
+    // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
+    // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
+    // const three = longToNumber(
+    //   Long.fromBytesLE(bytes.slice(offset + 20, offset + 28), true),
+    // )
+    const lineCount = longToNumber(
+      Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true),
+    )
+    return { lineCount }
   }
 
   async blocksForRange(refName, beg, end) {
@@ -214,7 +238,13 @@ class CSI {
 
     const { binIndex } = indexes
 
-    const bins = reg2bins(beg, end, indexData.minShift, indexData.depth)
+    const bins = reg2bins(
+      beg,
+      end,
+      indexData.minShift,
+      indexData.depth,
+      indexData.maxBinNumber,
+    )
 
     let l
     let numOffsets = 0

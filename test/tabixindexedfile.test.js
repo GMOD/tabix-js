@@ -56,10 +56,11 @@ describe('tabix file', () => {
       maxBlockSize: 1 << 16,
       format: 'VCF',
       metaChar: '#',
-      firstDataLine: new VirtualOffset(0, 109),
+      firstDataLine: new VirtualOffset(0, 10431),
       refIdToName: ['ctgA'],
       refNameToId: { ctgA: 0 },
       skipLines: 0,
+      maxBinNumber: 37449,
     })
   })
   it('can count lines with TBI', async () => {
@@ -240,5 +241,23 @@ describe('tabix file', () => {
     lines.clear()
     await f.getLines('1', 1206810423, 1206810424, lines.callback)
     expect(lines.length).toEqual(0)
+  })
+
+  xit('can fetch the entire header for a very large vcf header', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/large_vcf_header.vcf.gz'),
+    })
+
+    const headerString = await f.getHeader()
+    const lastHeaderLine =
+      '##bcftools_callCommand=call -A -m -v 350_LcChr1.bcf\n'
+    expect(
+      headerString.slice(
+        headerString.length - lastHeaderLine.length,
+        headerString.length,
+      ),
+    ).toEqual(lastHeaderLine)
+    expect(headerString[headerString.length - 1]).toEqual('\n')
+    expect(headerString.length).toEqual(700000)
   })
 })
