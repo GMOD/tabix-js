@@ -1,6 +1,8 @@
 const TabixIndexedFile = require('../src/tabixIndexedFile')
 const VirtualOffset = require('../src/virtualOffset')
 
+const { extended } = require('./utils')
+
 class RecordCollector {
   constructor() {
     this.clear()
@@ -16,6 +18,16 @@ class RecordCollector {
     this.records = []
     this.length = 0
   }
+  text() {
+    return this.records.map(r => `${r.line}\n`).join('')
+  }
+  expectNoDuplicates() {
+    const seen = {}
+    this.forEach(({ line, fileOffset }) => {
+      expect(seen[line]).toBe(undefined)
+      seen[line] = fileOffset
+    })
+  }
 }
 describe('tabix file', () => {
   it('can read ctgA:1000..4000', async () => {
@@ -27,6 +39,7 @@ describe('tabix file', () => {
     })
     const items = new RecordCollector()
     await f.getLines('ctgA', 1000, 4000, items.callback)
+    items.expectNoDuplicates()
     expect(items.length).toEqual(8)
     items.forEach(({ line, fileOffset }) => {
       line = line.split('\t')
@@ -117,26 +130,27 @@ describe('tabix file', () => {
     expect(headerString[headerString.length - 1]).toEqual('\n')
     expect(headerString.length).toEqual(130)
 
-    const lines = []
-    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    const lines = new RecordCollector()
+    await f.getLines('ctgB', 0, Infinity, lines.callback)
+    lines.expectNoDuplicates()
     expect(lines.length).toEqual(4)
-    expect(lines[3]).toEqual(
+    expect(lines.records[3].line).toEqual(
       'ctgB	example	remark	4715	5968	.	-	.	Name=f05;Note=ああ、この機能は、世界中を旅しています！',
     )
-    lines.length = 0
-    await f.getLines('ctgA', 10000000, Infinity, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgA', 10000000, Infinity, lines.callback)
     expect(lines.length).toEqual(0)
-    lines.length = 0
-    await f.getLines('ctgA', 0, Infinity, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgA', 0, Infinity, lines.callback)
     expect(lines.length).toEqual(237)
-    lines.length = 0
-    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgB', 0, Infinity, lines.callback)
     expect(lines.length).toEqual(4)
-    lines.length = 0
-    await f.getLines('ctgB', 0, 4715, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgB', 0, 4715, lines.callback)
     expect(lines.length).toEqual(4)
-    lines.length = 0
-    await f.getLines('ctgB', 1, 4714, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgB', 1, 4714, lines.callback)
     expect(lines.length).toEqual(3)
   })
   it('can query gvcf.vcf.gz', async () => {
@@ -180,6 +194,7 @@ describe('tabix file', () => {
     let lineCount = 0
     const lines = new RecordCollector()
     await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
+    lines.expectNoDuplicates()
     lines.forEach(({ line, fileOffset }) => {
       const fields = line.split('\t')
       lineCount += 1
@@ -234,6 +249,7 @@ describe('tabix file', () => {
     await f.getLines('1', 1206810423, 1206810424, lines.callback)
     expect(lines.length).toEqual(0)
     await f.getLines('1', 1206810423, 1206849288, lines.callback)
+    lines.expectNoDuplicates()
     expect(lines.length).toEqual(36)
     expect(lines.records[35].line).toEqual(
       '1	1206849288	.	G	A	106	.	DP=23;VDB=0.0399;AF1=1;AC1=2;DP4=0,0,16,7;MQ=35;FQ=-96	GT:PL:GQ	1/1:139,69,0:99',
@@ -260,4 +276,47 @@ describe('tabix file', () => {
     expect(headerString[headerString.length - 1]).toEqual('\n')
     expect(headerString.length).toEqual(5315655)
   })
+
+  extended(
+    'can fetch NC_000001.11:184099343..184125655 correctly',
+    async () => {
+      const f = new TabixIndexedFile({
+        path: require.resolve('./extended_data/out.sorted.gff.gz'),
+      })
+
+      // const headerString = await f.getHeader()
+      // expect(headerString).toEqual('')
+
+      const lines = new RecordCollector()
+      await f.getLines('ctgB', 0, Infinity, lines.callback)
+      expect(lines.length).toEqual(0)
+
+      await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
+      // expect there to be no duplicate lines
+      lines.expectNoDuplicates()
+      const text = lines.text()
+      expect(text).toEqual(
+        `NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA
+NC_000001.11	RefSeq	match	143184588	223558935	.	+	.	Target=NC_000001.11 143184588 223558935 +;gap_count=0;num_mismatch=0;pct_coverage=100;pct_identity_gap=100
+NC_000001.11	Gnomon	exon	184112091	184112377	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
+NC_000001.11	Gnomon	lnc_RNA	184112091	184122540	.	+	.	ID=lnc_RNA1660;Parent=gene3367;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;Name=XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;model_evidence=Supporting evidence includes similarity to: 100%25 coverage of the annotated genomic feature by RNAseq alignments%2C including 2 samples with support for all annotated introns;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
+NC_000001.11	Gnomon	gene	184112091	184122540	.	+	.	ID=gene3367;Dbxref=GeneID:102724830;Name=LOC102724830;gbkey=Gene;gene=LOC102724830;gene_biotype=lncRNA
+NC_000001.11	Gnomon	exon	184112558	184112960	.	+	.	Parent=lnc_RNA1662;Dbxref=GeneID:102724830,Genbank:XR_426875.3;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
+NC_000001.11	Gnomon	exon	184112558	184112960	.	+	.	Parent=lnc_RNA1661;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
+NC_000001.11	Gnomon	lnc_RNA	184112558	184122540	.	+	.	ID=lnc_RNA1662;Parent=gene3367;Dbxref=GeneID:102724830,Genbank:XR_426875.3;Name=XR_426875.3;gbkey=ncRNA;gene=LOC102724830;model_evidence=Supporting evidence includes similarity to: 100%25 coverage of the annotated genomic feature by RNAseq alignments%2C including 8 samples with support for all annotated introns;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
+NC_000001.11	Gnomon	lnc_RNA	184112558	184122540	.	+	.	ID=lnc_RNA1661;Parent=gene3367;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;Name=XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;model_evidence=Supporting evidence includes similarity to: 100%25 coverage of the annotated genomic feature by RNAseq alignments%2C including 2 samples with support for all annotated introns;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
+NC_000001.11	Gnomon	exon	184112865	184112960	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
+NC_000001.11	Gnomon	exon	184119720	184119835	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
+NC_000001.11	Gnomon	exon	184119720	184119835	.	+	.	Parent=lnc_RNA1662;Dbxref=GeneID:102724830,Genbank:XR_426875.3;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
+NC_000001.11	Gnomon	exon	184119720	184119849	.	+	.	Parent=lnc_RNA1661;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
+NC_000001.11	Gnomon	exon	184120965	184121250	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
+NC_000001.11	Gnomon	exon	184120965	184121250	.	+	.	Parent=lnc_RNA1662;Dbxref=GeneID:102724830,Genbank:XR_426875.3;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
+NC_000001.11	Gnomon	exon	184120965	184121250	.	+	.	Parent=lnc_RNA1661;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
+NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
+NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1662;Dbxref=GeneID:102724830,Genbank:XR_426875.3;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
+NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
+`,
+      )
+    },
+  )
 })

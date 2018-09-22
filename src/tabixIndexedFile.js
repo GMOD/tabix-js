@@ -1,4 +1,4 @@
-const { unzip } = require('@gmod/bgzf-filehandle')
+const { unzip, unzipChunk } = require('./unzip')
 const LRU = require('lru-cache')
 
 const LocalFile = require('./localFile')
@@ -183,6 +183,15 @@ class TabixIndexedFile {
     // actually takes up more than one block? this case is not covered here
 
     let bytes = await this._readRegion(0, maxFetch)
+    try {
+      bytes = unzip(bytes)
+    } catch (e) {
+      throw new Error(
+        `error decompressing block ${e.code} at 0 (length ${maxFetch})`,
+        e,
+      )
+    }
+
     // trim off lines after the last non-meta line
     if (metaChar) {
       // trim backward from the end
@@ -313,44 +322,22 @@ class TabixIndexedFile {
     return freshPromise
   }
 
-  _readRegion(position, compressedSize) {
-    return this._cacheWith(
-      this.blockCache,
-      `${position}/${compressedSize}`,
-      async () => {
-        // console.log(`reading region ${position} / ${compressedSize}`)
-        const { size: fileSize } = await this.filehandle.stat()
-        if (position + compressedSize > fileSize)
-          compressedSize = fileSize - position
+  async _readRegion(position, compressedSize) {
+    // console.log(`reading region ${position} / ${compressedSize}`)
+    const { size: fileSize } = await this.filehandle.stat()
+    if (position + compressedSize > fileSize)
+      compressedSize = fileSize - position
 
-        const compressedData = Buffer.alloc(compressedSize)
+    const compressedData = Buffer.alloc(compressedSize)
 
-        /* const bytesRead = */ await this.filehandle.read(
-          compressedData,
-          0,
-          compressedSize,
-          position,
-        )
-        // if (bytesRead !== compressedSize) {
-        //   debugger
-        //   // throw new Error(
-        //   //   `failed to read block at ${
-        //   //     chunk.minv.blockPosition
-        //   //   } (reported length is ${compressedSize}, but ${bytesRead} compressed bytes were read)`,
-        //   // )
-        // }
-        const uncompressed = await unzip(compressedData).catch(e => {
-          throw new Error(
-            `error decompressing block ${
-              e.code
-            } at ${position} (length ${compressedSize})`,
-            e,
-            compressedData,
-          )
-        })
-        return uncompressed
-      },
+    /* const bytesRead = */ await this.filehandle.read(
+      compressedData,
+      0,
+      compressedSize,
+      position,
     )
+
+    return compressedData
   }
 
   /**
@@ -361,22 +348,21 @@ class TabixIndexedFile {
    */
   readChunk(chunk) {
     return this._cacheWith(this.chunkCache, chunk.toString(), async () => {
-      const uncompressed = await this._readRegion(
+      // fetch the uncompressed data, uncompress carefully a block at a time,
+      // and stop when done
+
+      const compressedData = await this._readRegion(
         chunk.minv.blockPosition,
         chunk.fetchedSize(),
       )
+      let uncompressed
+      try {
+        uncompressed = unzipChunk(compressedData, chunk)
+      } catch (e) {
+        throw new Error(`error decompressing chunk ${chunk.toString()}`)
+      }
 
-      const lines = uncompressed
-        .slice(
-          chunk.minv.dataPosition,
-          // only have a slice end if the chunk is all in one bgzf block,
-          // because we can't calculate it if they are in different blocks
-          chunk.maxv.blockPosition === chunk.minv.blockPosition
-            ? chunk.maxv.dataPosition
-            : undefined,
-        )
-        .toString('utf8')
-        .split('\n')
+      const lines = uncompressed.toString('utf8').split('\n')
 
       // remove the last line, since it will be either empty or partial
       lines.pop()
