@@ -116,10 +116,14 @@ class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
+    const chunkResults = []
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
+      chunkResults.push(this.readChunk(chunks[chunkNum]))
+    }
+    const resolvedChunks = await Promise.all(chunkResults)
+    for (let chunkNum = 0; chunkNum < resolvedChunks.length; chunkNum += 1) {
+      const lines = resolvedChunks[chunkNum]
       let previousStartCoordinate
-      const lines = await this.readChunk(chunks[chunkNum])
-
       let currentLineStart = 0
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
