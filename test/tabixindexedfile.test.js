@@ -1,6 +1,7 @@
 const TabixIndexedFile = require('../src/tabixIndexedFile')
 const VirtualOffset = require('../src/virtualOffset')
 
+// const extended = it
 class RecordCollector {
   constructor() {
     this.clear()
@@ -15,6 +16,9 @@ class RecordCollector {
   clear() {
     this.records = []
     this.length = 0
+  }
+  text() {
+    return this.records.map(r => `${r.line}\n`).join('')
   }
 }
 describe('tabix file', () => {
@@ -259,5 +263,28 @@ describe('tabix file', () => {
     ).toEqual(lastBitOfLastHeaderLine)
     expect(headerString[headerString.length - 1]).toEqual('\n')
     expect(headerString.length).toEqual(5315655)
+  })
+
+  xit('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./extended_data/out.sorted.gff.gz'),
+    })
+
+    // const headerString = await f.getHeader()
+    // expect(headerString).toEqual('')
+
+    const lines = new RecordCollector()
+    // await f.getLines('ctgB', 0, Infinity, lines.callback)
+    // expect(lines.length).toEqual(0)
+
+    await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
+    // expect there to be no duplicate lines
+    const seen = {}
+    lines.forEach(({ line, fileOffset }) => {
+      expect(seen[line]).toBe(undefined)
+      seen[line] = fileOffset
+    })
+    // const text = lines.text()
+    // expect(text).toEqual(0)
   })
 })
