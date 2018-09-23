@@ -1,6 +1,6 @@
 const Long = require('long')
 
-const { unzip } = require('@gmod/bgzf-filehandle')
+const { unzip } = require('./unzip')
 
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')

@@ -3,7 +3,7 @@ const Long = require('long')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
-const { unzip } = require('@gmod/bgzf-filehandle')
+const { unzip } = require('./unzip')
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
@@ -137,6 +137,8 @@ class TabixIndex {
             currOffset += 16
             data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
             chunks[k] = new Chunk(u, v, bin)
+            if (chunks[k].minv.compareTo(chunks[k].maxv < 0))
+              debugger
           }
           binIndex[bin] = chunks
         }
