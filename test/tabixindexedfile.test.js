@@ -20,6 +20,13 @@ class RecordCollector {
   text() {
     return this.records.map(r => `${r.line}\n`).join('')
   }
+  expectNoDuplicates() {
+    const seen = {}
+    this.forEach(({ line, fileOffset }) => {
+      expect(seen[line]).toBe(undefined)
+      seen[line] = fileOffset
+    })
+  }
 }
 describe('tabix file', () => {
   it('can read ctgA:1000..4000', async () => {
@@ -31,6 +38,7 @@ describe('tabix file', () => {
     })
     const items = new RecordCollector()
     await f.getLines('ctgA', 1000, 4000, items.callback)
+    items.expectNoDuplicates()
     expect(items.length).toEqual(8)
     items.forEach(({ line, fileOffset }) => {
       line = line.split('\t')
@@ -121,26 +129,27 @@ describe('tabix file', () => {
     expect(headerString[headerString.length - 1]).toEqual('\n')
     expect(headerString.length).toEqual(130)
 
-    const lines = []
-    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    const lines = new RecordCollector()
+    await f.getLines('ctgB', 0, Infinity, lines.callback)
+    lines.expectNoDuplicates()
     expect(lines.length).toEqual(4)
-    expect(lines[3]).toEqual(
+    expect(lines.records[3].line).toEqual(
       'ctgB	example	remark	4715	5968	.	-	.	Name=f05;Note=ああ、この機能は、世界中を旅しています！',
     )
-    lines.length = 0
-    await f.getLines('ctgA', 10000000, Infinity, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgA', 10000000, Infinity, lines.callback)
     expect(lines.length).toEqual(0)
-    lines.length = 0
-    await f.getLines('ctgA', 0, Infinity, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgA', 0, Infinity, lines.callback)
     expect(lines.length).toEqual(237)
-    lines.length = 0
-    await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgB', 0, Infinity, lines.callback)
     expect(lines.length).toEqual(4)
-    lines.length = 0
-    await f.getLines('ctgB', 0, 4715, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgB', 0, 4715, lines.callback)
     expect(lines.length).toEqual(4)
-    lines.length = 0
-    await f.getLines('ctgB', 1, 4714, l => lines.push(l))
+    lines.clear()
+    await f.getLines('ctgB', 1, 4714, lines.callback)
     expect(lines.length).toEqual(3)
   })
   it('can query gvcf.vcf.gz', async () => {
@@ -184,6 +193,7 @@ describe('tabix file', () => {
     let lineCount = 0
     const lines = new RecordCollector()
     await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
+    lines.expectNoDuplicates()
     lines.forEach(({ line, fileOffset }) => {
       const fields = line.split('\t')
       lineCount += 1
@@ -238,6 +248,7 @@ describe('tabix file', () => {
     await f.getLines('1', 1206810423, 1206810424, lines.callback)
     expect(lines.length).toEqual(0)
     await f.getLines('1', 1206810423, 1206849288, lines.callback)
+    lines.expectNoDuplicates()
     expect(lines.length).toEqual(36)
     expect(lines.records[35].line).toEqual(
       '1	1206849288	.	G	A	106	.	DP=23;VDB=0.0399;AF1=1;AC1=2;DP4=0,0,16,7;MQ=35;FQ=-96	GT:PL:GQ	1/1:139,69,0:99',
@@ -265,7 +276,7 @@ describe('tabix file', () => {
     expect(headerString.length).toEqual(5315655)
   })
 
-  xit('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
+  it('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./extended_data/out.sorted.gff.gz'),
     })
@@ -279,11 +290,7 @@ describe('tabix file', () => {
 
     await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
     // expect there to be no duplicate lines
-    const seen = {}
-    lines.forEach(({ line, fileOffset }) => {
-      expect(seen[line]).toBe(undefined)
-      seen[line] = fileOffset
-    })
+    lines.expectNoDuplicates()
     // const text = lines.text()
     // expect(text).toEqual(0)
   })
