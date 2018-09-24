@@ -1,6 +1,6 @@
 {
   "name": "@gmod/tabix",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Read Tabix-indexed files, supports both .tbi and .csi indexes",
   "license": "MIT",
   "repository": "GMOD/tabix-js",
