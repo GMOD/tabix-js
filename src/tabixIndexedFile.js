@@ -142,7 +142,7 @@ class TabixIndexedFile {
         previousStartCoordinate = startCoordinate
 
         if (overlaps) {
-          lineCallback(line, fileOffset)
+          lineCallback(line.trim(), fileOffset)
         } else if (startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
           // we must be at the end of the relevant data and we can stop
@@ -150,7 +150,7 @@ class TabixIndexedFile {
           return
         }
 
-        currentLineStart += line.length
+        currentLineStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
         linesSinceLastYield += 1
