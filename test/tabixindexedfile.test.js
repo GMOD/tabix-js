@@ -277,6 +277,16 @@ describe('tabix file', () => {
     expect(headerString.length).toEqual(5315655)
   })
 
+  it('can fetch a CNV with length defined by END in INFO field', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/CNVtest.vcf.gz'),
+    })
+
+    const lines = new RecordCollector()
+    await f.getLines('22', 16063470, 16063480, lines.callback)
+    expect(lines.length).toEqual(1)
+  })
+
   extended(
     'can fetch NC_000001.11:184099343..184125655 correctly',
     async () => {
