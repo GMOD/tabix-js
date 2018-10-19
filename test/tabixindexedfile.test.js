@@ -108,17 +108,11 @@ describe('tabix file', () => {
       tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
       yieldLimit: 10,
     })
-    let err
-    const catchErr = e => {
-      err = e
-    }
-    await f.getLines('foo', 32, 24).catch(catchErr)
-    expect(err.toString()).toContain('invalid start')
-    err = undefined
-    await f.getLines().catch(catchErr)
-    expect(err.toString()).toContain('reference')
-    await f.getLines('foo', 23, 45).catch(catchErr)
-    expect(err.toString()).toContain('callback')
+    await expect(f.getLines('foo', 32, 24, () => {})).rejects.toThrow(
+      /invalid start/,
+    )
+    await expect(f.getLines()).rejects.toThrow(/reference/)
+    await expect(f.getLines('foo', 23, 45)).rejects.toThrow(/callback/)
   })
   it('can query volvox.sort.gff3.gz.1', async () => {
     const f = new TabixIndexedFile({
