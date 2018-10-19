@@ -167,8 +167,14 @@ describe('tabix file', () => {
     await f.getLines('ctgA', 4000, 5000, l => lines.push(l))
     expect(lines.length).toEqual(7)
     lines.length = 0
-    await f.getLines('ctgA', 4370, 4371, l => lines.push(l))
-    expect(lines.length).toEqual(0)
+    await f.getLines('ctgA', 4383, 4384, l => lines.push(l))
+    expect(lines.length).toEqual(1)
+    lines.length = 0
+    await f.getLines('ctgA', 4384, 4385, l => lines.push(l))
+    expect(lines.length).toEqual(1)
+    lines.length = 0
+    await f.getLines('ctgA', 4385, 4386, l => lines.push(l))
+    expect(lines.length).toEqual(1)
     lines.length = 0
     await f.getLines('ctgA', 4369, 4370, l => lines.push(l))
     expect(lines.length).toEqual(1)
