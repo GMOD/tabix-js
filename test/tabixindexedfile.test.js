@@ -2,6 +2,7 @@ const TabixIndexedFile = require('../src/tabixIndexedFile')
 const VirtualOffset = require('../src/virtualOffset')
 
 const { extended } = require('./utils')
+const LocalFile = require('../src/localFile')
 
 class RecordCollector {
   constructor() {
@@ -285,6 +286,54 @@ describe('tabix file', () => {
     const lines = new RecordCollector()
     await f.getLines('22', 16063470, 16063480, lines.callback)
     expect(lines.length).toEqual(1)
+  })
+
+  it('can get the correct fileOffset', async () => {
+    const uncompressedVcf = new LocalFile(
+      require.resolve('./data/OffsetTest.vcf'),
+    )
+    const { size: fileSize } = await uncompressedVcf.stat()
+    const vcfData = Buffer.alloc(fileSize)
+    await uncompressedVcf.read(vcfData, 0, fileSize, 0)
+    const FirstLineStart = vcfData.indexOf('contigA', 0, 'utf8')
+    const SecondLineStart = vcfData.indexOf(
+      'contigA',
+      FirstLineStart + 1,
+      'utf8',
+    )
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/OffsetTest.vcf.gz'),
+    })
+
+    const lines = new RecordCollector()
+    await f.getLines('contigA', 2999, 3110, lines.callback)
+    expect(lines.length).toEqual(2)
+    expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
+    expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
+  })
+
+  it('can get the correct fileOffset with CRLF line endings', async () => {
+    const uncompressedVcf = new LocalFile(
+      require.resolve('./data/CrlfOffsetTest.vcf'),
+    )
+    const { size: fileSize } = await uncompressedVcf.stat()
+    const vcfData = Buffer.alloc(fileSize)
+    await uncompressedVcf.read(vcfData, 0, fileSize, 0)
+    const FirstLineStart = vcfData.indexOf('contigA', 0, 'utf8')
+    const SecondLineStart = vcfData.indexOf(
+      'contigA',
+      FirstLineStart + 1,
+      'utf8',
+    )
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/CrlfOffsetTest.vcf.gz'),
+    })
+
+    const lines = new RecordCollector()
+    await f.getLines('contigA', 2999, 3110, lines.callback)
+    expect(lines.length).toEqual(2)
+    expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
+    expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
   })
 
   extended(

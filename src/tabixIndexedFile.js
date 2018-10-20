@@ -116,7 +116,7 @@ class TabixIndexedFile {
       let previousStartCoordinate
       const lines = await this.readChunk(chunks[chunkNum])
 
-      let currentLineStart = 0
+      let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
         const fileOffset =
