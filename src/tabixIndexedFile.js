@@ -275,8 +275,8 @@ class TabixIndexedFile {
     let currentColumnStart = 0
     let refSeq = ' '
     let startCoordinate
-    for (let i = 0; i < line.length; i += 1) {
-      if (line[i] === '\t') {
+    for (let i = 0; i < line.length + 1; i += 1) {
+      if (line[i] === '\t' || i === line.length) {
         if (currentColumnNumber === ref) {
           let refName = line.slice(currentColumnStart, i)
           refName = this.renameRefSeq(refName)
