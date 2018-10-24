@@ -273,7 +273,7 @@ class TabixIndexedFile {
 
     let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
     let currentColumnStart = 0
-    let refSeq = ' '
+    let refSeq
     let startCoordinate
     for (let i = 0; i < line.length + 1; i += 1) {
       if (line[i] === '\t' || i === line.length) {
@@ -290,7 +290,7 @@ class TabixIndexedFile {
             // if we have no end, we assume the feature is 1 bp long
             if (startCoordinate + 1 <= regionStart) return { overlaps: false }
           }
-        } else if ((format === 'VCF') & (currentColumnNumber === 4)) {
+        } else if (format === 'VCF' && currentColumnNumber === 4) {
           refSeq = line.slice(currentColumnStart, i)
         } else if (currentColumnNumber === end) {
           let endCoordinate
@@ -317,7 +317,7 @@ class TabixIndexedFile {
     if (info[0] !== '.') {
       let prevChar = ';'
       for (let j = 0; j < info.length; j += 1) {
-        if ((prevChar === ';') & (info.slice(j, j + 4) === 'END=')) {
+        if (prevChar === ';' && info.slice(j, j + 4) === 'END=') {
           let valueEnd = info.indexOf(';', j)
           if (valueEnd === -1) valueEnd = info.length
           endCoordinate = parseInt(info.slice(j + 4, valueEnd), 10)
