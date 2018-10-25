@@ -285,10 +285,12 @@ class TabixIndexedFile {
           startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           // we convert to 0-based-half-open
           if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd) return { overlaps: false }
+          if (startCoordinate >= regionEnd)
+            return { startCoordinate, overlaps: false }
           if (end === 0) {
             // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart) return { overlaps: false }
+            if (startCoordinate + 1 <= regionStart)
+              return { startCoordinate, overlaps: false }
           }
         } else if (format === 'VCF' && currentColumnNumber === 4) {
           refSeq = line.slice(currentColumnStart, i)
