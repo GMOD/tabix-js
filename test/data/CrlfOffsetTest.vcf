@@ -1,0 +1,5 @@
+##fileformat=VCFv4.1
+##INFO=<ID=TEST,Number=1,Type=String,Description="A test INFO tag">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+contigA	3000	rs17883296	G	T	100	PASS	TEST=abc
+contigA	3105	rs17878855	G	C	100	q10	TEST=def

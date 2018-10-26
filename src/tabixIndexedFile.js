@@ -89,19 +89,15 @@ class TabixIndexedFile {
   async getLines(refName, start, end, lineCallback) {
     if (refName === undefined)
       throw new TypeError('must provide a reference sequence name')
+    if (!lineCallback) throw new TypeError('line callback must be provided')
     if (!(start <= end))
       throw new TypeError(
         'invalid start and end coordinates. must be provided, and start must be less than or equal to end',
       )
-    if (!lineCallback) throw new TypeError('line callback must be provided')
+    else if (start === end) return
 
     const chunks = await this.index.blocksForRange(refName, start, end)
     const metadata = await this.index.getMetadata()
-    metadata.maxColumn = Math.max(
-      metadata.columnNumbers.ref || 0,
-      metadata.columnNumbers.start || 0,
-      metadata.columnNumbers.end || 0,
-    )
 
     // check the chunks for any that are over the size limit.  if
     // any are, don't fetch any of them
@@ -120,7 +116,7 @@ class TabixIndexedFile {
       let previousStartCoordinate
       const lines = await this.readChunk(chunks[chunkNum])
 
-      let currentLineStart = 0
+      let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
         const fileOffset =
@@ -245,7 +241,7 @@ class TabixIndexedFile {
 
   /**
    * @param {object} metadata metadata object from the parsed index,
-   * containing columnNumbers, metaChar, and maxColumn
+   * containing columnNumbers, metaChar, and format
    * @param {string} regionRefName
    * @param {number} regionStart region start coordinate (0-based-half-open)
    * @param {number} regionEnd region end coordinate (0-based-half-open)
@@ -254,7 +250,7 @@ class TabixIndexedFile {
    * true if line is a data line that overlaps the given region
    */
   checkLine(
-    { columnNumbers, metaChar, maxColumn, coordinateType },
+    { columnNumbers, metaChar, coordinateType, format },
     regionRefName,
     regionStart,
     regionEnd,
@@ -268,6 +264,8 @@ class TabixIndexedFile {
     if (!ref) ref = 0
     if (!start) start = 0
     if (!end) end = 0
+    if (format === 'VCF') end = 8
+    const maxColumn = Math.max(ref, start, end)
 
     // this code is kind of complex, but it is fairly fast.
     // basically, we want to avoid doing a split, because if the lines are really long
@@ -275,9 +273,10 @@ class TabixIndexedFile {
 
     let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
     let currentColumnStart = 0
+    let refSeq
     let startCoordinate
-    for (let i = 0; i < line.length; i += 1) {
-      if (line[i] === '\t') {
+    for (let i = 0; i < line.length + 1; i += 1) {
+      if (line[i] === '\t' || i === line.length) {
         if (currentColumnNumber === ref) {
           let refName = line.slice(currentColumnStart, i)
           refName = this.renameRefSeq(refName)
@@ -286,14 +285,25 @@ class TabixIndexedFile {
           startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           // we convert to 0-based-half-open
           if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd) return { overlaps: false }
+          if (startCoordinate >= regionEnd)
+            return { startCoordinate, overlaps: false }
           if (end === 0) {
             // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart) return { overlaps: false }
+            if (startCoordinate + 1 <= regionStart)
+              return { startCoordinate, overlaps: false }
           }
+        } else if (format === 'VCF' && currentColumnNumber === 4) {
+          refSeq = line.slice(currentColumnStart, i)
         } else if (currentColumnNumber === end) {
+          let endCoordinate
           // this will never match if there is no end column
-          const endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
+          if (format === 'VCF')
+            endCoordinate = this._getVcfEnd(
+              startCoordinate,
+              refSeq,
+              line.slice(currentColumnStart, i),
+            )
+          else endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           if (endCoordinate <= regionStart) return { overlaps: false }
         }
         currentColumnStart = i + 1
@@ -302,6 +312,23 @@ class TabixIndexedFile {
       }
     }
     return { startCoordinate, overlaps: true }
+  }
+
+  _getVcfEnd(startCoordinate, refSeq, info) {
+    let endCoordinate = startCoordinate + refSeq.length
+    if (info[0] !== '.') {
+      let prevChar = ';'
+      for (let j = 0; j < info.length; j += 1) {
+        if (prevChar === ';' && info.slice(j, j + 4) === 'END=') {
+          let valueEnd = info.indexOf(';', j)
+          if (valueEnd === -1) valueEnd = info.length
+          endCoordinate = parseInt(info.slice(j + 4, valueEnd), 10)
+          break
+        }
+        prevChar = info[j]
+      }
+    }
+    return endCoordinate
   }
 
   /**
