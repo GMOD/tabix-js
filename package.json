@@ -42,10 +42,10 @@
     "genomics"
   ],
   "dependencies": {
+    "es6-promisify": "^6.0.1",
     "long": "^4.0.0",
     "pako": "1.0.6",
-    "quick-lru": "^2.0.0",
-    "util.promisify": "^1.0.0"
+    "quick-lru": "^2.0.0"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
