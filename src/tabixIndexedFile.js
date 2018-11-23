@@ -1,5 +1,5 @@
 const { unzip, unzipChunk } = require('./unzip')
-const LRU = require('lru-cache')
+const LRU = require('quick-lru')
 
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
@@ -72,11 +72,12 @@ class TabixIndexedFile {
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
     this.renameRefSeqCallback = renameRefSeqs
-    this.chunkCache = LRU({
-      max: Math.floor(chunkCacheSize / (1 << 16)),
-      length: () => 1,
+    this.chunkCache = new LRU({
+      maxSize: Math.floor(chunkCacheSize / (1 << 16))
     })
-    this.blockCache = LRU({ max: Math.floor(blockCacheSize / (1 << 16)) })
+    this.blockCache = new LRU({
+      maxSize: Math.floor(blockCacheSize / (1 << 16))
+    })
   }
 
   /**
