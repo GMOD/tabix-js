@@ -73,10 +73,10 @@ class TabixIndexedFile {
     this.yieldLimit = yieldLimit
     this.renameRefSeqCallback = renameRefSeqs
     this.chunkCache = new LRU({
-      maxSize: Math.floor(chunkCacheSize / (1 << 16))
+      maxSize: Math.floor(chunkCacheSize / (1 << 16)),
     })
     this.blockCache = new LRU({
-      maxSize: Math.floor(blockCacheSize / (1 << 16))
+      maxSize: Math.floor(blockCacheSize / (1 << 16)),
     })
   }
 
