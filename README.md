@@ -1,7 +1,8 @@
 # @gmod/tabix
 
 [![NPM version](https://img.shields.io/npm/v/@gmod/tabix.svg?style=flat-square)](https://npmjs.org/package/@gmod/tabix)
-[![Build Status](https://img.shields.io/travis/GMOD/tabix-js/master.svg?style=flat-square)](https://travis-ci.org/GMOD/tabix-js) [![Greenkeeper badge](https://badges.greenkeeper.io/GMOD/tabix-js.svg)](https://greenkeeper.io/) 
+[![Build Status](https://img.shields.io/travis/GMOD/tabix-js/master.svg?style=flat-square)](https://travis-ci.org/GMOD/tabix-js)
+[![Greenkeeper badge](https://badges.greenkeeper.io/GMOD/tabix-js.svg)](https://greenkeeper.io/)
 
 Read Tabix-indexed files using either .tbi or .csi indexes.
 
@@ -25,7 +26,7 @@ const csiIndexed = new TabixIndexedFile({
 })
 
 // iterate over lines in the specified region, each of which
-// is structured as 
+// is structured as
 const lines = []
 await tbiIndexed.getLines('ctgA',200,300, (line, fileOffset) => lines.push(line))
 // lines is now an array of strings, which are data lines.
