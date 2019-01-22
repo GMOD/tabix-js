@@ -42,7 +42,7 @@ class TabixIndex {
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
     if (!idx) return -1
-    const stats = indexData.indices[refId].stats
+    const { stats } = indexData.indices[refId]
     if (stats) return stats.lineCount
     return -1
   }

@@ -1,5 +1,5 @@
-const { unzip, unzipChunk } = require('./unzip')
 const LRU = require('quick-lru')
+const { unzip, unzipChunk } = require('./unzip')
 
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')

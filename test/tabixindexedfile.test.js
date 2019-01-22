@@ -12,16 +12,20 @@ class RecordCollector {
       this.length += 1
     }
   }
+
   forEach(cb) {
     this.records.forEach(cb)
   }
+
   clear() {
     this.records = []
     this.length = 0
   }
+
   text() {
     return this.records.map(r => `${r.line}\n`).join('')
   }
+
   expectNoDuplicates() {
     const seen = {}
     this.forEach(({ line, fileOffset }) => {

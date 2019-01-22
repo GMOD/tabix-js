@@ -9,7 +9,7 @@ function pakoUnzip(inputData) {
   do {
     const remainingInput = inputData.slice(pos)
     inflator = new Inflate()
-    strm = inflator.strm
+    ;({ strm } = inflator)
     inflator.push(remainingInput, Z_SYNC_FLUSH)
     if (inflator.err) throw new Error(inflator.msg)
 
@@ -35,7 +35,7 @@ function unzipChunk(inputData, chunk) {
   for (;;) {
     const remainingInput = inputData.slice(pos)
     inflator = new Inflate()
-    strm = inflator.strm
+    ;({ strm } = inflator)
     inflator.push(remainingInput, Z_SYNC_FLUSH)
     if (inflator.err) throw new Error(inflator.msg)
 
