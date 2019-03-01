@@ -65,4 +65,12 @@ describe('csi index', () => {
       skipLines: 0,
     })
   })
+  it('loads blank.csi', async () => {
+    const ti = new CSI({
+      filehandle: new LocalFile(require.resolve('./data/blank.csi')),
+    })
+    const indexData = await ti.parse()
+    expect(await ti.lineCount('wtf')).toEqual(-1)
+  })
+
 })

@@ -34,4 +34,11 @@ describe('tbi index', () => {
       skipLines: 0,
     })
   })
+  it('loads blank.tbi', async () => {
+    const ti = new TabixIndex({
+      filehandle: new LocalFile(require.resolve('./data/blank.tbi')),
+    })
+    const indexData = await ti.parse()
+    expect(await ti.lineCount('wtf')).toEqual(-1)
+  })
 })

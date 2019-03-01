@@ -64,7 +64,7 @@ class CSI {
 
   async lineCount(refName) {
     const indexData = await this.parse()
-    if (!indexData) return -1
+    if (!indexData || !indexData.indices.length) return -1
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
     if (!idx) return -1
