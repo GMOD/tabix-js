@@ -190,6 +190,9 @@ describe('tabix file', () => {
       path: require.resolve('./data/out.gff.gz'),
     })
 
+    expect(await f.lineCount('nonexistent')).toEqual(-1)
+    expect(await f.lineCount('NC_000001.11')).toEqual(350741)
+
     const headerString = await f.getHeader()
     expect(headerString.length).toEqual(132)
     expect(headerString[headerString.length - 1]).toEqual('\n')
@@ -199,6 +202,7 @@ describe('tabix file', () => {
     let lineCount = 0
     const lines = new RecordCollector()
     await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
+    console.log(lines)
     lines.expectNoDuplicates()
     lines.forEach(({ line, fileOffset }) => {
       const fields = line.split('\t')

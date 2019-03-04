@@ -72,5 +72,4 @@ describe('csi index', () => {
     const indexData = await ti.parse()
     expect(await ti.lineCount('wtf')).toEqual(-1)
   })
-
 })

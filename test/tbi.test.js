@@ -47,6 +47,6 @@ describe('tbi index', () => {
     })
     const indexData = await ti.parse()
     expect(await ti.lineCount('wtf')).toEqual(-1)
-    expect(await ti.lineCount('chr1A')).toEqual(-1)
+    expect(await ti.lineCount('chr1A')).toEqual(10491)
   })
 })

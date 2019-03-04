@@ -1,11 +1,11 @@
 const Long = require('long')
-// const { Parser } = require('binary-parser')
+const { Parser } = require('@gmod/binary-parser')
+
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
 const { unzip } = require('./unzip')
 
-const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
 const { longToNumber } = require('./util')
@@ -51,114 +51,127 @@ class TabixIndex {
    * @returns {Promise} for an object like
    * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId, coordinateType, format }`
    */
-  async getMetadata() {
-    const {
-      columnNumbers,
-      metaChar,
-      format,
-      coordinateType,
-      skipLines,
-      refIdToName,
-      refNameToId,
-      firstDataLine,
-      maxBlockSize,
-    } = await this.parse()
-    return {
-      columnNumbers,
-      metaChar,
-      format,
-      coordinateType,
-      skipLines,
-      refIdToName,
-      refNameToId,
-      firstDataLine,
-      maxBlockSize,
-      maxBinNumber: ((1 << 18) - 1) / 7,
-    }
+  getMetadata() {
+    return this.parse()
   }
 
   // memoize
   // fetch and parse the index
   async parse() {
-    const data = { depth: 5, maxBlockSize: 1 << 16 }
     const bytes = await unzip(await this.filehandle.readFile())
+    const depth = 5
+    const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
+    const p = new Parser()
+      .uint32('magic', { assert: val => val === 21578324 /* TBI\1 */ })
+      .int32('refCount')
+      .int32('formatFlags')
+      .int32('ref')
+      .int32('start')
+      .int32('end')
+      .int32('metaValue')
+      .int32('skipLines')
+      .int32('nameSectionLength')
+      .buffer('names', { length: 'nameSectionLength' })
+      .array('indices', {
+        length: 'refCount',
+        type: new Parser()
+          .int32('binCount')
+          .array('bins', {
+            length: 'binCount',
+            type: new Parser().uint32('bin').choice('binContents', {
+              tag: 'bin',
+              choices: {
+                [maxBinNumber + 1]: new Parser()
+                  .int32('chunkCount')
+                  .buffer('pseudoBin', {
+                    length: 32,
+                  }),
+              },
+              defaultChoice: new Parser().int32('chunkCount').array('chunks', {
+                length: 'chunkCount',
+                type: new Parser()
+                  .buffer('u', { length: 8 })
+                  .buffer('v', { length: 8 }),
+              }),
+            }),
+          })
+          .int32('linearCount')
+          .array('linearIndex', {
+            length: 'linearCount',
+            type: new Parser().buffer('offset', { length: 8 }),
+          }),
+      })
 
-    // check TBI magic numbers
-    if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
-      throw new Error('Not a TBI file')
-      // TODO: do we need to support big-endian TBI files?
-    }
+    const data = p.parse(bytes).result
+    Object.assign(data, this._parseNameBytes(data.names))
 
-    // number of reference sequences in the index
-    data.refCount = bytes.readInt32LE(4)
-    data.formatFlags = bytes.readInt32LE(8)
-    data.coordinateType =
-      data.formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    data.format = { 0: 'generic', 1: 'SAM', 2: 'VCF' }[data.formatFlags & 0xf]
-    if (!data.format)
-      throw new Error(`invalid Tabix preset format flags ${data.formatFlags}`)
-    data.columnNumbers = {
-      ref: bytes.readInt32LE(12),
-      start: bytes.readInt32LE(16),
-      end: bytes.readInt32LE(20),
-    }
-    data.metaValue = bytes.readInt32LE(24)
-    data.depth = 5
-    data.maxBinNumber = ((1 << ((data.depth + 1) * 3)) - 1) / 7
+    data.maxBlockSize = 1 << 16
     data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : null
-    data.skipLines = bytes.readInt32LE(28)
+    data.columnNumbers = { ref: data.ref, start: data.start, end: data.end }
+    console.log(data.indices[0].bins.filter(b => b.bin == maxBinNumber+1))
 
-    // read sequence dictionary
-    const nameSectionLength = bytes.readInt32LE(32)
-    const names = this._parseNameBytes(bytes.slice(36, 36 + nameSectionLength))
-    Object.assign(data, names)
+    if (data.indices)
+      data.indices.forEach(ret => {
+        ret.linearIndex = new VirtualOffset(ret.linearIndex)
+        if (ret.bins)
+          ret.bins.forEach(bin => {
+            if(bin.bin == maxBinNumber+1) {
+              const lineCount = longToNumber(
+                Long.fromBytesLE(bin.binContents.pseudoBin.slice(16, 24), true),
+              )
+              ret.stats = { lineCount }
+            }
+            else if (bin.chunks)
+              bin.chunks.forEach(chunk => {
+                chunk.u = new VirtualOffset(chunk.u)
+                chunk.v = new VirtualOffset(chunk.v)
+              })
+          })
+      })
+    console.log(data)
 
-    // read the indexes for each reference sequence
-    data.indices = new Array(data.refCount)
-    let currOffset = 36 + nameSectionLength
-    for (let i = 0; i < data.refCount; i += 1) {
-      // the binning index
-      const binCount = bytes.readInt32LE(currOffset)
-      currOffset += 4
-      const binIndex = {}
-      let stats
-      for (let j = 0; j < binCount; j += 1) {
-        const bin = bytes.readUInt32LE(currOffset)
-        if (bin > data.maxBinNumber) {
-          stats = this.parsePseudoBin(bytes, currOffset + 4)
-          currOffset += 8 + 2 * 16
-        } else {
-          const chunkCount = bytes.readInt32LE(currOffset + 4)
-          const chunks = new Array(chunkCount)
-          currOffset += 8
-          for (let k = 0; k < chunkCount; k += 1) {
-            const u = VirtualOffset.fromBytes(bytes, currOffset)
-            const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
-            currOffset += 16
-            data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
-            chunks[k] = new Chunk(u, v, bin)
-          }
-          binIndex[bin] = chunks
-        }
-      }
+    //     // read the indexes for each reference sequence
+    //     data.indices = new Array(data.refCount)
+    //     let currOffset = 36 + nameSectionLength
+    //     for (let i = 0; i < data.refCount; i += 1) {
+    //       // the binning index
+    //       const binCount = bytes.readInt32LE(currOffset)
+    //       currOffset += 4
+    //       const binIndex = {}
+    //       let stats
+    //       for (let j = 0; j < binCount; j += 1) {
+    //         const bin = bytes.readUInt32LE(currOffset)
+    //         const chunkCount = bytes.readInt32LE(currOffset + 4)
+    //         console.log(chunkCount, bin>data.maxBinNumber)
 
-      // the linear index
-      const linearCount = bytes.readInt32LE(currOffset)
-      currOffset += 4
-      const linearIndex = new Array(linearCount)
-      for (let k = 0; k < linearCount; k += 1) {
-        linearIndex[k] = VirtualOffset.fromBytes(bytes, currOffset)
-        currOffset += 8
-        data.firstDataLine = VirtualOffset.min(
-          data.firstDataLine,
-          linearIndex[k],
-        )
-      }
+    //         const chunks = new Array(chunkCount)
+    //         currOffset += 8
+    //         for (let k = 0; k < chunkCount; k += 1) {
+    //           const u = VirtualOffset.fromBytes(bytes, currOffset)
+    //           const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
+    //           currOffset += 16
+    //           data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
+    //           chunks[k] = new Chunk(u, v, bin)
+    //         }
+    //         binIndex[bin] = chunks
+    //       }
+    //       // the linear index
+    //       const linearCount = bytes.readInt32LE(currOffset)
+    //       currOffset += 4
+    //       const linearIndex = new Array(linearCount)
+    //       for (let k = 0; k < linearCount; k += 1) {
+    //         linearIndex[k] = VirtualOffset.fromBytes(bytes, currOffset)
+    //         currOffset += 8
+    //         data.firstDataLine = VirtualOffset.min(
+    //           data.firstDataLine,
+    //           linearIndex[k],
+    //         )
+    //       }
 
-      data.indices[i] = { binIndex, linearIndex, stats }
-    }
+    //       data.indices[i] = { binIndex, linearIndex, stats }
+    //     }
 
-    return data
+    return data // data
   }
 
   parsePseudoBin(bytes, offset) {
@@ -199,9 +212,10 @@ class TabixIndex {
     const refId = indexData.refNameToId[refName]
     const indexes = indexData.indices[refId]
     if (!indexes) return []
+    console.log(indexes)
+    return []
 
     const { linearIndex, binIndex } = indexes
-
     const bins = reg2bins(beg, end)
 
     const minOffset = linearIndex.length
