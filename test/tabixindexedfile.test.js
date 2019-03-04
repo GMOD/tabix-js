@@ -202,7 +202,6 @@ describe('tabix file', () => {
     let lineCount = 0
     const lines = new RecordCollector()
     await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
-    console.log(lines)
     lines.expectNoDuplicates()
     lines.forEach(({ line, fileOffset }) => {
       const fields = line.split('\t')

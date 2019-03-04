@@ -98,6 +98,7 @@ class TabixIndexedFile {
     else if (start === end) return
 
     const chunks = await this.index.blocksForRange(refName, start, end)
+    console.log(chunks, 'chunks')
     const metadata = await this.index.getMetadata()
 
     // check the chunks for any that are over the size limit.  if

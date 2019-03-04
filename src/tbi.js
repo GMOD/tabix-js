@@ -68,7 +68,7 @@ class TabixIndex {
       .int32('ref')
       .int32('start')
       .int32('end')
-      .int32('metaValue')
+      .int32('metaChar')
       .int32('skipLines')
       .int32('nameSectionLength')
       .buffer('names', { length: 'nameSectionLength' })
@@ -106,82 +106,39 @@ class TabixIndex {
     Object.assign(data, this._parseNameBytes(data.names))
 
     data.maxBlockSize = 1 << 16
-    data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : null
+    data.metaChar = data.metaChar ? String.fromCharCode(data.metaChar) : null
     data.columnNumbers = { ref: data.ref, start: data.start, end: data.end }
-    console.log(data.indices[0].bins.filter(b => b.bin == maxBinNumber+1))
 
-    if (data.indices)
-      data.indices.forEach(ret => {
-        ret.linearIndex = new VirtualOffset(ret.linearIndex)
-        if (ret.bins)
-          ret.bins.forEach(bin => {
-            if(bin.bin == maxBinNumber+1) {
-              const lineCount = longToNumber(
-                Long.fromBytesLE(bin.binContents.pseudoBin.slice(16, 24), true),
-              )
-              ret.stats = { lineCount }
-            }
-            else if (bin.chunks)
-              bin.chunks.forEach(chunk => {
-                chunk.u = new VirtualOffset(chunk.u)
-                chunk.v = new VirtualOffset(chunk.v)
-              })
-          })
+    if (data.indices) {
+      data.indices = data.indices.map(ret => {
+        let stats
+        const linearIndex = new VirtualOffset(ret.linearIndex)
+        const binIndex = ret.bins.map(bin => {
+          if (bin.bin == maxBinNumber + 1) {
+            const lineCount = longToNumber(
+              Long.fromBytesLE(bin.binContents.pseudoBin.slice(16, 24), true),
+            )
+            stats = { lineCount }
+          } else if (bin.binContents.chunks) {
+            bin.chunks = bin.binContents.chunks.map(chunk => {
+              const u = new VirtualOffset(chunk.u)
+              const v = new VirtualOffset(chunk.v)
+              data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
+              return new Chunk(u, v)
+            })
+          }
+          bin.binContents = undefined
+          return bin
+        })
+
+        return { binIndex, linearIndex, stats }
       })
-    console.log(data)
+      data.firstDataLine = data.indices.reduce((accum, curr) => {
+        VirtualOffset.min(accum, curr.linearIndex)
+      }, data.firstDataLine)
+    }
 
-    //     // read the indexes for each reference sequence
-    //     data.indices = new Array(data.refCount)
-    //     let currOffset = 36 + nameSectionLength
-    //     for (let i = 0; i < data.refCount; i += 1) {
-    //       // the binning index
-    //       const binCount = bytes.readInt32LE(currOffset)
-    //       currOffset += 4
-    //       const binIndex = {}
-    //       let stats
-    //       for (let j = 0; j < binCount; j += 1) {
-    //         const bin = bytes.readUInt32LE(currOffset)
-    //         const chunkCount = bytes.readInt32LE(currOffset + 4)
-    //         console.log(chunkCount, bin>data.maxBinNumber)
-
-    //         const chunks = new Array(chunkCount)
-    //         currOffset += 8
-    //         for (let k = 0; k < chunkCount; k += 1) {
-    //           const u = VirtualOffset.fromBytes(bytes, currOffset)
-    //           const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
-    //           currOffset += 16
-    //           data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
-    //           chunks[k] = new Chunk(u, v, bin)
-    //         }
-    //         binIndex[bin] = chunks
-    //       }
-    //       // the linear index
-    //       const linearCount = bytes.readInt32LE(currOffset)
-    //       currOffset += 4
-    //       const linearIndex = new Array(linearCount)
-    //       for (let k = 0; k < linearCount; k += 1) {
-    //         linearIndex[k] = VirtualOffset.fromBytes(bytes, currOffset)
-    //         currOffset += 8
-    //         data.firstDataLine = VirtualOffset.min(
-    //           data.firstDataLine,
-    //           linearIndex[k],
-    //         )
-    //       }
-
-    //       data.indices[i] = { binIndex, linearIndex, stats }
-    //     }
-
-    return data // data
-  }
-
-  parsePseudoBin(bytes, offset) {
-    // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
-    // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
-    const lineCount = longToNumber(
-      Long.fromBytesLE(bytes.slice(offset + 20, offset + 28), true),
-    )
-    // const four = Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true)
-    return { lineCount }
+    return data
   }
 
   _parseNameBytes(namesBytes) {
@@ -208,14 +165,16 @@ class TabixIndex {
     if (beg < 0) beg = 0
 
     const indexData = await this.parse()
+    console.log(indexData, indexData.refNameToId, indexes)
     if (!indexData) return []
     const refId = indexData.refNameToId[refName]
     const indexes = indexData.indices[refId]
-    if (!indexes) return []
     console.log(indexes)
-    return []
+    if (!indexes) return []
 
     const { linearIndex, binIndex } = indexes
+    console.log(binIndex, 'binIndex')
+    console.log(linearIndex)
     const bins = reg2bins(beg, end)
 
     const minOffset = linearIndex.length
