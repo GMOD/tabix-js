@@ -1,3 +1,4 @@
+const bsplit = require('buffer-split')
 const LRU = require('quick-lru')
 const { unzip, unzipChunk } = require('./unzip')
 
@@ -78,6 +79,51 @@ class TabixIndexedFile {
     this.blockCache = new LRU({
       maxSize: Math.floor(blockCacheSize / (1 << 16)),
     })
+  }
+
+  async getLineCount(refName, start, end) {
+    if (refName === undefined)
+      throw new TypeError('must provide a reference sequence name')
+    if (!(start <= end))
+      throw new TypeError(
+        'invalid start and end coordinates. must be provided, and start must be less than or equal to end',
+      )
+    else if (start === end) return 0
+
+    const chunks = await this.index.blocksForRange(refName, start, end)
+
+    // check the chunks for any that are over the size limit.  if
+    // any are, don't fetch any of them
+    for (let i = 0; i < chunks.length; i += 1) {
+      const size = chunks[i].fetchedSize()
+      if (size > this.chunkSizeLimit) {
+        throw new Error(
+          `Too much data. Chunk size ${size.toLocaleString()} bytes exceeds chunkSizeLimit of ${this.chunkSizeLimit.toLocaleString()}.`,
+        )
+      }
+    }
+
+    let lineCount = 0
+    // now go through each chunk and parse and filter the lines out of it
+    for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
+      const chunk = chunks[chunkNum]
+      const compressedData = await this._readRegion(
+        chunk.minv.blockPosition,
+        chunk.fetchedSize(),
+      )
+      let uncompressed
+      try {
+        uncompressed = unzipChunk(compressedData, chunk)
+      } catch (e) {
+        throw new Error(`error decompressing chunk ${chunk.toString()}`)
+      }
+
+      const lines = bsplit(uncompressed, Buffer.from('\n'))
+
+      // remove the last line, since it will be either empty or partial
+      lineCount += lines.length - 1
+    }
+    return lineCount
   }
 
   /**
