@@ -125,31 +125,15 @@ class TabixIndex {
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
         currOffset += 4
-        if (bin === data.maxBinNumber+1) {
+        if (bin === data.maxBinNumber + 1) {
           const chunkCount = bytes.readInt32LE(currOffset)
-          currOffset+=4
-          console.log(chunkCount)
-          //console.log(`NORMAL::::bin# ${bin}\tchunkCount ${chunkCount}`)
-          // // stats = this.parsePseudoBin(bytes, currOffset)
-          // // currOffset += chunkCount*16
-          if(chunkCount == 2) {
+          currOffset += 4
+          if (chunkCount === 2) {
             stats = this.parsePseudoBin(bytes, currOffset)
           }
-          currOffset += 16*chunkCount
-          // const chunks = new Array(chunkCount)
-          // for (let k = 0; k < chunkCount; k += 1) {
-          //   const u = VirtualOffset.fromBytes(bytes, currOffset)
-          //   const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
-          //   currOffset += 16
-          //   chunks[k] = new Chunk(u, v, bin)
-          // }
-          //binIndex[bin] = chunks
-          // if(chunks.length > 1) {
-          //   stats = {lineCount: chunks[1].minv.dataPosition}
-          // }
+          currOffset += 16 * chunkCount
         } else {
           const chunkCount = bytes.readInt32LE(currOffset)
-          //console.log(`NORMAL::::bin# ${bin}\tchunkCount ${chunkCount}`)
           currOffset += 4
           const chunks = new Array(chunkCount)
           for (let k = 0; k < chunkCount; k += 1) {
