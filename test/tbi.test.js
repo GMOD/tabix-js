@@ -34,4 +34,13 @@ describe('tbi index', () => {
       skipLines: 0,
     })
   })
+  it('failing tabix', async () => {
+    const ti = new TabixIndex({
+      filehandle: new LocalFile(
+        require.resolve('./data/failing_tabix.vcf.gz.tbi'),
+      ),
+    })
+
+    await expect(ti.parse()).rejects.toThrow(/too many bins/)
+  })
 })
