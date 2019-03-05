@@ -34,4 +34,15 @@ describe('tbi index', () => {
       skipLines: 0,
     })
   })
+  it('failing tabix', async () => {
+    const ti = new TabixIndex({
+      filehandle: new LocalFile(
+        require.resolve('./data/failing_tabix.vcf.gz.tbi'),
+      ),
+    })
+    const indexData = await ti.parse()
+    expect(indexData.columnNumbers.start).toEqual(2)
+    expect(indexData.columnNumbers.ref).toEqual(1)
+    expect(indexData.columnNumbers.end).toEqual(0)
+  })
 })

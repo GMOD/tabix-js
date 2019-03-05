@@ -124,13 +124,18 @@ class TabixIndex {
       let stats
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
-        if (bin > data.maxBinNumber) {
-          stats = this.parsePseudoBin(bytes, currOffset + 4)
-          currOffset += 8 + 2 * 16
+        currOffset += 4
+        if (bin === data.maxBinNumber + 1) {
+          const chunkCount = bytes.readInt32LE(currOffset)
+          currOffset += 4
+          stats = this.parsePseudoBin(bytes, currOffset)
+          console.log(`PSEUDO:::::bin# ${bin}\tchunkCount: ${chunkCount}\tlineCount ${stats.lineCount}`)
+          currOffset += 2 * 16
         } else {
-          const chunkCount = bytes.readInt32LE(currOffset + 4)
+          const chunkCount = bytes.readInt32LE(currOffset)
+          console.log(`NORMAL::::bin# ${bin}\tchunkCount ${chunkCount}`)
+          currOffset+=4
           const chunks = new Array(chunkCount)
-          currOffset += 8
           for (let k = 0; k < chunkCount; k += 1) {
             const u = VirtualOffset.fromBytes(bytes, currOffset)
             const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
@@ -165,7 +170,7 @@ class TabixIndex {
     // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
     // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
     const lineCount = longToNumber(
-      Long.fromBytesLE(bytes.slice(offset + 20, offset + 28), true),
+      Long.fromBytesLE(bytes.slice(offset + 16, offset + 24), true),
     )
     // const four = Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true)
     return { lineCount }
