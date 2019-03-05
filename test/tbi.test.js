@@ -45,6 +45,5 @@ describe('tbi index', () => {
     expect(indexData.columnNumbers.ref).toEqual(1)
     expect(indexData.columnNumbers.end).toEqual(0)
     expect(await ti.lineCount('chr1A')).toEqual(10491)
-    console.log(indexData.indices[0])
   })
 })
