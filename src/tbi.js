@@ -125,7 +125,11 @@ class TabixIndex {
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
         currOffset += 4
-        if (bin === data.maxBinNumber + 1) {
+        if (bin > data.maxBinNumber + 1) {
+          throw new Error(
+            'tabix index contains too many bins, please use a CSI index',
+          )
+        } else if (bin === data.maxBinNumber + 1) {
           const chunkCount = bytes.readInt32LE(currOffset)
           currOffset += 4
           if (chunkCount === 2) {

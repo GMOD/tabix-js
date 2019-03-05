@@ -40,10 +40,7 @@ describe('tbi index', () => {
         require.resolve('./data/failing_tabix.vcf.gz.tbi'),
       ),
     })
-    const indexData = await ti.parse()
-    expect(indexData.columnNumbers.start).toEqual(2)
-    expect(indexData.columnNumbers.ref).toEqual(1)
-    expect(indexData.columnNumbers.end).toEqual(0)
-    expect(await ti.lineCount('chr1A')).toEqual(10491)
+
+    await expect(ti.parse()).rejects.toThrow(/too many bins/)
   })
 })
