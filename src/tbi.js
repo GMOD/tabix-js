@@ -220,6 +220,10 @@ class TabixIndex {
             : beg >> TAD_LIDX_SHIFT
         ]
       : new VirtualOffset(0, 0)
+    if (!minOffset) {
+      console.warn('querying outside of possible tabix range')
+      return []
+    }
 
     let l
     let numOffsets = 0

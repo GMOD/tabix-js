@@ -33,6 +33,9 @@ describe('tbi index', () => {
       maxBlockSize: 1 << 16,
       skipLines: 0,
     })
+    console.warn = jest.fn();
+    expect(await ti.blocksForRange('contigA',7334998796,8104229566)).toEqual([])
+    expect(console.warn).toHaveBeenCalledWith("querying outside of possible tabix range");
   })
   it('failing tabix', async () => {
     const ti = new TabixIndex({
