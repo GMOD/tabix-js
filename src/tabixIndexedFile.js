@@ -1,6 +1,6 @@
 const bsplit = require('buffer-split')
 const LRU = require('quick-lru')
-const { unzip, unzipChunk } = require('./unzip')
+const { unzip, unzipChunk , unzipCount } = require('./unzip')
 
 const LocalFile = require('./localFile')
 const TBI = require('./tbi')
@@ -90,10 +90,13 @@ class TabixIndexedFile {
       )
     else if (start === end) return 0
 
+    // const start1 = Date.now()
     const chunks = await this.index.blocksForRange(refName, start, end)
+    // console.log((Date.now() - start1) / 1000, 'seconds, A getLineCount')
 
     // check the chunks for any that are over the size limit.  if
     // any are, don't fetch any of them
+    // const start2 = Date.now()
     for (let i = 0; i < chunks.length; i += 1) {
       const size = chunks[i].fetchedSize()
       if (size > this.chunkSizeLimit) {
@@ -102,7 +105,9 @@ class TabixIndexedFile {
         )
       }
     }
+    // console.log((Date.now() - start2) / 1000, 'seconds, B getLineCount')
 
+    const start3 = Date.now()
     let lineCount = 0
     // now go through each chunk and parse and filter the lines out of it
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
@@ -111,18 +116,21 @@ class TabixIndexedFile {
         chunk.minv.blockPosition,
         chunk.fetchedSize(),
       )
-      let uncompressed
+      // let uncompressed
       try {
-        uncompressed = unzipChunk(compressedData, chunk)
+        // uncompressed = unzipChunk(compressedData, chunk)
+        // uncompressed = unzip(compressedData);
+         lineCount += unzipCount(compressedData);
       } catch (e) {
         throw new Error(`error decompressing chunk ${chunk.toString()}`)
       }
 
-      const lines = bsplit(uncompressed, Buffer.from('\n'))
+      // const lines = bsplit(uncompressed, Buffer.from('\n'))
 
       // remove the last line, since it will be either empty or partial
-      lineCount += lines.length - 1
+      // lineCount += lines.length - 1
     }
+    console.log((Date.now() - start3) / 1000, 'seconds, C getLineCount: ',chunks.length)
     return lineCount
   }
 

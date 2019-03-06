@@ -7,20 +7,20 @@ const tbiIndexed = new TabixIndexedFile({
 })
 
 async function main() {
-  const start = Date.now()
-  for (let i = 35; i < 135; i += 1) {
-    const lines = []
-    await tbiIndexed.getLines('1', i * 500000, i * 500000 + 100000, line =>
-      lines.push(line),
-    )
-  }
-  console.log((Date.now() - start) / 1000, 'seconds, getLines')
+  // const start = Date.now()
+  // for (let i = 35; i < 135; i += 1) {
+  //   const lines = []
+  //   await tbiIndexed.getLines('1', i * 500000, i * 500000 + 100000, line =>
+  //     lines.push(line),
+  //   )
+  // }
+  // console.log((Date.now() - start) / 1000, 'seconds, getLines')
 
   const start2 = Date.now()
   for (let i = 35; i < 135; i += 1) {
     await tbiIndexed.getLineCount('1', i * 500000, i * 500000 + 100000)
   }
-  console.log((Date.now() - start2) / 1000, 'seconds, getLineCount')
+  console.log((Date.now() - start2) / 1000, 'seconds, final getLineCount')
 }
 
 main()

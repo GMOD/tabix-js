@@ -23,6 +23,32 @@ function pakoUnzip(inputData) {
   return result
 }
 
+function pakoUnzipCount(inputData) {
+  let strm
+  let pos = 0
+  // let i = 0
+  // const chunks = []
+  let count = 0
+  let inflator
+  do {
+    const remainingInput = inputData.slice(pos)
+    inflator = new Inflate()
+    ;({ strm } = inflator)
+    inflator.push(remainingInput, Z_SYNC_FLUSH)
+    if (inflator.err) throw new Error(inflator.msg)
+
+    pos += strm.next_in
+    count += inflator.result.toString().split('\n').length
+    // chunks[i] = Buffer.from(inflator.result)
+    // i += 1
+  } while (strm.avail_in)
+
+  // const result = Buffer.concat(chunks)
+
+  // return result
+  return count
+}
+
 // similar to pakounzip, except it does extra counting and
 // trimming to make sure to return only exactly the data
 // range specified in the chunk
@@ -71,5 +97,6 @@ function unzipChunk(inputData, chunk) {
 
 module.exports = {
   unzip: pakoUnzip,
+  unzipCount: pakoUnzipCount,
   unzipChunk,
 }
