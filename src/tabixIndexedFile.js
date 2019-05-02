@@ -196,11 +196,8 @@ class TabixIndexedFile {
       const newlineByte = '\n'.charCodeAt(0)
       const metaByte = metaChar.charCodeAt(0)
       for (let i = 0; i < bytes.length; i += 1) {
-        if (bytes[i] === newlineByte) {
-          lastNewline = i
-          i += 1
-          if (bytes[i] !== metaByte) break
-        }
+        if (i === lastNewline + 1 && bytes[i] !== metaByte) break
+        if (bytes[i] === newlineByte) lastNewline = i
       }
       bytes = bytes.slice(0, lastNewline + 1)
     }

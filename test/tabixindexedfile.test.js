@@ -191,8 +191,7 @@ describe('tabix file', () => {
     })
 
     const headerString = await f.getHeader()
-    expect(headerString.length).toEqual(132)
-    expect(headerString[headerString.length - 1]).toEqual('\n')
+    expect(headerString.length).toEqual(0)
 
     expect(await f.getReferenceSequenceNames()).toEqual(['NC_000001.11'])
 
@@ -338,6 +337,15 @@ describe('tabix file', () => {
     expect(lines.length).toEqual(2)
     expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
     expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
+  })
+
+  it('returns and empty string for `getHeader()` if there is no header', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/test.bed.gz'),
+    })
+
+    const headerString = await f.getHeader()
+    expect(headerString).toBe('')
   })
 
   extended(
