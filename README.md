@@ -25,6 +25,13 @@ const csiIndexed = new TabixIndexedFile({
   csiPath: 'path/to/my/file.gz.csi'
 })
 
+// use a remote file or other filehandle, note RemoteFile comes from https://github.com/GMOD/generic-filehandle
+const {RemoteFile} = require('generic-filehandle')
+const remoteTbiIndexed = new TabixIndexedFile({
+  filehandle: new RemoteFile('http://yourhost/file.vcf.gz'),
+  tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi') // can also be csiFilehandle
+})
+
 // iterate over lines in the specified region, each of which
 // is structured as
 const lines = []
