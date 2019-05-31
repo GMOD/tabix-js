@@ -1,7 +1,7 @@
 const LRU = require('quick-lru')
+const { LocalFile } = require('generic-filehandle')
 const { unzip, unzipChunk } = require('./unzip')
 
-const LocalFile = require('./localFile')
 const TBI = require('./tbi')
 const CSI = require('./csi')
 
@@ -183,6 +183,7 @@ class TabixIndexedFile {
     try {
       bytes = unzip(bytes)
     } catch (e) {
+      console.log(e)
       throw new Error(
         `error decompressing block ${e.code} at 0 (length ${maxFetch})`,
         e,

@@ -1,6 +1,6 @@
+const { LocalFile } = require('generic-filehandle')
 const VirtualOffset = require('../src/virtualOffset')
 const TabixIndex = require('../src/tbi')
-const LocalFile = require('../src/localFile')
 
 describe('tbi index', () => {
   it('loads', async () => {

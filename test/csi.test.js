@@ -1,6 +1,6 @@
+const { LocalFile } = require('generic-filehandle')
 const VirtualOffset = require('../src/virtualOffset')
 const CSI = require('../src/csi')
-const LocalFile = require('../src/localFile')
 
 describe('csi index', () => {
   it('loads test.gff3.gz.csi', async () => {

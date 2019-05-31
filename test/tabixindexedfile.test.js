@@ -1,8 +1,8 @@
+const { LocalFile } = require('generic-filehandle')
 const TabixIndexedFile = require('../src/tabixIndexedFile')
 const VirtualOffset = require('../src/virtualOffset')
 
 const { extended } = require('./utils')
-const LocalFile = require('../src/localFile')
 
 class RecordCollector {
   constructor() {
