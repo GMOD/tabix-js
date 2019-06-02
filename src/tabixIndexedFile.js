@@ -112,51 +112,21 @@ class TabixIndexedFile {
     }
 
     // now go through each chunk and parse and filter the lines out of it
-    let linesSinceLastYield = 0
-    for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
-      let previousStartCoordinate
-      const lines = await this.readChunk(chunks[chunkNum])
-
-      let currentLineStart = chunks[chunkNum].minv.dataPosition
-      for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i]
-        const fileOffset =
-          chunks[chunkNum].minv.blockPosition * 2 ** 16 + currentLineStart
-        // filter the line for whether it is within the requested range
-        const { startCoordinate, overlaps } = this.checkLine(
-          metadata,
+    await Promise.all(
+      chunks.map((chunk, chunkNum) => {
+        const currentLineStart = chunks[chunkNum].minv.dataPosition
+        const fileOffset = chunks[chunkNum].minv.blockPosition * 2 ** 16
+        return this.readChunk(chunks[chunkNum], {
           refName,
           start,
           end,
-          line,
-        )
-
-        // do a small check just to make sure that the lines are really sorted by start coordinate
-        if (previousStartCoordinate > startCoordinate)
-          throw new Error(
-            `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
-          )
-        previousStartCoordinate = startCoordinate
-
-        if (overlaps) {
-          lineCallback(line.trim(), fileOffset)
-        } else if (startCoordinate >= end) {
-          // the lines were overlapping the region, but now have stopped, so
-          // we must be at the end of the relevant data and we can stop
-          // processing data now
-          return
-        }
-
-        currentLineStart += line.length + 1
-
-        // yield if we have emitted beyond the yield limit
-        linesSinceLastYield += 1
-        if (linesSinceLastYield >= this.yieldLimit) {
-          await timeout(1)
-          linesSinceLastYield = 0
-        }
-      }
-    }
+          metadata,
+          fileOffset,
+          currentLineStart,
+          lineCallback,
+        })
+      }),
+    )
   }
 
   async getMetadata() {
@@ -372,29 +342,83 @@ class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  readChunk(chunk) {
-    return this._cacheWith(this.chunkCache, chunk.toString(), async () => {
-      // fetch the uncompressed data, uncompress carefully a block at a time,
-      // and stop when done
+  async readChunk(
+    chunk,
+    {
+      refName,
+      start,
+      end,
+      metadata,
+      currentLineStart,
+      fileOffset,
+      lineCallback,
+    },
+  ) {
+    const uncompressed = await this._cacheWith(
+      this.chunkCache,
+      chunk.toString(),
+      async () => {
+        // fetch the uncompressed data, uncompress carefully a block at a time,
+        // and stop when done
 
-      const compressedData = await this._readRegion(
-        chunk.minv.blockPosition,
-        chunk.fetchedSize(),
+        const compressedData = await this._readRegion(
+          chunk.minv.blockPosition,
+          chunk.fetchedSize(),
+        )
+        let uncom
+        try {
+          uncom = unzipChunk(compressedData, chunk)
+        } catch (e) {
+          // this is uncaught by our code
+          throw new Error(`error decompressing chunk ${chunk.toString()}`)
+        }
+        return uncom
+      },
+    )
+
+    let currBuffer = uncompressed
+    let previousStartCoordinate = -Infinity
+
+    let linesSinceLastYield = 0
+    // eslint-disable-next-line no-cond-assign
+    while (true) {
+      const currEndLinePos = currBuffer.indexOf('\n')
+      if (currEndLinePos === -1) break
+      const line = currBuffer.slice(0, currEndLinePos).toString('utf8')
+      currBuffer = currBuffer.slice(currEndLinePos + 1)
+      const prevLineStart = currentLineStart
+      currentLineStart += currEndLinePos + 1
+
+      // if it was super smart it could perform check line on a partial slice of line but this
+      // seems irrelevant unless there are (a) many instances of checkLine returning
+      // non-overlapping data and (b) very long lines. in the short case it seems like it would
+      // just slow it down
+
+      const { startCoordinate, overlaps } = this.checkLine(
+        metadata,
+        refName,
+        start,
+        end,
+        line,
       )
-      let uncompressed
-      try {
-        uncompressed = unzipChunk(compressedData, chunk)
-      } catch (e) {
-        throw new Error(`error decompressing chunk ${chunk.toString()}`)
+      // do a small check just to make sure that the lines are really sorted by start coordinate
+      if (previousStartCoordinate > startCoordinate)
+        throw new Error(
+          `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
+        )
+      previousStartCoordinate = startCoordinate
+
+      if (overlaps) {
+        lineCallback(line, fileOffset + prevLineStart)
+      } else if (startCoordinate >= end) {
+        break
       }
-
-      const lines = uncompressed.toString('utf8').split('\n')
-
-      // remove the last line, since it will be either empty or partial
-      lines.pop()
-
-      return lines
-    })
+      linesSinceLastYield += 1
+      if (linesSinceLastYield >= this.yieldLimit) {
+        await timeout(1)
+        linesSinceLastYield = 0
+      }
+    }
   }
 }
 
