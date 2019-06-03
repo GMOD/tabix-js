@@ -1,3 +1,5 @@
+import { TextDecoder } from 'text-encoding'
+
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
 const { unzip, unzipChunk } = require('./unzip')
@@ -387,8 +389,9 @@ class TabixIndexedFile {
       } catch (e) {
         throw new Error(`error decompressing chunk ${chunk.toString()}`)
       }
+      const d = new TextDecoder()
 
-      const lines = uncompressed.toString('utf8').split('\n')
+      const lines = d.decode(uncompressed).split('\n')
 
       // remove the last line, since it will be either empty or partial
       lines.pop()
