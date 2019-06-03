@@ -13,6 +13,9 @@ function timeout(time) {
   })
 }
 
+// we use text decoder if in browser or webworker in browser
+const isBrowser = typeof window !== 'undefined' || typeof self !== 'undefined'
+
 class TabixIndexedFile {
   /**
    * @param {object} args
@@ -390,8 +393,10 @@ class TabixIndexedFile {
         throw new Error(`error decompressing chunk ${chunk.toString()}`)
       }
       const d = new TextDecoder()
-
-      const lines = d.decode(uncompressed).split('\n')
+      const lines = (isBrowser
+        ? d.decode(uncompressed)
+        : uncompressed.toString()
+      ).split('\n')
 
       // remove the last line, since it will be either empty or partial
       lines.pop()
