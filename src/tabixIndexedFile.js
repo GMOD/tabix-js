@@ -14,6 +14,7 @@ function timeout(time) {
 }
 
 // we use text decoder if in browser or webworker in browser
+// eslint-disable-next-line no-restricted-globals
 const isBrowser = typeof window !== 'undefined' || typeof self !== 'undefined'
 
 class TabixIndexedFile {
