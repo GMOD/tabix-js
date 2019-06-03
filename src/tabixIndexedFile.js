@@ -112,21 +112,20 @@ class TabixIndexedFile {
     }
 
     // now go through each chunk and parse and filter the lines out of it
-    await Promise.all(
-      chunks.map((chunk, chunkNum) => {
-        const currentLineStart = chunks[chunkNum].minv.dataPosition
-        const fileOffset = chunks[chunkNum].minv.blockPosition * 2 ** 16
-        return this.readChunk(chunks[chunkNum], {
-          refName,
-          start,
-          end,
-          metadata,
-          fileOffset,
-          currentLineStart,
-          lineCallback,
-        })
-      }),
-    )
+    for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
+      const chunk = chunks[chunkNum]
+      const currentLineStart = chunk.minv.dataPosition
+      const fileOffset = chunk.minv.blockPosition * 2 ** 16
+      await this.readChunk(chunk, {
+        refName,
+        start,
+        end,
+        metadata,
+        fileOffset,
+        currentLineStart,
+        lineCallback,
+      })
+    }
   }
 
   async getMetadata() {
