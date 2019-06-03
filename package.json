@@ -46,7 +46,8 @@
     "generic-filehandle": "^1.0.9",
     "long": "^4.0.0",
     "pako": "1.0.10",
-    "quick-lru": "^2.0.0"
+    "quick-lru": "^2.0.0",
+    "text-encoding": "^0.7.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.2.3",

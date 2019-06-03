@@ -1,3 +1,5 @@
+import { TextDecoder } from 'text-encoding'
+
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
 const { unzip, unzipChunk } = require('./unzip')
@@ -10,6 +12,10 @@ function timeout(time) {
     setTimeout(resolve, time)
   })
 }
+
+// we use text decoder if in browser or webworker in browser
+// eslint-disable-next-line no-restricted-globals
+const isBrowser = typeof window !== 'undefined' || typeof self !== 'undefined'
 
 class TabixIndexedFile {
   /**
@@ -387,8 +393,11 @@ class TabixIndexedFile {
       } catch (e) {
         throw new Error(`error decompressing chunk ${chunk.toString()}`)
       }
-
-      const lines = uncompressed.toString('utf8').split('\n')
+      const d = new TextDecoder()
+      const lines = (isBrowser
+        ? d.decode(uncompressed)
+        : uncompressed.toString()
+      ).split('\n')
 
       // remove the last line, since it will be either empty or partial
       lines.pop()
