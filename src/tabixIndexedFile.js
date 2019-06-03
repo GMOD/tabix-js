@@ -225,60 +225,63 @@ class TabixIndexedFile {
     line,
   ) {
     // skip meta lines
-    if (line.charAt(0) === metaChar) return { overlaps: false }
+    if (line[0] === metaChar.charCodeAt(0)) return { overlaps: false }
 
     // check ref/start/end using column metadata from index
     let { ref, start, end } = columnNumbers
     if (!ref) ref = 0
     if (!start) start = 0
     if (!end) end = 0
+
     if (format === 'VCF') end = 8
     const maxColumn = Math.max(ref, start, end)
 
-    // this code is kind of complex, but it is fairly fast.
-    // basically, we want to avoid doing a split, because if the lines are really long
-    // that could lead to us allocating a bunch of extra memory, which is slow
+    let currNumTabs = 0
+    let currPos = 0
+    const tab = '\t'.charCodeAt(0)
+    const nl = '\n'.charCodeAt(0)
+    const cr = '\r'.charCodeAt(0)
 
-    let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
-    let currentColumnStart = 0
-    let refSeq
-    let startCoordinate
-    for (let i = 0; i < line.length + 1; i += 1) {
-      if (line[i] === '\t' || i === line.length) {
-        if (currentColumnNumber === ref) {
-          let refName = line.slice(currentColumnStart, i)
-          refName = this.renameRefSeq(refName)
-          if (refName !== regionRefName) return { overlaps: false }
-        } else if (currentColumnNumber === start) {
-          startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
-          // we convert to 0-based-half-open
-          if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd)
-            return { startCoordinate, overlaps: false }
-          if (end === 0) {
-            // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart)
-              return { startCoordinate, overlaps: false }
-          }
-        } else if (format === 'VCF' && currentColumnNumber === 4) {
-          refSeq = line.slice(currentColumnStart, i)
-        } else if (currentColumnNumber === end) {
-          let endCoordinate
-          // this will never match if there is no end column
-          if (format === 'VCF')
-            endCoordinate = this._getVcfEnd(
-              startCoordinate,
-              refSeq,
-              line.slice(currentColumnStart, i),
-            )
-          else endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
-          if (endCoordinate <= regionStart) return { overlaps: false }
-        }
-        currentColumnStart = i + 1
-        currentColumnNumber += 1
-        if (currentColumnNumber > maxColumn) break
+    for (; currPos < line.byteLength && currNumTabs < maxColumn; currPos += 1) {
+      if (line[currPos] === tab) currNumTabs += 1
+      if (line[currPos] === nl || line[currPos] === cr) break
+    }
+    const fields = line
+      .slice(0, currPos - 1)
+      .toString('ascii')
+      .split('\t')
+
+    if (fields.length < maxColumn) {
+      console.error('incomplete line')
+      return { overlaps: false }
+    }
+
+    if (this.renameRefSeq(fields[ref - 1]) !== regionRefName) {
+      return { overlaps: false }
+    }
+
+    let startCoordinate = parseInt(fields[start - 1], 10)
+    if (coordinateType === '1-based-closed') startCoordinate -= 1
+    if (startCoordinate >= regionEnd) {
+      return { startCoordinate, overlaps: false }
+    }
+
+    if (end === 0) {
+      // if we have no end, we assume the feature is 1 bp long
+      if (startCoordinate + 1 <= regionStart) {
+        return { startCoordinate, overlaps: false }
       }
     }
+
+    const endCoordinate =
+      format === 'VCF'
+        ? this._getVcfEnd(startCoordinate, fields[4], fields[7])
+        : parseInt(fields[end - 1], 10)
+
+    if (endCoordinate <= regionStart) {
+      return { overlaps: false }
+    }
+
     return { startCoordinate, overlaps: true }
   }
 
@@ -383,23 +386,17 @@ class TabixIndexedFile {
     while (true) {
       const currEndLinePos = currBuffer.indexOf('\n')
       if (currEndLinePos === -1) break
-      const line = currBuffer.slice(0, currEndLinePos).toString('utf8')
-      currBuffer = currBuffer.slice(currEndLinePos + 1)
       const prevLineStart = currentLineStart
       currentLineStart += currEndLinePos + 1
-
-      // if it was super smart it could perform check line on a partial slice of line but this
-      // seems irrelevant unless there are (a) many instances of checkLine returning
-      // non-overlapping data and (b) very long lines. in the short case it seems like it would
-      // just slow it down
-
       const { startCoordinate, overlaps } = this.checkLine(
         metadata,
         refName,
         start,
         end,
-        line,
+        currBuffer,
       )
+      const line = currBuffer.slice(0, currEndLinePos).toString('utf8')
+      currBuffer = currBuffer.slice(currEndLinePos + 1)
       // do a small check just to make sure that the lines are really sorted by start coordinate
       if (previousStartCoordinate > startCoordinate)
         throw new Error(
