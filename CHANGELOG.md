@@ -1,3 +1,8 @@
+<a name="1.1.7"></a>
+## [1.1.7](https://github.com/GMOD/tabix-js/compare/v1.1.6...v1.1.7) (2019-06-04)
+
+
+
 - Removed chunk merging from header file parsing which now results in smaller bgzf unzip calls being streamed out to clients
 
 ## [1.1.6](https://github.com/GMOD/tabix-js/compare/v1.1.5...v1.1.6) (2019-05-31)
