@@ -338,7 +338,7 @@ describe('tabix file', () => {
 
   it('can get the correct fileOffset with non-ascii characters', async () => {
     const uncompressedVcf = new LocalFile(
-      require.resolve('./data/CrlfOffsetTest.vcf'),
+      require.resolve('./data/NonAsciiOffsetTest.vcf'),
     )
     const { size: fileSize } = await uncompressedVcf.stat()
     const vcfData = Buffer.alloc(fileSize)
