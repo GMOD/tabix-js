@@ -58,7 +58,7 @@ function unzipChunk(inputData, chunk) {
         0,
         chunk.minv.blockPosition === chunk.maxv.blockPosition
           ? chunk.maxv.dataPosition - chunk.minv.dataPosition + 1
-          : chunk.maxv.blockPosition + 1,
+          : chunk.maxv.dataPosition + 1,
       )
       break
     }
