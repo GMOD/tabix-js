@@ -44,7 +44,7 @@
   "dependencies": {
     "@babel/runtime-corejs2": "^7.3.1",
     "es6-promisify": "^6.0.1",
-    "generic-filehandle": "^1.0.9",
+    "generic-filehandle": "^2.0.0",
     "long": "^4.0.0",
     "pako": "1.0.10",
     "quick-lru": "^2.0.0"
