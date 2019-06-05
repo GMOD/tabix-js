@@ -1,4 +1,6 @@
-<a name="1.1.7"></a>
+- Add a fix for a bgzf unzipping thing that could result in duplicate features being returned
+
+
 ## [1.1.7](https://github.com/GMOD/tabix-js/compare/v1.1.6...v1.1.7) (2019-06-04)
 
 
