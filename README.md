@@ -36,6 +36,12 @@ const remoteTbiIndexed = new TabixIndexedFile({
 // is structured as
 const lines = []
 await tbiIndexed.getLines('ctgA',200,300, (line, fileOffset) => lines.push(line))
+// alternative API usage
+const aborter = new AbortController()
+await tbiIndexed.getLines('ctgA',200,300, {
+  lineCallback: (line, fileOffset) => lines.push(line),
+  signal: aborter.signal// an AbortController signal
+})
 // lines is now an array of strings, which are data lines.
 // commented (meta) lines are skipped.
 // line strings do not include any trailing whitespace characters.
