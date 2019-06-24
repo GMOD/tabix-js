@@ -84,14 +84,22 @@ class TabixIndexedFile {
    * @param {string} refName name of the reference sequence
    * @param {number} start start of the region (in 0-based half-open coordinates)
    * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function} lineCallback callback called for each line in the region, called as (line, fileOffset)
+   * @param {function|object} lineCallback callback called for each line in the region, called as (line, fileOffset) or object containing obj.lineCallback, obj.signal, etc
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
-  async getLines(refName, start, end, lineCallback) {
-    if (refName === undefined)
+  async getLines(refName, start, end, opts) {
+    let signal
+    let lineCallback = opts
+    if (refName === undefined) {
       throw new TypeError('must provide a reference sequence name')
-    if (!lineCallback) throw new TypeError('line callback must be provided')
-
+    }
+    if (!lineCallback) {
+      throw new TypeError('line callback must be provided')
+    }
+    if (typeof opts !== 'function') {
+      lineCallback = opts.lineCallback
+      signal = opts.signal
+    }
     const metadata = await this.index.getMetadata()
     if (!start) start = 0
     if (!end) end = metadata.maxRefLength
@@ -342,15 +350,6 @@ class TabixIndexedFile {
     return this.index.lineCount(refSeq)
   }
 
-  _cacheWith(cache, cacheKey, fillCallback) {
-    const cachedPromise = cache.get(cacheKey)
-    if (cachedPromise) return cachedPromise
-
-    const freshPromise = fillCallback()
-    cache.set(cacheKey, freshPromise)
-    return freshPromise
-  }
-
   async _readRegion(position, compressedSize) {
     // console.log(`reading region ${position} / ${compressedSize}`)
     const { size: fileSize } = await this.filehandle.stat()
@@ -375,28 +374,26 @@ class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  readChunk(chunk) {
-    return this._cacheWith(this.chunkCache, chunk.toString(), async () => {
-      // fetch the uncompressed data, uncompress carefully a block at a time,
-      // and stop when done
+  async readChunk(chunk) {
+    // fetch the uncompressed data, uncompress carefully a block at a time,
+    // and stop when done
 
-      const compressedData = await this._readRegion(
-        chunk.minv.blockPosition,
-        chunk.fetchedSize(),
-      )
-      let uncompressed
-      try {
-        uncompressed = unzipChunk(compressedData, chunk)
-      } catch (e) {
-        throw new Error(`error decompressing chunk ${chunk.toString()}`)
-      }
-      const lines = uncompressed.toString().split('\n')
+    const compressedData = await this._readRegion(
+      chunk.minv.blockPosition,
+      chunk.fetchedSize(),
+    )
+    let uncompressed
+    try {
+      uncompressed = unzipChunk(compressedData, chunk)
+    } catch (e) {
+      throw new Error(`error decompressing chunk ${chunk.toString()}`)
+    }
+    const lines = uncompressed.toString().split('\n')
 
-      // remove the last line, since it will be either empty or partial
-      lines.pop()
+    // remove the last line, since it will be either empty or partial
+    lines.pop()
 
-      return lines
-    })
+    return lines
   }
 }
 
