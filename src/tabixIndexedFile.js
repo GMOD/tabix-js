@@ -91,14 +91,17 @@ class TabixIndexedFile {
     if (refName === undefined)
       throw new TypeError('must provide a reference sequence name')
     if (!lineCallback) throw new TypeError('line callback must be provided')
+
+    const metadata = await this.index.getMetadata()
+    if (!start) start = 0
+    if (!end) end = metadata.maxRefLength
     if (!(start <= end))
       throw new TypeError(
-        'invalid start and end coordinates. must be provided, and start must be less than or equal to end',
+        'invalid start and end coordinates. start must be less than or equal to end',
       )
-    else if (start === end) return
+    if (start === end) return
 
     const chunks = await this.index.blocksForRange(refName, start, end)
-    const metadata = await this.index.getMetadata()
 
     // check the chunks for any that are over the size limit.  if
     // any are, don't fetch any of them

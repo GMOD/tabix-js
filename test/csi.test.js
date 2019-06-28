@@ -31,6 +31,8 @@ describe('csi index', () => {
       refNameToId: { 1: 0, ctgB: 1 },
       skipLines: 0,
       maxBlockSize: 1 << 16,
+      maxBinNumber: 299593,
+      maxRefLength: 4294967296,
     })
   })
   it('loads test.vcf.gz.csi', async () => {
@@ -63,6 +65,8 @@ describe('csi index', () => {
       refNameToId: { 1: 0 },
       maxBlockSize: 1 << 16,
       skipLines: 0,
+      maxBinNumber: 299593,
+      maxRefLength: 4294967296,
     })
   })
 })

@@ -85,9 +85,11 @@ class CSI {
       coordinateType,
       skipLines,
       refIdToName,
-      maxBlockSize,
       refNameToId,
       firstDataLine,
+      maxBlockSize,
+      maxBinNumber,
+      maxRefLength,
     } = await this.parse()
     return {
       columnNumbers,
@@ -95,10 +97,12 @@ class CSI {
       format,
       coordinateType,
       skipLines,
-      maxBlockSize,
       refIdToName,
       refNameToId,
       firstDataLine,
+      maxBlockSize,
+      maxBinNumber,
+      maxRefLength,
     }
   }
 
@@ -170,6 +174,8 @@ class CSI {
     data.minShift = bytes.readInt32LE(4)
     data.depth = bytes.readInt32LE(8)
     data.maxBinNumber = ((1 << ((data.depth + 1) * 3)) - 1) / 7
+    data.maxRefLength = 2 ** (data.minShift + data.depth * 3)
+
     const auxLength = bytes.readInt32LE(12)
     if (auxLength) {
       Object.assign(data, this.parseAuxData(bytes, 16, auxLength))
