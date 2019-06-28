@@ -55,7 +55,7 @@ const headerBuffer = await tbiIndexed.getHeaderBuffer()
 ```
 
 You may also use e.g. `tbiIndexed.getLines('ctgA', 200, undefined, lineCallback)`
-to get all lines staring at 200 and going to the end of ctgA.
+to get all lines starting at 200 and going to the end of ctgA.
 
 ## Academic Use
 
