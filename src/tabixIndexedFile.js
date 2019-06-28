@@ -382,7 +382,6 @@ class TabixIndexedFile {
    * @returns {Promise} for a string chunk of the file
    */
   async readChunk(chunk, signal) {
-    console.log(signal)
     // fetch the uncompressed data, uncompress carefully a block at a time,
     // and stop when done
 
