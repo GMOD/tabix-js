@@ -79,6 +79,42 @@ describe('tabix file', () => {
       refNameToId: { ctgA: 0 },
       skipLines: 0,
       maxBinNumber: 37449,
+      maxRefLength: 536870912,
+    })
+  })
+  it('can read ctgA:10000', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/volvox.test.vcf.gz'),
+      tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
+      yieldLimit: 10,
+      renameRefSeqs: n => n.replace('contig', 'ctg'),
+    })
+    const items = new RecordCollector()
+    await f.getLines('ctgA', 10000, undefined, items.callback)
+    items.expectNoDuplicates()
+    expect(items.length).toEqual(30)
+    items.forEach(({ line, fileOffset }) => {
+      line = line.split('\t')
+      expect(line[0]).toEqual('contigA')
+      expect(parseInt(line[1], 10)).toBeGreaterThan(9999)
+      expect(fileOffset).toBeGreaterThanOrEqual(0)
+    })
+  })
+  it('can read ctgA', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/volvox.test.vcf.gz'),
+      tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
+      yieldLimit: 10,
+      renameRefSeqs: n => n.replace('contig', 'ctg'),
+    })
+    const items = new RecordCollector()
+    await f.getLines('ctgA', undefined, undefined, items.callback)
+    items.expectNoDuplicates()
+    expect(items.length).toEqual(109)
+    items.forEach(({ line, fileOffset }) => {
+      line = line.split('\t')
+      expect(line[0]).toEqual('contigA')
+      expect(fileOffset).toBeGreaterThanOrEqual(0)
     })
   })
   it('can count lines with TBI', async () => {

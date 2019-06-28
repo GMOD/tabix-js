@@ -32,6 +32,7 @@ describe('tbi index', () => {
       refNameToId: { contigA: 0 },
       maxBlockSize: 1 << 16,
       skipLines: 0,
+      maxRefLength: 536870912,
     })
     console.warn = jest.fn()
     expect(await ti.blocksForRange('contigA', 7334998796, 8104229566)).toEqual(

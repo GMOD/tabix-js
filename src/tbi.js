@@ -62,6 +62,8 @@ class TabixIndex {
       refNameToId,
       firstDataLine,
       maxBlockSize,
+      maxBinNumber,
+      maxRefLength,
     } = await this.parse()
     return {
       columnNumbers,
@@ -73,7 +75,8 @@ class TabixIndex {
       refNameToId,
       firstDataLine,
       maxBlockSize,
-      maxBinNumber: ((1 << 18) - 1) / 7,
+      maxBinNumber,
+      maxRefLength,
     }
   }
 
@@ -105,6 +108,7 @@ class TabixIndex {
     data.metaValue = bytes.readInt32LE(24)
     data.depth = 5
     data.maxBinNumber = ((1 << ((data.depth + 1) * 3)) - 1) / 7
+    data.maxRefLength = 2 ** (14 + data.depth * 3)
     data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : null
     data.skipLines = bytes.readInt32LE(28)
 

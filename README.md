@@ -54,6 +54,9 @@ const headerText = await tbiIndexed.getHeader()
 const headerBuffer = await tbiIndexed.getHeaderBuffer()
 ```
 
+You may also use e.g. `tbiIndexed.getLines('ctgA', 200, undefined, lineCallback)`
+to get all lines staring at 200 and going to the end of ctgA.
+
 ## Academic Use
 
 This package was written with funding from the [NHGRI](http://genome.gov) as part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic project that you publish, please cite the most recent JBrowse paper, which will be linked from [jbrowse.org](http://jbrowse.org).
