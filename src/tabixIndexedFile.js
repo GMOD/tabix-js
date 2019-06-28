@@ -1,3 +1,5 @@
+import AbortablePromiseCache from 'abortable-promise-cache'
+
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
 const { unzip, unzipChunk } = require('./unzip')
@@ -41,7 +43,6 @@ class TabixIndexedFile {
     yieldLimit = 300,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
-    blockCacheSize = 5 * 2 ** 20,
   }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
@@ -72,11 +73,15 @@ class TabixIndexedFile {
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
     this.renameRefSeqCallback = renameRefSeqs
-    this.chunkCache = new LRU({
-      maxSize: Math.floor(chunkCacheSize / (1 << 16)),
-    })
-    this.blockCache = new LRU({
-      maxSize: Math.floor(blockCacheSize / (1 << 16)),
+    const readChunk = this.readChunk.bind(this)
+    this.chunkCache = new AbortablePromiseCache({
+      cache: new LRU({
+        maxSize: Math.floor(chunkCacheSize / (1 << 16)),
+      }),
+
+      async fill(requestData, abortSignal) {
+        return readChunk(requestData, abortSignal)
+      },
     })
   }
 
@@ -126,7 +131,8 @@ class TabixIndexedFile {
     let linesSinceLastYield = 0
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate
-      const lines = await this.readChunk(chunks[chunkNum])
+      const c = chunks[chunkNum]
+      const lines = await this.chunkCache.get(c.toString(), c, signal)
 
       let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
@@ -350,7 +356,7 @@ class TabixIndexedFile {
     return this.index.lineCount(refSeq)
   }
 
-  async _readRegion(position, compressedSize) {
+  async _readRegion(position, compressedSize, opts) {
     // console.log(`reading region ${position} / ${compressedSize}`)
     const { size: fileSize } = await this.filehandle.stat()
     if (position + compressedSize > fileSize)
@@ -363,6 +369,7 @@ class TabixIndexedFile {
       0,
       compressedSize,
       position,
+      opts,
     )
 
     return compressedData
@@ -374,13 +381,15 @@ class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  async readChunk(chunk) {
+  async readChunk(chunk, signal) {
+    console.log(signal)
     // fetch the uncompressed data, uncompress carefully a block at a time,
     // and stop when done
 
     const compressedData = await this._readRegion(
       chunk.minv.blockPosition,
       chunk.fetchedSize(),
+      { signal },
     )
     let uncompressed
     try {
