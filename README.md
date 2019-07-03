@@ -51,13 +51,16 @@ await tbiIndexed.getLines('ctgA',200,300, {
 // get the approximate number of data lines in the
 // file for the given reference sequence, excluding header, comment, and whitespace lines
 const numLines = await tbiIndexed.lineCount('ctgA')
+// or const numLines = await tbiIndexed.lineCount('ctgA', { signal: aborter.signal })
 
 // get the "header text" string from the file, which is the first contiguous
 // set of lines in the file that all start with a "meta" character (usually #)
 const headerText = await tbiIndexed.getHeader()
+// or const headerText = await tbiIndexed.getHeader({ signal: aborter.signal })
 
 // or if you want a buffer instead, there is getHeaderBuffer()
 const headerBuffer = await tbiIndexed.getHeaderBuffer()
+// or const headerBuffer = await tbiIndexed.getHeaderBuffer({ signal: aborter.signal })
 ```
 
 You may also use e.g. `tbiIndexed.getLines('ctgA', 200, undefined, lineCallback)`
