@@ -1,3 +1,6 @@
+- Add ability for `getLines` to be open-ended. With no `end`, getlines continues
+until the end of the sequence.
+
 <a name="1.1.8"></a>
 ## [1.1.8](https://github.com/GMOD/tabix-js/compare/v1.1.7...v1.1.8) (2019-06-06)
 
@@ -54,8 +57,6 @@
 - Add renameRefSeqs handling
 - Fix some blocksForRange
 
-## 1.0.0 (2018-09-09)
+# 1.0.0 (2018-09-09)
 
 - Initial release
-
-
