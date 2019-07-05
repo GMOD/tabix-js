@@ -1,3 +1,8 @@
+<a name="1.2.0"></a>
+# [1.2.0](https://github.com/GMOD/tabix-js/compare/v1.1.8...v1.2.0) (2019-07-05)
+
+
+
 - Add ability for `getLines` to be open-ended. With no `end`, getlines continues
 until the end of the sequence.
 
