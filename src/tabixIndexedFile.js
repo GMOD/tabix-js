@@ -3,6 +3,7 @@ import AbortablePromiseCache from 'abortable-promise-cache'
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
 const { unzip, unzipChunk } = require('./unzip')
+const { checkAbortSignal } = require('./util')
 
 const TBI = require('./tbi')
 const CSI = require('./csi')
@@ -106,6 +107,7 @@ class TabixIndexedFile {
       signal = opts.signal
     }
     const metadata = await this.index.getMetadata({ signal })
+    checkAbortSignal(signal)
     if (!start) start = 0
     if (!end) end = metadata.maxRefLength
     if (!(start <= end))
@@ -117,6 +119,7 @@ class TabixIndexedFile {
     const chunks = await this.index.blocksForRange(refName, start, end, {
       signal,
     })
+    checkAbortSignal(signal)
 
     // check the chunks for any that are over the size limit.  if
     // any are, don't fetch any of them
@@ -135,6 +138,7 @@ class TabixIndexedFile {
       let previousStartCoordinate
       const c = chunks[chunkNum]
       const lines = await this.chunkCache.get(c.toString(), c, signal)
+      checkAbortSignal(signal)
 
       let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
@@ -172,6 +176,7 @@ class TabixIndexedFile {
         linesSinceLastYield += 1
         if (linesSinceLastYield >= this.yieldLimit) {
           await timeout(1)
+          checkAbortSignal(signal)
           linesSinceLastYield = 0
         }
       }
@@ -193,6 +198,7 @@ class TabixIndexedFile {
     const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
       opts,
     )
+    checkAbortSignal(opts.signal)
     const maxFetch =
       firstDataLine && firstDataLine.blockPosition
         ? firstDataLine.blockPosition + maxBlockSize
@@ -201,6 +207,7 @@ class TabixIndexedFile {
     // actually takes up more than one block? this case is not covered here
 
     let bytes = await this._readRegion(0, maxFetch)
+    checkAbortSignal(opts.signal)
     try {
       bytes = unzip(bytes)
     } catch (e) {
@@ -232,8 +239,9 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for a string
    */
-  async getHeader(opts) {
+  async getHeader(opts = {}) {
     const bytes = await this.getHeaderBuffer(opts)
+    checkAbortSignal(opts.signal)
     return bytes.toString('utf8')
   }
 

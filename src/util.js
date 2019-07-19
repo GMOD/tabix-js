@@ -8,4 +8,31 @@ module.exports = {
     }
     return long.toNumber()
   },
+
+  /**
+   * properly check if the given AbortSignal is aborted.
+   * per the standard, if the signal reads as aborted,
+   * this function throws either a DOMException AbortError, or a regular error
+   * with a `code` attribute set to `ERR_ABORTED`.
+   *
+   * for convenience, passing `undefined` is a no-op
+   *
+   * @param {AbortSignal} [signal]
+   * @returns nothing
+   */
+  checkAbortSignal(signal) {
+    if (!signal) return
+
+    if (signal.aborted) {
+      // console.warn('tabix operation aborted')
+      if (typeof DOMException !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        throw new DOMException('aborted', 'AbortError')
+      } else {
+        const e = new Error('aborted')
+        e.code = 'ERR_ABORTED'
+        throw e
+      }
+    }
+  },
 }
