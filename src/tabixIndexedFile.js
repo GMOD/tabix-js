@@ -80,7 +80,7 @@ class TabixIndexedFile {
       }),
 
       async fill(requestData, abortSignal) {
-        return readChunk(requestData, abortSignal)
+        return readChunk(requestData, { signal: abortSignal })
       },
     })
   }
@@ -105,7 +105,7 @@ class TabixIndexedFile {
       lineCallback = opts.lineCallback
       signal = opts.signal
     }
-    const metadata = await this.index.getMetadata()
+    const metadata = await this.index.getMetadata({ signal })
     if (!start) start = 0
     if (!end) end = metadata.maxRefLength
     if (!(start <= end))
@@ -114,7 +114,9 @@ class TabixIndexedFile {
       )
     if (start === end) return
 
-    const chunks = await this.index.blocksForRange(refName, start, end)
+    const chunks = await this.index.blocksForRange(refName, start, end, {
+      signal,
+    })
 
     // check the chunks for any that are over the size limit.  if
     // any are, don't fetch any of them
@@ -176,8 +178,8 @@ class TabixIndexedFile {
     }
   }
 
-  async getMetadata() {
-    return this.index.getMetadata()
+  async getMetadata(opts) {
+    return this.index.getMetadata(opts)
   }
 
   /**
@@ -187,8 +189,10 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for a buffer
    */
-  async getHeaderBuffer() {
-    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata()
+  async getHeaderBuffer(opts) {
+    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
+      opts,
+    )
     const maxFetch =
       firstDataLine && firstDataLine.blockPosition
         ? firstDataLine.blockPosition + maxBlockSize
@@ -228,8 +232,8 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for a string
    */
-  async getHeader() {
-    const bytes = await this.getHeaderBuffer()
+  async getHeader(opts) {
+    const bytes = await this.getHeaderBuffer(opts)
     return bytes.toString('utf8')
   }
 
@@ -241,8 +245,8 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for an array of string sequence names
    */
-  async getReferenceSequenceNames() {
-    const metadata = await this.getMetadata()
+  async getReferenceSequenceNames(opts) {
+    const metadata = await this.getMetadata(opts)
     return metadata.refIdToName
   }
 
@@ -352,8 +356,8 @@ class TabixIndexedFile {
    * @param {string} refSeq reference sequence name
    * @returns {Promise} for number of data lines present on that reference sequence
    */
-  async lineCount(refSeq) {
-    return this.index.lineCount(refSeq)
+  async lineCount(refSeq, opts) {
+    return this.index.lineCount(refSeq, opts)
   }
 
   async _readRegion(position, compressedSize, opts) {
@@ -381,14 +385,14 @@ class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  async readChunk(chunk, signal) {
+  async readChunk(chunk, opts) {
     // fetch the uncompressed data, uncompress carefully a block at a time,
     // and stop when done
 
     const compressedData = await this._readRegion(
       chunk.minv.blockPosition,
       chunk.fetchedSize(),
-      { signal },
+      opts,
     )
     let uncompressed
     try {

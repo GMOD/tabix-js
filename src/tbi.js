@@ -36,8 +36,8 @@ class TabixIndex {
     this.renameRefSeq = renameRefSeqs
   }
 
-  async lineCount(refName) {
-    const indexData = await this.parse()
+  async lineCount(refName, opts) {
+    const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
@@ -51,7 +51,7 @@ class TabixIndex {
    * @returns {Promise} for an object like
    * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId, coordinateType, format }`
    */
-  async getMetadata() {
+  async getMetadata(opts) {
     const {
       columnNumbers,
       metaChar,
@@ -64,7 +64,7 @@ class TabixIndex {
       maxBlockSize,
       maxBinNumber,
       maxRefLength,
-    } = await this.parse()
+    } = await this.parse(opts)
     return {
       columnNumbers,
       metaChar,
@@ -82,9 +82,10 @@ class TabixIndex {
 
   // memoize
   // fetch and parse the index
-  async parse() {
+  async parse(opts) {
+    const signal = opts && opts.signal
     const data = { depth: 5, maxBlockSize: 1 << 16 }
-    const bytes = await unzip(await this.filehandle.readFile())
+    const bytes = await unzip(await this.filehandle.readFile({ signal }))
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
@@ -204,10 +205,10 @@ class TabixIndex {
     return { refNameToId, refIdToName }
   }
 
-  async blocksForRange(refName, beg, end) {
+  async blocksForRange(refName, beg, end, opts) {
     if (beg < 0) beg = 0
 
-    const indexData = await this.parse()
+    const indexData = await this.parse(opts)
     if (!indexData) return []
     const refId = indexData.refNameToId[refName]
     const indexes = indexData.indices[refId]
