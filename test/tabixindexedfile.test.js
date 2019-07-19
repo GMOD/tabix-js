@@ -327,6 +327,16 @@ describe('tabix file', () => {
     expect(lines.length).toEqual(1)
   })
 
+  it('can fetch a CNV with length defined by END in INFO field using the opts.lineCallback', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/CNVtest.vcf.gz'),
+    })
+
+    const lines = new RecordCollector()
+    await f.getLines('22', 16063470, 16063480, { lineCallback: lines.callback })
+    expect(lines.length).toEqual(1)
+  })
+
   it('can get the correct fileOffset', async () => {
     const uncompressedVcf = new LocalFile(
       require.resolve('./data/OffsetTest.vcf'),
