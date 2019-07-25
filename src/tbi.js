@@ -8,7 +8,7 @@ const { unzip } = require('./unzip')
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
-const { longToNumber } = require('./util')
+const { longToNumber, checkAbortSignal } = require('./util')
 
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
@@ -86,6 +86,7 @@ class TabixIndex {
     const signal = opts && opts.signal
     const data = { depth: 5, maxBlockSize: 1 << 16 }
     const bytes = await unzip(await this.filehandle.readFile({ signal }))
+    checkAbortSignal(opts)
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {

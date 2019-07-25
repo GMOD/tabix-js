@@ -206,7 +206,7 @@ class TabixIndexedFile {
     // TODO: what if we don't have a firstDataLine, and the header
     // actually takes up more than one block? this case is not covered here
 
-    let bytes = await this._readRegion(0, maxFetch)
+    let bytes = await this._readRegion(0, maxFetch, opts)
     checkAbortSignal(opts.signal)
     try {
       bytes = unzip(bytes)

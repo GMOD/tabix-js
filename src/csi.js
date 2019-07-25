@@ -5,7 +5,7 @@ const { unzip } = require('./unzip')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
-const { longToNumber } = require('./util')
+const { longToNumber, checkAbortSignal } = require('./util')
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -161,7 +161,7 @@ class CSI {
     const signal = opts && opts.signal
     const data = { csi: true, maxBlockSize: 1 << 16 }
     const bytes = await unzip(await this.filehandle.readFile({ signal }))
-
+    checkAbortSignal(signal)
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) === CSI1_MAGIC) {
       data.csiVersion = 1
