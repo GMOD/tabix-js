@@ -1,3 +1,5 @@
+const MAX_MERGED_BLOCK_SIZE = 30 * 2 ** 20 // 30 MB
+
 module.exports = {
   longToNumber(long) {
     if (
@@ -34,5 +36,13 @@ module.exports = {
         throw e
       }
     }
+  },
+
+  canMergeBlocks(block1, block2) {
+    return (
+      block1.maxv.blockPosition === block2.minv.blockPosition &&
+      block2.maxv.blockPosition - block1.minv.blockPosition <=
+        MAX_MERGED_BLOCK_SIZE
+    )
   },
 }

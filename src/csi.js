@@ -5,7 +5,7 @@ const { unzip } = require('./unzip')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
-const { longToNumber, checkAbortSignal } = require('./util')
+const { longToNumber, checkAbortSignal, canMergeBlocks } = require('./util')
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -295,6 +295,17 @@ class CSI {
     for (let i = 1; i < numOffsets; i += 1)
       if (off[i - 1].maxv.compareTo(off[i].minv) >= 0)
         off[i - 1].maxv = off[i].minv
+    // merge adjacent blocks
+    l = 0
+    for (let i = 1; i < numOffsets; i += 1) {
+      if (canMergeBlocks(off[l], off[i])) off[l].maxv = off[i].maxv
+      else {
+        l += 1
+        off[l].minv = off[i].minv
+        off[l].maxv = off[i].maxv
+      }
+    }
+    numOffsets = l + 1
 
     return off.slice(0, numOffsets)
   }

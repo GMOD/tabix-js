@@ -49,9 +49,6 @@ function unzipChunk(inputData, chunk) {
     }
     if (fileStartingOffset + pos >= chunk.maxv.blockPosition) {
       // this is the last chunk, trim it and stop decompressing
-      // note if it is the same block is minv it subtracts that already
-      // trimmed part of the slice length
-
       decompressedBlocks[decompressedBlocks.length - 1] = decompressedBlocks[
         decompressedBlocks.length - 1
       ].slice(

@@ -8,7 +8,7 @@ const { unzip } = require('./unzip')
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
-const { longToNumber, checkAbortSignal } = require('./util')
+const { longToNumber, checkAbortSignal, canMergeBlocks } = require('./util')
 
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
@@ -274,6 +274,17 @@ class TabixIndex {
     for (let i = 1; i < numOffsets; i += 1)
       if (off[i - 1].maxv.compareTo(off[i].minv) >= 0)
         off[i - 1].maxv = off[i].minv
+    // merge adjacent blocks
+    l = 0
+    for (let i = 1; i < numOffsets; i += 1) {
+      if (canMergeBlocks(off[l], off[i])) off[l].maxv = off[i].maxv
+      else {
+        l += 1
+        off[l].minv = off[i].minv
+        off[l].maxv = off[i].maxv
+      }
+    }
+    numOffsets = l + 1
 
     return off.slice(0, numOffsets)
   }
