@@ -32,15 +32,14 @@ const remoteTbiIndexed = new TabixIndexedFile({
   tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi') // can also be csiFilehandle
 })
 
-// iterate over lines in the specified region, each of which
-// is structured as
+// iterate over lines in the specified region
 const lines = []
 await tbiIndexed.getLines('ctgA',200,300, (line, fileOffset) => lines.push(line))
 // alternative API usage
 const aborter = new AbortController()
 await tbiIndexed.getLines('ctgA',200,300, {
   lineCallback: (line, fileOffset) => lines.push(line),
-  signal: aborter.signal// an AbortController signal
+  signal: aborter.signal // an optional AbortSignal from an AbortController
 })
 // lines is now an array of strings, which are data lines.
 // commented (meta) lines are skipped.
@@ -58,7 +57,7 @@ const numLines = await tbiIndexed.lineCount('ctgA')
 const headerText = await tbiIndexed.getHeader()
 // or const headerText = await tbiIndexed.getHeader({ signal: aborter.signal })
 
-// or if you want a buffer instead, there is getHeaderBuffer()
+// or if you want a nodejs Buffer object instead, there is getHeaderBuffer()
 const headerBuffer = await tbiIndexed.getHeaderBuffer()
 // or const headerBuffer = await tbiIndexed.getHeaderBuffer({ signal: aborter.signal })
 ```
