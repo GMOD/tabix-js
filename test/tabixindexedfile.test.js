@@ -7,8 +7,8 @@ const { extended } = require('./utils')
 class RecordCollector {
   constructor() {
     this.clear()
-    this.callback = (line, fileOffset) => {
-      this.records.push({ line, fileOffset })
+    this.callback = (line, lineHash) => {
+      this.records.push({ line, lineHash })
       this.length += 1
     }
   }
@@ -28,9 +28,9 @@ class RecordCollector {
 
   expectNoDuplicates() {
     const seen = {}
-    this.forEach(({ line, fileOffset }) => {
+    this.forEach(({ line, lineHash }) => {
       expect(seen[line]).toBe(undefined)
-      seen[line] = fileOffset
+      seen[line] = lineHash
     })
   }
 }
@@ -46,12 +46,12 @@ describe('tabix file', () => {
     await f.getLines('ctgA', 1000, 4000, items.callback)
     items.expectNoDuplicates()
     expect(items.length).toEqual(8)
-    items.forEach(({ line, fileOffset }) => {
+    items.forEach(({ line, lineHash }) => {
       line = line.split('\t')
       expect(line[0]).toEqual('contigA')
       expect(parseInt(line[1], 10)).toBeGreaterThan(999)
       expect(parseInt(line[1], 10)).toBeLessThan(4001)
-      expect(fileOffset).toBeGreaterThanOrEqual(0)
+      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
 
     items.clear()
@@ -93,11 +93,11 @@ describe('tabix file', () => {
     await f.getLines('ctgA', 10000, undefined, items.callback)
     items.expectNoDuplicates()
     expect(items.length).toEqual(30)
-    items.forEach(({ line, fileOffset }) => {
+    items.forEach(({ line, lineHash }) => {
       line = line.split('\t')
       expect(line[0]).toEqual('contigA')
       expect(parseInt(line[1], 10)).toBeGreaterThan(9999)
-      expect(fileOffset).toBeGreaterThanOrEqual(0)
+      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
   })
   it('can read ctgA', async () => {
@@ -111,10 +111,10 @@ describe('tabix file', () => {
     await f.getLines('ctgA', undefined, undefined, items.callback)
     items.expectNoDuplicates()
     expect(items.length).toEqual(109)
-    items.forEach(({ line, fileOffset }) => {
+    items.forEach(({ line, lineHash }) => {
       line = line.split('\t')
       expect(line[0]).toEqual('contigA')
-      expect(fileOffset).toBeGreaterThanOrEqual(0)
+      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
   })
   it('can count lines with TBI', async () => {
@@ -235,13 +235,13 @@ describe('tabix file', () => {
     const lines = new RecordCollector()
     await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
     lines.expectNoDuplicates()
-    lines.forEach(({ line, fileOffset }) => {
+    lines.forEach(({ line, lineHash }) => {
       const fields = line.split('\t')
       lineCount += 1
       expect(fields[0]).toEqual('NC_000001.11')
       expect(parseInt(fields[3], 10)).toBeLessThan(55000)
       expect(parseInt(fields[4], 10)).toBeGreaterThan(3000)
-      expect(fileOffset).toBeGreaterThanOrEqual(0)
+      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
     expect(lineCount).toEqual(23)
     expect(lines.records[0].line).toEqual(
@@ -335,54 +335,6 @@ describe('tabix file', () => {
     const lines = new RecordCollector()
     await f.getLines('22', 16063470, 16063480, { lineCallback: lines.callback })
     expect(lines.length).toEqual(1)
-  })
-
-  it('can get the correct fileOffset', async () => {
-    const uncompressedVcf = new LocalFile(
-      require.resolve('./data/OffsetTest.vcf'),
-    )
-    const { size: fileSize } = await uncompressedVcf.stat()
-    const vcfData = Buffer.alloc(fileSize)
-    await uncompressedVcf.read(vcfData, 0, fileSize, 0)
-    const FirstLineStart = vcfData.indexOf('contigA', 0, 'utf8')
-    const SecondLineStart = vcfData.indexOf(
-      'contigA',
-      FirstLineStart + 1,
-      'utf8',
-    )
-    const f = new TabixIndexedFile({
-      path: require.resolve('./data/OffsetTest.vcf.gz'),
-    })
-
-    const lines = new RecordCollector()
-    await f.getLines('contigA', 2999, 3110, lines.callback)
-    expect(lines.length).toEqual(2)
-    expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
-    expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
-  })
-
-  it('can get the correct fileOffset with CRLF line endings', async () => {
-    const uncompressedVcf = new LocalFile(
-      require.resolve('./data/CrlfOffsetTest.vcf'),
-    )
-    const { size: fileSize } = await uncompressedVcf.stat()
-    const vcfData = Buffer.alloc(fileSize)
-    await uncompressedVcf.read(vcfData, 0, fileSize, 0)
-    const FirstLineStart = vcfData.indexOf('contigA', 0, 'utf8')
-    const SecondLineStart = vcfData.indexOf(
-      'contigA',
-      FirstLineStart + 1,
-      'utf8',
-    )
-    const f = new TabixIndexedFile({
-      path: require.resolve('./data/CrlfOffsetTest.vcf.gz'),
-    })
-
-    const lines = new RecordCollector()
-    await f.getLines('contigA', 2999, 3110, lines.callback)
-    expect(lines.length).toEqual(2)
-    expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
-    expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
   })
 
   it('returns and empty string for `getHeader()` if there is no header', async () => {

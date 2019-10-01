@@ -1,4 +1,5 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
+import crc32 from 'buffer-crc32'
 
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
@@ -90,7 +91,7 @@ class TabixIndexedFile {
    * @param {string} refName name of the reference sequence
    * @param {number} start start of the region (in 0-based half-open coordinates)
    * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function|object} lineCallback callback called for each line in the region, called as (line, fileOffset) or object containing obj.lineCallback, obj.signal, etc
+   * @param {function|object} lineCallback callback called for each line in the region, called as (line, lineHash) or object containing obj.lineCallback, obj.signal, etc
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
   async getLines(refName, start, end, opts) {
@@ -140,11 +141,9 @@ class TabixIndexedFile {
       const lines = await this.chunkCache.get(c.toString(), c, signal)
       checkAbortSignal(signal)
 
-      let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
-        const fileOffset =
-          chunks[chunkNum].minv.blockPosition * 2 ** 16 + currentLineStart
+        const lineHash = crc32.unsigned(line)
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
           metadata,
@@ -162,15 +161,13 @@ class TabixIndexedFile {
         previousStartCoordinate = startCoordinate
 
         if (overlaps) {
-          lineCallback(line.trim(), fileOffset)
+          lineCallback(line.trim(), lineHash)
         } else if (startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
           // we must be at the end of the relevant data and we can stop
           // processing data now
           return
         }
-
-        currentLineStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
         linesSinceLastYield += 1
