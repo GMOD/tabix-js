@@ -1,20 +1,26 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
+import LRU from 'quick-lru'
+import { GenericFilehandle, LocalFile } from 'generic-filehandle'
+import { unzip, unzipChunk } from './unzip'
+import { checkAbortSignal } from './util'
+import IndexFile from './indexFile'
+import Chunk from './chunk'
+import TBI from './tbi'
+import CSI from './csi'
 
-const LRU = require('quick-lru')
-const { LocalFile } = require('generic-filehandle')
-const { unzip, unzipChunk } = require('@gmod/bgzf-filehandle')
-const { checkAbortSignal } = require('./util')
-
-const TBI = require('./tbi')
-const CSI = require('./csi')
-
-function timeout(time) {
+function timeout(time: number) {
   return new Promise(resolve => {
     setTimeout(resolve, time)
   })
 }
 
-class TabixIndexedFile {
+export default class TabixIndexedFile {
+  private filehandle: GenericFilehandle
+  private index: IndexFile
+  private chunkSizeLimit: number
+  private renameRefSeqCallback: (n: string) => string
+  private yieldLimit: number
+  private chunkCache: any
   /**
    * @param {object} args
    * @param {string} [args.path]
@@ -44,15 +50,24 @@ class TabixIndexedFile {
     yieldLimit = 300,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
+  }: {
+    path?: string
+    filehandle?: GenericFilehandle
+    tbiPath?: string
+    tbiFilehandle?: GenericFilehandle
+    csiPath?: string
+    csiFilehandle?: GenericFilehandle
+    chunkSizeLimit?: number
+    yieldLimit?: number
+    renameRefSeqs: (n: string) => string
+    chunkCacheSize?: number
   }) {
     if (filehandle) this.filehandle = filehandle
     else if (path) this.filehandle = new LocalFile(path)
     else throw new TypeError('must provide either filehandle or path')
 
-    if (tbiFilehandle)
-      this.index = new TBI({ filehandle: tbiFilehandle, renameRefSeqs })
-    else if (csiFilehandle)
-      this.index = new CSI({ filehandle: csiFilehandle, renameRefSeqs })
+    if (tbiFilehandle) this.index = new TBI({ filehandle: tbiFilehandle, renameRefSeqs })
+    else if (csiFilehandle) this.index = new CSI({ filehandle: csiFilehandle, renameRefSeqs })
     else if (tbiPath)
       this.index = new TBI({
         filehandle: new LocalFile(tbiPath),
@@ -64,25 +79,23 @@ class TabixIndexedFile {
         renameRefSeqs,
       })
     else if (path) {
-      this.index = new TBI({ filehandle: new LocalFile(`${path}.tbi`) })
+      this.index = new TBI({
+        filehandle: new LocalFile(`${path}.tbi`),
+        renameRefSeqs,
+      })
     } else {
-      throw new TypeError(
-        'must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath',
-      )
+      throw new TypeError('must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath')
     }
 
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
     this.renameRefSeqCallback = renameRefSeqs
-    const readChunk = this.readChunk.bind(this)
     this.chunkCache = new AbortablePromiseCache({
       cache: new LRU({
         maxSize: Math.floor(chunkCacheSize / (1 << 16)),
       }),
 
-      async fill(requestData, abortSignal) {
-        return readChunk(requestData, { signal: abortSignal })
-      },
+      fill: this.readChunk.bind(this),
     })
   }
 
@@ -90,22 +103,30 @@ class TabixIndexedFile {
    * @param {string} refName name of the reference sequence
    * @param {number} start start of the region (in 0-based half-open coordinates)
    * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function|object} lineCallback callback called for each line in the region, called as (line, fileOffset) or object containing obj.lineCallback, obj.signal, etc
+   * @param {function|object} lineCallback callback called for each line in the region. can also pass a object param containing obj.lineCallback, obj.signal, etc
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
-  async getLines(refName, start, end, opts) {
-    let signal
-    let lineCallback = opts
+  async getLines(
+    refName: string,
+    start: number,
+    end: number,
+    opts: { signal?: AbortSignal; lineCallback: Function } | Function,
+  ) {
+    let signal: AbortSignal | undefined
+    let callback: Function
+    if (typeof opts === 'undefined') throw new TypeError('line callback must be provided')
+    if (typeof opts === 'function') callback = opts
+    else {
+      callback = opts.lineCallback
+      signal = opts.signal
+    }
     if (refName === undefined) {
       throw new TypeError('must provide a reference sequence name')
     }
-    if (!lineCallback) {
+    if (!callback) {
       throw new TypeError('line callback must be provided')
     }
-    if (typeof opts !== 'function') {
-      lineCallback = opts.lineCallback
-      signal = opts.signal
-    }
+
     const metadata = await this.index.getMetadata({ signal })
     checkAbortSignal(signal)
     if (!start) start = 0
@@ -134,16 +155,10 @@ class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
-
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
-      let previousStartCoordinate
+      let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
-      const { buffer: b, cpositions, dpositions } = await this.chunkCache.get(
-        c.toString(),
-        c,
-        signal,
-      )
-      const buffer = b.slice(c.minv.dataPosition)
+      const { buffer, cpositions, dpositions } = await this.chunkCache.get(c.toString(), c, signal)
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
@@ -153,27 +168,25 @@ class TabixIndexedFile {
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (pos = 0; fileOffset > dpositions[pos]; pos += 1);
+        for (pos = 0; fileOffset > dpositions[pos] + c.minv.dataPosition; pos++);
         pos = Math.min(dpositions.length - 1, pos)
 
         // filter the line for whether it is within the requested range
-        const { startCoordinate, overlaps } = this.checkLine(
-          metadata,
-          refName,
-          start,
-          end,
-          line,
-        )
+        const { startCoordinate, overlaps } = this.checkLine(metadata, refName, start, end, line)
 
         // do a small check just to make sure that the lines are really sorted by start coordinate
-        if (previousStartCoordinate > startCoordinate)
+        if (
+          startCoordinate !== undefined &&
+          previousStartCoordinate !== undefined &&
+          previousStartCoordinate > startCoordinate
+        )
           throw new Error(
             `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
           )
         previousStartCoordinate = startCoordinate
 
         if (overlaps) {
-          lineCallback(
+          callback(
             line.trim(),
             c.minv.blockPosition * (1 << 8) +
               cpositions[pos] * (1 << 8) -
@@ -200,7 +213,7 @@ class TabixIndexedFile {
     }
   }
 
-  async getMetadata(opts) {
+  async getMetadata(opts: { signal?: AbortSignal } = {}) {
     return this.index.getMetadata(opts)
   }
 
@@ -211,10 +224,8 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for a buffer
    */
-  async getHeaderBuffer(opts) {
-    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
-      opts,
-    )
+  async getHeaderBuffer(opts: { signal?: AbortSignal } = {}) {
+    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(opts)
     checkAbortSignal(opts.signal)
     const maxFetch =
       firstDataLine && firstDataLine.blockPosition
@@ -256,7 +267,7 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for a string
    */
-  async getHeader(opts = {}) {
+  async getHeader(opts: { signal?: AbortSignal } = {}) {
     const bytes = await this.getHeaderBuffer(opts)
     checkAbortSignal(opts.signal)
     return bytes.toString('utf8')
@@ -270,18 +281,9 @@ class TabixIndexedFile {
    *
    * @returns {Promise} for an array of string sequence names
    */
-  async getReferenceSequenceNames(opts) {
+  async getReferenceSequenceNames(opts: { signal?: AbortSignal } = {}) {
     const metadata = await this.getMetadata(opts)
     return metadata.refIdToName
-  }
-
-  renameRefSeq(refName) {
-    if (this._renameRefSeqCache && this._renameRefSeqCache.from === refName)
-      return this._renameRefSeqCache.to
-
-    const renamed = this.renameRefSeqCallback(refName)
-    this._renameRefSeqCache = { from: refName, to: renamed }
-    return renamed
   }
 
   /**
@@ -295,11 +297,21 @@ class TabixIndexedFile {
    * true if line is a data line that overlaps the given region
    */
   checkLine(
-    { columnNumbers, metaChar, coordinateType, format },
-    regionRefName,
-    regionStart,
-    regionEnd,
-    line,
+    {
+      columnNumbers,
+      metaChar,
+      coordinateType,
+      format,
+    }: {
+      columnNumbers: { ref: number; start: number; end: number }
+      metaChar: string
+      coordinateType: string
+      format: string
+    },
+    regionRefName: string,
+    regionStart: number,
+    regionEnd: number,
+    line: string,
   ) {
     // skip meta lines
     if (line.charAt(0) === metaChar) return { overlaps: false }
@@ -318,24 +330,22 @@ class TabixIndexedFile {
 
     let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
     let currentColumnStart = 0
-    let refSeq
-    let startCoordinate
+    let refSeq = ''
+    let startCoordinate = -Infinity
     for (let i = 0; i < line.length + 1; i += 1) {
       if (line[i] === '\t' || i === line.length) {
         if (currentColumnNumber === ref) {
           let refName = line.slice(currentColumnStart, i)
-          refName = this.renameRefSeq(refName)
+          refName = this.renameRefSeqCallback(refName)
           if (refName !== regionRefName) return { overlaps: false }
         } else if (currentColumnNumber === start) {
           startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           // we convert to 0-based-half-open
           if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd)
-            return { startCoordinate, overlaps: false }
+          if (startCoordinate >= regionEnd) return { startCoordinate, overlaps: false }
           if (end === 0) {
             // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart)
-              return { startCoordinate, overlaps: false }
+            if (startCoordinate + 1 <= regionStart) return { startCoordinate, overlaps: false }
           }
         } else if (format === 'VCF' && currentColumnNumber === 4) {
           refSeq = line.slice(currentColumnStart, i)
@@ -359,7 +369,7 @@ class TabixIndexedFile {
     return { startCoordinate, overlaps: true }
   }
 
-  _getVcfEnd(startCoordinate, refSeq, info) {
+  _getVcfEnd(startCoordinate: number, refSeq: string, info: any) {
     let endCoordinate = startCoordinate + refSeq.length
     // ignore TRA features as they specify CHR2 and END
     // as being on a different chromosome
@@ -389,15 +399,14 @@ class TabixIndexedFile {
    * @param {string} refSeq reference sequence name
    * @returns {Promise} for number of data lines present on that reference sequence
    */
-  async lineCount(refSeq, opts) {
-    return this.index.lineCount(refSeq, opts)
+  async lineCount(refName: string, opts: { signal?: AbortSignal } = {}) {
+    return this.index.lineCount(refName, opts)
   }
 
-  async _readRegion(position, compressedSize, opts) {
-    // console.log(`reading region ${position} / ${compressedSize}`)
+  async _readRegion(position: number, compressedSize: number, opts: { signal?: AbortSignal } = {}) {
+    //@ts-ignore
     const { size: fileSize } = await this.filehandle.stat()
-    if (position + compressedSize > fileSize)
-      compressedSize = fileSize - position
+    if (position + compressedSize > fileSize) compressedSize = fileSize - position
 
     const { buffer } = await this.filehandle.read(
       Buffer.alloc(compressedSize),
@@ -416,7 +425,7 @@ class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  async readChunk(chunk, opts) {
+  async readChunk(chunk: Chunk, opts: { signal?: AbortSignal } = {}) {
     // fetch the uncompressed data, uncompress carefully a block at a time,
     // and stop when done
 
@@ -432,5 +441,3 @@ class TabixIndexedFile {
     }
   }
 }
-
-module.exports = TabixIndexedFile

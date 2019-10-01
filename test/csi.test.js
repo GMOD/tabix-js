@@ -1,6 +1,6 @@
-const { LocalFile } = require('generic-filehandle')
-const VirtualOffset = require('../src/virtualOffset')
-const CSI = require('../src/csi')
+import { LocalFile } from 'generic-filehandle'
+import VirtualOffset from '../src/virtualOffset'
+import CSI from '../src/csi'
 
 describe('csi index', () => {
   it('loads test.gff3.gz.csi', async () => {
@@ -23,6 +23,10 @@ describe('csi index', () => {
     const metadata = await ti.getMetadata()
     expect(metadata).toEqual({
       columnNumbers: { end: 5, ref: 1, start: 4 },
+      csi: true,
+      csiVersion: 1,
+      depth: 6,
+      refCount: 2,
       coordinateType: '1-based-closed',
       format: 'generic',
       firstDataLine: new VirtualOffset(0, 130),
@@ -56,6 +60,10 @@ describe('csi index', () => {
 
     const metadata = await ti.getMetadata()
     expect(metadata).toEqual({
+      csi: true,
+      csiVersion: 1,
+      depth: 6,
+      refCount: 1,
       columnNumbers: { end: 0, ref: 1, start: 2 },
       coordinateType: '1-based-closed',
       format: 'VCF',

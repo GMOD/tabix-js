@@ -1,13 +1,11 @@
-const { LocalFile } = require('generic-filehandle')
-const VirtualOffset = require('../src/virtualOffset')
-const TabixIndex = require('../src/tbi')
+import { LocalFile } from 'generic-filehandle'
+import VirtualOffset from '../src/virtualOffset'
+import TabixIndex from '../src/tbi'
 
 describe('tbi index', () => {
   it('loads', async () => {
     const ti = new TabixIndex({
-      filehandle: new LocalFile(
-        require.resolve('./data/volvox.test.vcf.gz.tbi'),
-      ),
+      filehandle: new LocalFile(require.resolve('./data/volvox.test.vcf.gz.tbi')),
     })
     const indexData = await ti.parse()
     expect(indexData.columnNumbers.start).toEqual(2)
@@ -35,18 +33,12 @@ describe('tbi index', () => {
       maxRefLength: 536870912,
     })
     console.warn = jest.fn()
-    expect(await ti.blocksForRange('contigA', 7334998796, 8104229566)).toEqual(
-      [],
-    )
-    expect(console.warn).toHaveBeenCalledWith(
-      'querying outside of possible tabix range',
-    )
+    expect(await ti.blocksForRange('contigA', 7334998796, 8104229566)).toEqual([])
+    expect(console.warn).toHaveBeenCalledWith('querying outside of possible tabix range')
   })
   it('failing tabix', async () => {
     const ti = new TabixIndex({
-      filehandle: new LocalFile(
-        require.resolve('./data/failing_tabix.vcf.gz.tbi'),
-      ),
+      filehandle: new LocalFile(require.resolve('./data/failing_tabix.vcf.gz.tbi')),
     })
 
     await expect(ti.parse()).rejects.toThrow(/too many bins/)
