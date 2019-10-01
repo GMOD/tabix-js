@@ -6,3 +6,4 @@ coverage/
 test/data/extended/
 *.uncompressed
 test/extended_data
+.eslintcache
