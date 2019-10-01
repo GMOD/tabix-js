@@ -34,18 +34,18 @@ const remoteTbiIndexed = new TabixIndexedFile({
 
 // iterate over lines in the specified region
 const lines = []
-await tbiIndexed.getLines('ctgA',200,300, (line, fileOffset) => lines.push(line))
+await tbiIndexed.getLines('ctgA',200,300, (line, lineHash) => lines.push(line))
 // alternative API usage
 const aborter = new AbortController()
 await tbiIndexed.getLines('ctgA',200,300, {
-  lineCallback: (line, fileOffset) => lines.push(line),
+  lineCallback: (line, lineHash) => lines.push(line),
   signal: aborter.signal // an optional AbortSignal from an AbortController
 })
 // lines is now an array of strings, which are data lines.
 // commented (meta) lines are skipped.
 // line strings do not include any trailing whitespace characters.
-// the callback is also called with a `fileOffset`,
-// which gives the virtual file offset where the line is found in the file
+// the callback is also called with a `lineHash`,
+// which gives a lineHash to use as a feature ID
 
 // get the approximate number of data lines in the
 // file for the given reference sequence, excluding header, comment, and whitespace lines
