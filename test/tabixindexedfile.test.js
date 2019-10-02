@@ -1,3 +1,4 @@
+const crc32 = require('buffer-crc32')
 const TabixIndexedFile = require('../src/tabixIndexedFile')
 const VirtualOffset = require('../src/virtualOffset')
 
@@ -6,8 +7,8 @@ const { extended } = require('./utils')
 class RecordCollector {
   constructor() {
     this.clear()
-    this.callback = (line, lineHash) => {
-      this.records.push({ line, lineHash })
+    this.callback = line => {
+      this.records.push(line)
       this.length += 1
     }
   }
@@ -22,14 +23,14 @@ class RecordCollector {
   }
 
   text() {
-    return this.records.map(r => `${r.line}\n`).join('')
+    return this.records.join('\n')
   }
 
   expectNoDuplicates() {
     const seen = {}
-    this.forEach(({ line, lineHash }) => {
+    this.forEach(line => {
       expect(seen[line]).toBe(undefined)
-      seen[line] = lineHash
+      seen[line] = crc32.signed(line)
     })
   }
 }
@@ -45,12 +46,11 @@ describe('tabix file', () => {
     await f.getLines('ctgA', 1000, 4000, items.callback)
     items.expectNoDuplicates()
     expect(items.length).toEqual(8)
-    items.forEach(({ line, lineHash }) => {
-      line = line.split('\t')
+    items.forEach(l => {
+      const line = l.split('\t')
       expect(line[0]).toEqual('contigA')
       expect(parseInt(line[1], 10)).toBeGreaterThan(999)
       expect(parseInt(line[1], 10)).toBeLessThan(4001)
-      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
 
     items.clear()
@@ -92,11 +92,10 @@ describe('tabix file', () => {
     await f.getLines('ctgA', 10000, undefined, items.callback)
     items.expectNoDuplicates()
     expect(items.length).toEqual(30)
-    items.forEach(({ line, lineHash }) => {
-      line = line.split('\t')
+    items.forEach(l => {
+      const line = l.split('\t')
       expect(line[0]).toEqual('contigA')
       expect(parseInt(line[1], 10)).toBeGreaterThan(9999)
-      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
   })
   it('can read ctgA', async () => {
@@ -110,10 +109,9 @@ describe('tabix file', () => {
     await f.getLines('ctgA', undefined, undefined, items.callback)
     items.expectNoDuplicates()
     expect(items.length).toEqual(109)
-    items.forEach(({ line, lineHash }) => {
-      line = line.split('\t')
+    items.forEach(l => {
+      const line = l.split('\t')
       expect(line[0]).toEqual('contigA')
-      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
   })
   it('can count lines with TBI', async () => {
@@ -168,7 +166,7 @@ describe('tabix file', () => {
     await f.getLines('ctgB', 0, Infinity, lines.callback)
     lines.expectNoDuplicates()
     expect(lines.length).toEqual(4)
-    expect(lines.records[3].line).toEqual(
+    expect(lines.records[3]).toEqual(
       'ctgB	example	remark	4715	5968	.	-	.	Name=f05;Note=ああ、この機能は、世界中を旅しています！',
     )
     lines.clear()
@@ -234,19 +232,18 @@ describe('tabix file', () => {
     const lines = new RecordCollector()
     await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
     lines.expectNoDuplicates()
-    lines.forEach(({ line, lineHash }) => {
+    lines.forEach(line => {
       const fields = line.split('\t')
       lineCount += 1
       expect(fields[0]).toEqual('NC_000001.11')
       expect(parseInt(fields[3], 10)).toBeLessThan(55000)
       expect(parseInt(fields[4], 10)).toBeGreaterThan(3000)
-      expect(lineHash).toBeGreaterThanOrEqual(0)
     })
     expect(lineCount).toEqual(23)
-    expect(lines.records[0].line).toEqual(
+    expect(lines.records[0]).toEqual(
       'NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA',
     )
-    expect(lines.records[22].line).toEqual(
+    expect(lines.records[22]).toEqual(
       'NC_000001.11	Gnomon	exon	53282	53959	.	+	.	Parent=lnc_RNA3;Dbxref=GeneID:105379212,Genbank:XR_948874.1;gbkey=ncRNA;gene=LOC105379212;product=uncharacterized LOC105379212;transcript_id=XR_948874.1',
     )
   })
@@ -281,7 +278,7 @@ describe('tabix file', () => {
     lines.clear()
     await f.getLines('1', 1206810422, 1206810423, lines.callback)
     expect(lines.length).toEqual(1)
-    expect(lines.records[0].line).toEqual(
+    expect(lines.records[0]).toEqual(
       '1	1206810423	.	T	A	25	.	DP=19;VDB=0.0404;AF1=0.5;AC1=1;DP4=3,7,3,6;MQ=37;FQ=28;PV4=1,1,1,0.27	GT:PL:GQ	0/1:55,0,73:58',
     )
     lines.clear()
@@ -290,7 +287,7 @@ describe('tabix file', () => {
     await f.getLines('1', 1206810423, 1206849288, lines.callback)
     lines.expectNoDuplicates()
     expect(lines.length).toEqual(36)
-    expect(lines.records[35].line).toEqual(
+    expect(lines.records[35]).toEqual(
       '1	1206849288	.	G	A	106	.	DP=23;VDB=0.0399;AF1=1;AC1=2;DP4=0,0,16,7;MQ=35;FQ=-96	GT:PL:GQ	1/1:139,69,0:99',
     )
     lines.clear()

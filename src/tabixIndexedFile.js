@@ -91,7 +91,7 @@ class TabixIndexedFile {
    * @param {string} refName name of the reference sequence
    * @param {number} start start of the region (in 0-based half-open coordinates)
    * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function|object} lineCallback callback called for each line in the region, called as (line, lineHash) or object containing obj.lineCallback, obj.signal, etc
+   * @param {function|object} lineCallback callback called for each line in the region. can also pass a object param containing obj.lineCallback, obj.signal, etc
    * @returns {Promise} resolved when the whole read is finished, rejected on error
    */
   async getLines(refName, start, end, opts) {
@@ -143,7 +143,6 @@ class TabixIndexedFile {
 
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
-        const lineHash = crc32.unsigned(line)
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
           metadata,
@@ -161,7 +160,7 @@ class TabixIndexedFile {
         previousStartCoordinate = startCoordinate
 
         if (overlaps) {
-          lineCallback(line.trim(), lineHash)
+          lineCallback(line.trim())
         } else if (startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
           // we must be at the end of the relevant data and we can stop
