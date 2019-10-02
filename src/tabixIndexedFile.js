@@ -1,5 +1,4 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
-import crc32 from 'buffer-crc32'
 
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
