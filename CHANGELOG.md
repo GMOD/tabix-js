@@ -1,7 +1,9 @@
+- Small refactor of `filehandle.read()` to make it more robust
+
 <a name="1.3.0"></a>
 # [1.3.0](https://github.com/GMOD/tabix-js/compare/v1.2.0...v1.3.0) (2019-08-08)
 
-
+- Add ability to pass an AbortSignal from an AbortController to `getLines()`
 
 <a name="1.2.0"></a>
 # [1.2.0](https://github.com/GMOD/tabix-js/compare/v1.1.8...v1.2.0) (2019-07-05)
