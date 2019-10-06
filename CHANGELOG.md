@@ -1,3 +1,8 @@
+<a name="1.3.1"></a>
+## [1.3.1](https://github.com/GMOD/tabix-js/compare/v1.3.0...v1.3.1) (2019-10-06)
+
+
+
 - Small refactor of `filehandle.read()` to make it more robust
 
 <a name="1.3.0"></a>
