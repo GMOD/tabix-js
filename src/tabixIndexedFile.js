@@ -374,17 +374,15 @@ class TabixIndexedFile {
     if (position + compressedSize > fileSize)
       compressedSize = fileSize - position
 
-    const compressedData = Buffer.alloc(compressedSize)
-
-    /* const bytesRead = */ await this.filehandle.read(
-      compressedData,
+    const { buffer } = await this.filehandle.read(
+      Buffer.alloc(compressedSize),
       0,
       compressedSize,
       position,
       opts,
     )
 
-    return compressedData
+    return buffer
   }
 
   /**
