@@ -134,17 +134,31 @@ class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
+
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate
       const c = chunks[chunkNum]
-      const lines = await this.chunkCache.get(c.toString(), c, signal)
+      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
+        c.toString(),
+        c,
+        signal,
+      )
+      const lines = buffer.toString().split('\n')
+      lines.pop()
       checkAbortSignal(signal)
+      let fileOffset = 0
+      let pos
 
-      let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
-        const fileOffset =
-          chunks[chunkNum].minv.blockPosition * 2 ** 16 + currentLineStart
+
+        for (
+          pos = 0;
+          fileOffset > dpositions[pos] + c.minv.dataPosition;
+          pos += 1
+        );
+        pos = Math.min(dpositions.length - 1, pos)
+
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
           metadata,
@@ -162,15 +176,21 @@ class TabixIndexedFile {
         previousStartCoordinate = startCoordinate
 
         if (overlaps) {
-          lineCallback(line.trim(), fileOffset)
-        } else if (startCoordinate >= end) {
+          lineCallback(
+            line.trim(),
+            c.minv.blockPosition * (1 << 16) +
+              cpositions[pos] * (1 << 16) -
+              dpositions[pos] +
+              c.minv.dataPosition +
+              fileOffset,
+          )
+        } else if (startCoordinate !== undefined && startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
           // we must be at the end of the relevant data and we can stop
           // processing data now
           return
         }
-
-        currentLineStart += line.length + 1
+        fileOffset += line.length + 1
 
         // yield if we have emitted beyond the yield limit
         linesSinceLastYield += 1
@@ -400,18 +420,11 @@ class TabixIndexedFile {
       chunk.fetchedSize(),
       opts,
     )
-    let uncompressed
     try {
-      uncompressed = unzipChunk(compressedData, chunk)
+      return unzipChunk(compressedData, chunk)
     } catch (e) {
       throw new Error(`error decompressing chunk ${chunk.toString()}`)
     }
-    const lines = uncompressed.toString().split('\n')
-
-    // remove the last line, since it will be either empty or partial
-    lines.pop()
-
-    return lines
   }
 }
 

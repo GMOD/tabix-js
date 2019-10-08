@@ -1,8 +1,7 @@
-const { LocalFile } = require('generic-filehandle')
-const TabixIndexedFile = require('../src/tabixIndexedFile')
-const VirtualOffset = require('../src/virtualOffset')
+import TabixIndexedFile from '../src/tabixIndexedFile'
+import VirtualOffset from '../src/virtualOffset'
 
-const { extended } = require('./utils')
+import { extended } from './utils'
 
 class RecordCollector {
   constructor() {
@@ -337,54 +336,6 @@ describe('tabix file', () => {
     expect(lines.length).toEqual(1)
   })
 
-  it('can get the correct fileOffset', async () => {
-    const uncompressedVcf = new LocalFile(
-      require.resolve('./data/OffsetTest.vcf'),
-    )
-    const { size: fileSize } = await uncompressedVcf.stat()
-    const vcfData = Buffer.alloc(fileSize)
-    await uncompressedVcf.read(vcfData, 0, fileSize, 0)
-    const FirstLineStart = vcfData.indexOf('contigA', 0, 'utf8')
-    const SecondLineStart = vcfData.indexOf(
-      'contigA',
-      FirstLineStart + 1,
-      'utf8',
-    )
-    const f = new TabixIndexedFile({
-      path: require.resolve('./data/OffsetTest.vcf.gz'),
-    })
-
-    const lines = new RecordCollector()
-    await f.getLines('contigA', 2999, 3110, lines.callback)
-    expect(lines.length).toEqual(2)
-    expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
-    expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
-  })
-
-  it('can get the correct fileOffset with CRLF line endings', async () => {
-    const uncompressedVcf = new LocalFile(
-      require.resolve('./data/CrlfOffsetTest.vcf'),
-    )
-    const { size: fileSize } = await uncompressedVcf.stat()
-    const vcfData = Buffer.alloc(fileSize)
-    await uncompressedVcf.read(vcfData, 0, fileSize, 0)
-    const FirstLineStart = vcfData.indexOf('contigA', 0, 'utf8')
-    const SecondLineStart = vcfData.indexOf(
-      'contigA',
-      FirstLineStart + 1,
-      'utf8',
-    )
-    const f = new TabixIndexedFile({
-      path: require.resolve('./data/CrlfOffsetTest.vcf.gz'),
-    })
-
-    const lines = new RecordCollector()
-    await f.getLines('contigA', 2999, 3110, lines.callback)
-    expect(lines.length).toEqual(2)
-    expect(lines.records[0].fileOffset).toEqual(FirstLineStart)
-    expect(lines.records[1].fileOffset).toEqual(SecondLineStart)
-  })
-
   it('returns and empty string for `getHeader()` if there is no header', async () => {
     const f = new TabixIndexedFile({
       path: require.resolve('./data/test.bed.gz'),
@@ -436,4 +387,47 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=Gen
       )
     },
   )
+
+  it('usage of the chr22 ultralong nanopore as a bed file', async () => {
+    const ti = new TabixIndexedFile({
+      path: require.resolve('./data/chr22_nanopore_subset.bed.gz'),
+    })
+    await ti.getHeader()
+    const ret1 = new RecordCollector()
+    await ti.getLines('22', 16559999, 16564499, ret1.callback)
+    const ret2 = new RecordCollector()
+    await ti.getLines('22', 16564499, 16564999, ret2.callback)
+    const findfeat = ({ line }) =>
+      line.split('\t')[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5'
+    const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
+    expect(r1.fileOffset).toEqual(r2.fileOffset)
+  })
+
+  it('too few', async () => {
+    const ti = new TabixIndexedFile({
+      path: require.resolve('./data/too_few_reads_if_chunk_merging_on.bed.gz'),
+    })
+    await ti.getHeader()
+
+    const ret = new RecordCollector()
+    await ti.getLines('1', 10000, 10600, ret.callback)
+    expect(ret.length).toBe(34)
+  })
+
+  it('long read consistent IDs', async () => {
+    const ti = new TabixIndexedFile({
+      path: require.resolve('./data/CHM1_pacbio_clip2.bed.gz'),
+    })
+    await ti.getHeader()
+    const ret1 = new RecordCollector()
+    await ti.getLines('chr1', 110114999, 110117499, ret1.callback)
+    const ret2 = new RecordCollector()
+    await ti.getLines('chr1', 110117499, 110119999, ret2.callback)
+
+    const findfeat = ({ line }) =>
+      line.split('\t')[3] ===
+      'm131004_105332_42213_c100572142530000001823103304021442_s1_p0/103296'
+    const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
+    expect(r1.fileOffset).toEqual(r2.fileOffset)
+  })
 })
