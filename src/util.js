@@ -10,6 +10,7 @@ module.exports = {
   },
 
   /**
+   * @ignore
    * properly check if the given AbortSignal is aborted.
    * per the standard, if the signal reads as aborted,
    * this function throws either a DOMException AbortError, or a regular error

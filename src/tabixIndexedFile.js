@@ -14,25 +14,33 @@ function timeout(time) {
   })
 }
 
+/**
+ * File indexed with a tabix (TBI) or CSI index
+ * @param {Object} args
+ * @param {string} [args.path] Must provide either `path` of `filehandle`
+ * @param {filehandle} [args.filehandle] Must provide either `path` of
+ * `filehandle`
+ * @param {string} [args.tbiPath] If `path` is provided, this defaults to
+ * \``${path}.tbi`\`
+ * @param {filehandle} [args.tbiFilehandle] Unless `path` is provided, must
+ * provide one of `tbiFilehandle`, `tbiPath`, `csiFilehandle`, or `csiPath`
+ * @param {string} [args.csiPath] Unless `path` is provided, must provide one
+ * of `tbiFilehandle`, `tbiPath`, `csiFilehandle`, or `csiPath`
+ * @param {filehandle} [args.csiFilehandle] Unless `path` is provided, must
+ * provide one of `tbiFilehandle`, `tbiPath`, `csiFilehandle`, or `csiPath`
+ * @param {number} [args.chunkSizeLimit=2000000] Maximum number of bytes to
+ * fetch in a single `getLines` call.
+ * @param {number} [args.yieldLimit=300] Maximum number of lines to parse
+ * without yielding. This avoids having a large read prevent any other work
+ * getting done on the thread.
+ * @param {function} [args.renameRefSeqs=n=>n] Optional function with signature
+ * `string => string` to transform reference sequence names for the purpose of
+ * indexing and querying. Note that the data that is returned is not altered,
+ * just the names of the reference sequences that are used for querying.
+ * @param {number} [args.chunkCacheSize=5242880] maximum size in bytes of the
+ * chunk cache.
+ */
 class TabixIndexedFile {
-  /**
-   * @param {object} args
-   * @param {string} [args.path]
-   * @param {filehandle} [args.filehandle]
-   * @param {string} [args.tbiPath]
-   * @param {filehandle} [args.tbiFilehandle]
-   * @param {string} [args.csiPath]
-   * @param {filehandle} [args.csiFilehandle]
-   * @param {number} [args.chunkSizeLimit] maximum number of bytes to fetch in a single `getLines` call.
-   * default 2MiB
-   * @param {number} [args.yieldLimit] maximum number of lines to parse without yielding.
-   * this avoids having a large read prevent any other work getting done on the thread.  default 300 lines.
-   * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
-   * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
-   * not altered, just the names of the reference sequences that are used for querying.
-   * @param {number} [args.chunkCacheSize] maximum size in bytes of the chunk cache. default 5MB
-   * @param {number} [args.blockCacheSize] maximum size in bytes of the block cache. default 5MB
-   */
   constructor({
     path,
     filehandle,
@@ -87,11 +95,16 @@ class TabixIndexedFile {
   }
 
   /**
-   * @param {string} refName name of the reference sequence
-   * @param {number} start start of the region (in 0-based half-open coordinates)
-   * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function|object} lineCallback callback called for each line in the region, called as (line, fileOffset) or object containing obj.lineCallback, obj.signal, etc
-   * @returns {Promise} resolved when the whole read is finished, rejected on error
+   * Get the lines in the given region
+   * @param {string} refName Name of the reference sequence
+   * @param {number} [start=0] start of the region (in 0-based half-open
+   * coordinates)
+   * @param {number} [end=Metadata.maxRefLength] End of the region (in 0-based half-open
+   * coordinates)
+   * @param {getLinesCallback|GetLinesOptions} opts Either a callback called for each line in
+   * the region, called as `(line, fileOffset) => {}` or object containing
+   * obj.lineCallback, obj.signal, etc
+   * @returns {Promise<undefined>} resolved when the whole read is finished, rejected on error
    */
   async getLines(refName, start, end, opts) {
     let signal
@@ -183,16 +196,32 @@ class TabixIndexedFile {
     }
   }
 
+  /**
+   * Get metadata from the index file
+   * @param {Options} opts options
+   * @returns {Promise<Metadata>} Metadata
+   */
   async getMetadata(opts) {
     return this.index.getMetadata(opts)
   }
 
   /**
-   * get a buffer containing the "header" region of
-   * the file, which are the bytes up to the first
-   * non-meta line
-   *
-   * @returns {Promise} for a buffer
+   * Get the "header" as a string
+   * @param {Options} opts options
+   * @returns {Promise<string>} The header, i.e. the portion up to the first
+   * non-metadata line
+   */
+  async getHeader(opts = {}) {
+    const bytes = await this.getHeaderBuffer(opts)
+    checkAbortSignal(opts.signal)
+    return bytes.toString('utf8')
+  }
+
+  /**
+   * Get the "header" as a buffer
+   * @param {Options} opts options
+   * @returns {Promise<Buffer>} The header, i.e. the portion up to the first
+   * non-metadata line
    */
   async getHeaderBuffer(opts) {
     const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
@@ -234,30 +263,23 @@ class TabixIndexedFile {
   }
 
   /**
-   * get a string containing the "header" region of the
-   * file, is the portion up to the first non-meta line
+   * Get an array of reference sequence names, in the order in which they occur
+   * in the file
    *
-   * @returns {Promise} for a string
-   */
-  async getHeader(opts = {}) {
-    const bytes = await this.getHeaderBuffer(opts)
-    checkAbortSignal(opts.signal)
-    return bytes.toString('utf8')
-  }
-
-  /**
-   * get an array of reference sequence names, in the order in which
-   * they occur in the file.
-   *
-   * reference sequence renaming is not applied to these names.
-   *
-   * @returns {Promise} for an array of string sequence names
+   * Reference sequence renaming is not applied to these names
+   * @param {Options} opts options
+   * @returns {Promise<string[]>} The reference sequence names
    */
   async getReferenceSequenceNames(opts) {
     const metadata = await this.getMetadata(opts)
     return metadata.refIdToName
   }
 
+  /**
+   * @ignore
+   * @param {string} refName The original refName
+   * @returns {string} The renamed refName
+   */
   renameRefSeq(refName) {
     if (this._renameRefSeqCache && this._renameRefSeqCache.from === refName)
       return this._renameRefSeqCache.to
@@ -268,13 +290,13 @@ class TabixIndexedFile {
   }
 
   /**
-   * @param {object} metadata metadata object from the parsed index,
-   * containing columnNumbers, metaChar, and format
-   * @param {string} regionRefName
+   * @ignore
+   * @param {Metadata} metadata metadata from the index
+   * @param {string} regionRefName region reference sequence name
    * @param {number} regionStart region start coordinate (0-based-half-open)
    * @param {number} regionEnd region end coordinate (0-based-half-open)
-   * @param {array[string]} line
-   * @returns {object} like `{startCoordinate, overlaps}`. overlaps is boolean,
+   * @param {string} line
+   * @returns {Object} like `{startCoordinate, overlaps}`. overlaps is boolean,
    * true if line is a data line that overlaps the given region
    */
   checkLine(
@@ -342,6 +364,15 @@ class TabixIndexedFile {
     return { startCoordinate, overlaps: true }
   }
 
+  /**
+   * Gets the end location of a line in a VCF, which is either the start
+   * coordinate plus the length of the REF entry, or the location defined by END
+   * in the INFO entry
+   * @ignore
+   * @param {number} startCoordinate The start coordinate
+   * @param {string} refSeq The REF entry
+   * @param {string} info The INFO entry
+   */
   _getVcfEnd(startCoordinate, refSeq, info) {
     let endCoordinate = startCoordinate + refSeq.length
     if (info[0] !== '.') {
@@ -360,9 +391,10 @@ class TabixIndexedFile {
   }
 
   /**
-   * return the approximate number of data lines in the given reference sequence
+   * Get the approximate number of data lines in the given reference sequence
    * @param {string} refSeq reference sequence name
-   * @returns {Promise} for number of data lines present on that reference sequence
+   * @returns {Promise<number>} number of data lines present on that reference
+   * sequence
    */
   async lineCount(refSeq, opts) {
     return this.index.lineCount(refSeq, opts)
@@ -386,13 +418,14 @@ class TabixIndexedFile {
   }
 
   /**
-   * read and uncompress the data in a chunk (composed of one or more
+   * @ignore
+   * read and decompress the data in a chunk (composed of one or more
    * contiguous bgzip blocks) of the file
    * @param {Chunk} chunk
-   * @returns {Promise} for a string chunk of the file
+   * @returns {Promise<string>} for a string chunk of the file
    */
   async readChunk(chunk, opts) {
-    // fetch the uncompressed data, uncompress carefully a block at a time,
+    // fetch the uncompressed data, decompress carefully a block at a time,
     // and stop when done
 
     const compressedData = await this._readRegion(
@@ -414,5 +447,52 @@ class TabixIndexedFile {
     return lines
   }
 }
+
+/**
+ * Metadata from the index file
+ * @typedef {Object} Metadata
+ * @property {Object} columnNumbers
+ * @property {number} columnNumbers.ref
+ * @property {number} columnNumbers.start
+ * @property {number} columnNumbers.end
+ * @property {string} metaChar
+ * @property {string} format
+ * @property {string} coordinateType
+ * @property {number} skipLines
+ * @property {string[]} refIdToName
+ * @property {Object.<string, number>} refNameToId
+ * @property {VirtualOffset} firstDataLine
+ * @property {number} maxBlockSize
+ * @property {number} maxBinNumber
+ * @property {number} maxRefLength
+ */
+
+/**
+ * An abort signal
+ * @typedef {Object} AbortSignal
+ * @readonly
+ * @property {boolean} aborted Indicates whether the request(s) the signal is
+ * communicating with is/are aborted
+ */
+
+/**
+ * Common options
+ * @typedef {Object} Options
+ * @property {AbortSignal} [signal] An abort signal
+ */
+
+/**
+ * Callback for each line
+ * @callback getLinesCallback
+ * @param {string} line The text of the line
+ * @param {number} fileOffset The file offset of the beginning of the line in the
+ * uncompressed file
+ */
+
+/**
+ * getLines options
+ * @typedef {Options} GetLinesOptions
+ * @property {getLinesCallback} lineCallback A line callback
+ */
 
 module.exports = TabixIndexedFile

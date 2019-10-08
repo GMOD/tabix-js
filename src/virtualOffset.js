@@ -1,3 +1,6 @@
+/**
+ * Virtual offset
+ */
 class VirtualOffset {
   constructor(blockPosition, dataPosition) {
     this.blockPosition = blockPosition // < offset of the compressed data block

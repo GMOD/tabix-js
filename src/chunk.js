@@ -1,11 +1,12 @@
-// little class representing a chunk in the index
+/**
+ * @ignore
+ * A chunk in the index
+ * @param {VirtualOffset} minv
+ * @param {VirtualOffset} maxv
+ * @param {number} bin
+ * @param {number} [fetchedSize]
+ */
 class Chunk {
-  /**
-   * @param {VirtualOffset} minv
-   * @param {VirtualOffset} maxv
-   * @param {number} bin
-   * @param {number} [fetchedSize]
-   */
   constructor(minv, maxv, bin, fetchedSize) {
     this.minv = minv
     this.maxv = maxv
