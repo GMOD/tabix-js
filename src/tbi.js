@@ -86,7 +86,7 @@ class TabixIndex {
     const signal = opts && opts.signal
     const data = { depth: 5, maxBlockSize: 1 << 16 }
     const bytes = await unzip(await this.filehandle.readFile({ signal }))
-    checkAbortSignal(opts)
+    checkAbortSignal(signal)
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
