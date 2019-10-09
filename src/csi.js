@@ -1,6 +1,6 @@
 const Long = require('long')
 
-const { unzip } = require('./unzip')
+const { unzip } = require('@gmod/bgzf-filehandle')
 
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
@@ -298,7 +298,8 @@ class CSI {
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
-      if (canMergeBlocks(off[l], off[i])) off[l].maxv = off[i].maxv
+      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
+        off[l].maxv = off[i].maxv
       else {
         l += 1
         off[l].minv = off[i].minv

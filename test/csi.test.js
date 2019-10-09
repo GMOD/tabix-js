@@ -47,7 +47,7 @@ describe('csi index', () => {
     let blocks = await ti.blocksForRange('1', 1, 4000)
     expect(blocks.length).toEqual(0)
     blocks = await ti.blocksForRange('1', 0, 2000046092)
-    expect(blocks.length).toEqual(2)
+    expect(blocks.length).toEqual(1)
     expect(blocks[0].minv.blockPosition).toEqual(0)
     expect(blocks[0].minv.dataPosition).toEqual(2560)
     // console.log( blocks );

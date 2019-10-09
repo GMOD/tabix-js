@@ -2,7 +2,7 @@ import AbortablePromiseCache from 'abortable-promise-cache'
 
 const LRU = require('quick-lru')
 const { LocalFile } = require('generic-filehandle')
-const { unzip, unzipChunk } = require('./unzip')
+const { unzip, unzipChunk } = require('@gmod/bgzf-filehandle')
 const { checkAbortSignal } = require('./util')
 
 const TBI = require('./tbi')
@@ -138,11 +138,12 @@ class TabixIndexedFile {
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate
       const c = chunks[chunkNum]
-      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
+      const { buffer: b, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
         signal,
       )
+      const buffer = b.slice(c.minv.dataPosition)
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
@@ -152,11 +153,7 @@ class TabixIndexedFile {
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (
-          pos = 0;
-          fileOffset > dpositions[pos] + c.minv.dataPosition;
-          pos += 1
-        );
+        for (pos = 0; fileOffset > dpositions[pos]; pos += 1);
         pos = Math.min(dpositions.length - 1, pos)
 
         // filter the line for whether it is within the requested range
@@ -229,7 +226,7 @@ class TabixIndexedFile {
     let bytes = await this._readRegion(0, maxFetch, opts)
     checkAbortSignal(opts.signal)
     try {
-      bytes = unzip(bytes)
+      bytes = await unzip(bytes)
     } catch (e) {
       console.log(e)
       throw new Error(

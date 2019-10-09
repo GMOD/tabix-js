@@ -3,7 +3,7 @@ const Long = require('long')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
-const { unzip } = require('./unzip')
+const { unzip } = require('@gmod/bgzf-filehandle')
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
@@ -277,7 +277,8 @@ class TabixIndex {
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
-      if (canMergeBlocks(off[l], off[i])) off[l].maxv = off[i].maxv
+      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
+        off[l].maxv = off[i].maxv
       else {
         l += 1
         off[l].minv = off[i].minv
