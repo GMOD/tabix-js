@@ -1,14 +1,13 @@
 const Long = require('long')
+const { unzip } = require('@gmod/bgzf-filehandle')
 // const { Parser } = require('binary-parser')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
-const { unzip } = require('@gmod/bgzf-filehandle')
-
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
-const { longToNumber, checkAbortSignal, canMergeBlocks } = require('./util')
+const { longToNumber, checkAbortSignal } = require('./util')
 
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)

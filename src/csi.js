@@ -5,7 +5,7 @@ const { unzip } = require('@gmod/bgzf-filehandle')
 const VirtualOffset = require('./virtualOffset')
 const Chunk = require('./chunk')
 
-const { longToNumber, checkAbortSignal, canMergeBlocks } = require('./util')
+const { longToNumber, checkAbortSignal } = require('./util')
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
