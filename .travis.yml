@@ -6,12 +6,14 @@ matrix:
     env: BACKCOMPAT=true
 script:
   - set -e
-  - npm run lint
-  - npm run build
-  - npm run test
+  - yarn lint
+  - yarn build
+  - yarn test --coverage
   # - if [ "x$BACKCOMPAT" = "x" ]; then npm run test; fi
   # - rm -rf src
   # - mv dist src
   # - if [ $BACKCOMPAT = "true" ]; then npm run built-tests; else npm run test; fi
 cache:
   - node_modules
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
