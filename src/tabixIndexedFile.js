@@ -133,12 +133,16 @@ class TabixIndexedFile {
     }
 
     // now go through each chunk and parse and filter the lines out of it
+    const completedChunks = []
     let linesSinceLastYield = 0
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
-      let previousStartCoordinate
       const c = chunks[chunkNum]
-      const lines = await this.chunkCache.get(c.toString(), c, signal)
-      checkAbortSignal(signal)
+      chunks.push(this.chunkCache.get(c.toString(), c, signal))
+    }
+    for (let chunkNum = 0; chunkNum < completedChunks.length; chunkNum += 1) {
+      let previousStartCoordinate
+      // eslint-disable no-await-inside-loop
+      const lines = await completedChunks[chunkNum]
 
       let currentLineStart = chunks[chunkNum].minv.dataPosition
       for (let i = 0; i < lines.length; i += 1) {
