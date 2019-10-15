@@ -19,9 +19,10 @@
   "scripts": {
     "test": "jest",
     "coverage": "npm test -- --coverage",
+    "docs": "documentation readme src/index.js --section API",
     "lint": "eslint src test",
     "clean": "rimraf dist",
-    "prebuild": "npm run clean",
+    "prebuild": "npm run clean && npm run docs",
     "build": "babel src -d dist",
     "watch": "npm-watch",
     "prepublishOnly": "npm run lint && npm test && npm run build",

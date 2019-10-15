@@ -10,8 +10,9 @@ const TAD_LIDX_SHIFT = 14
 const { longToNumber, checkAbortSignal } = require('./util')
 
 /**
+ * @ignore
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
- * @returns {Array[number]}
+ * @returns {number[]}
  */
 function reg2bins(beg, end) {
   beg += 1 // < convert to 1-based closed
@@ -25,11 +26,16 @@ function reg2bins(beg, end) {
   return list
 }
 
+/**
+ * Tabix (TBI) index
+ * @param {Object} args
+ * @param {filehandle} args.filehandle
+ * @param {function} [args.renameRefSeqs=n=>n] Optional function with signature
+ * `string => string` to transform reference sequence names for the purpose of
+ * indexing and querying. Note that the data that is returned is not altered,
+ * just the names of the reference sequences that are used for querying.
+ */
 class TabixIndex {
-  /**
-   * @param {filehandle} filehandle
-   * @param {function} [renameRefSeqs]
-   */
   constructor({ filehandle, renameRefSeqs = n => n }) {
     this.filehandle = filehandle
     this.renameRefSeq = renameRefSeqs
@@ -47,8 +53,8 @@ class TabixIndex {
   }
 
   /**
-   * @returns {Promise} for an object like
-   * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId, coordinateType, format }`
+   * @param {Options} opts options
+   * @returns {Promise<Metadata>} Metadata
    */
   async getMetadata(opts) {
     const {
@@ -85,7 +91,7 @@ class TabixIndex {
     const signal = opts && opts.signal
     const data = { depth: 5, maxBlockSize: 1 << 16 }
     const bytes = await unzip(await this.filehandle.readFile({ signal }))
-    checkAbortSignal(opts)
+    checkAbortSignal(signal)
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
