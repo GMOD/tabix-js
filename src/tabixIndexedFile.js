@@ -361,7 +361,8 @@ class TabixIndexedFile {
 
   _getVcfEnd(startCoordinate, refSeq, info) {
     let endCoordinate = startCoordinate + refSeq.length
-    if (info[0] !== '.') {
+    const isTRA = info.indexOf('SVTYPE=TRA') !== -1
+    if (info[0] !== '.' && !isTRA) {
       let prevChar = ';'
       for (let j = 0; j < info.length; j += 1) {
         if (prevChar === ';' && info.slice(j, j + 4) === 'END=') {
@@ -372,6 +373,8 @@ class TabixIndexedFile {
         }
         prevChar = info[j]
       }
+    } else if (isTRA) {
+      return startCoordinate + 1
     }
     return endCoordinate
   }
