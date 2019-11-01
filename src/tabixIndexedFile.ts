@@ -1,7 +1,7 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
-import { unzip, unzipChunk } from './unzip'
+import { unzip, unzipChunk } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile from './indexFile'
 import Chunk from './chunk'
@@ -191,7 +191,6 @@ export default class TabixIndexedFile {
             c.minv.blockPosition * (1 << 8) +
               cpositions[pos] * (1 << 8) -
               dpositions[pos] +
-              c.minv.dataPosition +
               fileOffset,
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
@@ -205,8 +204,6 @@ export default class TabixIndexedFile {
         // yield if we have emitted beyond the yield limit
         linesSinceLastYield += 1
         if (linesSinceLastYield >= this.yieldLimit) {
-          await timeout(1)
-          checkAbortSignal(signal)
           linesSinceLastYield = 0
         }
       }
@@ -240,10 +237,7 @@ export default class TabixIndexedFile {
       bytes = await unzip(bytes)
     } catch (e) {
       console.error(e)
-      throw new Error(
-        `error decompressing block ${e.code} at 0 (length ${maxFetch})`,
-        e,
-      )
+      throw new Error(`error decompressing block ${e.code} at 0 (length ${maxFetch}) ${e}`)
     }
 
     // trim off lines after the last non-meta line
@@ -404,7 +398,6 @@ export default class TabixIndexedFile {
   }
 
   async _readRegion(position: number, compressedSize: number, opts: { signal?: AbortSignal } = {}) {
-    //@ts-ignore
     const { size: fileSize } = await this.filehandle.stat()
     if (position + compressedSize > fileSize) compressedSize = fileSize - position
 

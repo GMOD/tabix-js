@@ -3243,10 +3243,10 @@ gauge@~2.7.3:
     strip-ansi "^3.0.1"
     wide-align "^1.1.0"
 
-generic-filehandle@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/generic-filehandle/-/generic-filehandle-2.0.0.tgz#f3bd727eb88dfb2aa5d527b9c492c7fc075b0645"
-  integrity sha512-QrrHlY40pGGPPr6BpdQq30mSQ6Gm8xbsc8KZaWzsY60mSRK+3CTDAOJ6+e4M6lccy+tzIXMPwOwD5dSa8EnYDg==
+generic-filehandle@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/generic-filehandle/-/generic-filehandle-2.0.1.tgz#cb3e9cb8098df52c55b510baabc5f92743f05046"
+  integrity sha512-lgCI05NxjUiNI3GA1P7uJyK90h+xIg1dCLLNIqWgvFqtZu/2BJ/a5/9QIfGfiCHGAiesZOzNunKxzkCgpd3jsA==
   dependencies:
     "@babel/runtime" "^7.4.5"
     es6-promisify "^6.0.1"

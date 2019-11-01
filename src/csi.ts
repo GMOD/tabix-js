@@ -1,5 +1,5 @@
 import Long from 'long'
-import { unzip } from './unzip'
+import { unzip } from '@gmod/bgzf-filehandle'
 
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
@@ -255,7 +255,7 @@ export default class CSI extends IndexFile {
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
-      if (canMergeBlocks(off[l], off[i])) off[l].maxv = off[i].maxv
+      if (off[l].maxv.blockPosition === off[i].minv.blockPosition) off[l].maxv = off[i].maxv
       else {
         l += 1
         off[l].minv = off[i].minv
@@ -263,6 +263,7 @@ export default class CSI extends IndexFile {
       }
     }
     numOffsets = l + 1
+
 
     return off.slice(0, numOffsets)
   }

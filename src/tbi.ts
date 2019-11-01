@@ -3,8 +3,8 @@ import { GenericFilehandle } from 'generic-filehandle'
 // const { Parser } = require('binary-parser')
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
-import { unzip } from './unzip'
-import { longToNumber, checkAbortSignal, canMergeBlocks } from './util'
+import { unzip } from '@gmod/bgzf-filehandle'
+import { longToNumber, checkAbortSignal } from './util'
 import IndexFile from './indexFile'
 
 const TBI_MAGIC = 21578324 // TBI\1
@@ -38,7 +38,7 @@ export default class TabixIndex extends IndexFile {
     this.renameRefSeq = renameRefSeqs
   }
 
-  async lineCount(refName: string, opts: { signal?: AbortSignal } = {}): Promise<number> {
+  async lineCount(refName: string, opts: { signal?: AbortSignal } = {}) {
     const indexData = await this.parse(opts.signal)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
@@ -184,7 +184,7 @@ export default class TabixIndex extends IndexFile {
     beg: number,
     end: number,
     opts: { signal?: AbortSignal } = {},
-  ): Promise<Chunk[]> {
+  ) {
     if (beg < 0) beg = 0
 
     const indexData = await this.parse(opts.signal)
@@ -254,8 +254,7 @@ export default class TabixIndex extends IndexFile {
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
-        off[l].maxv = off[i].maxv
+      if (off[l].maxv.blockPosition === off[i].minv.blockPosition) off[l].maxv = off[i].maxv
       else {
         l += 1
         off[l].minv = off[i].minv
