@@ -361,6 +361,11 @@ class TabixIndexedFile {
 
   _getVcfEnd(startCoordinate, refSeq, info) {
     let endCoordinate = startCoordinate + refSeq.length
+    // ignore TRA features as they specify CHR2 and END
+    // as being on a different chromosome
+    // if CHR2 is on the same chromosome, still ignore it
+    // because there should be another pairwise feature
+    // at the end of this one
     const isTRA = info.indexOf('SVTYPE=TRA') !== -1
     if (info[0] !== '.' && !isTRA) {
       let prevChar = ';'
