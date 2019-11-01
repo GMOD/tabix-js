@@ -162,11 +162,12 @@ export default class TabixIndexedFile {
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
-      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
+      const { buffer: b, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
         signal,
       )
+      const buffer = b.slice(c.minv.dataPosition)
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
@@ -178,8 +179,8 @@ export default class TabixIndexedFile {
 
         for (
           pos = 0;
-          fileOffset > dpositions[pos] + c.minv.dataPosition;
-          pos++
+          fileOffset > dpositions[pos] - c.minv.dataPosition;
+          pos += 1
         );
         pos = Math.min(dpositions.length - 1, pos)
 
@@ -194,8 +195,8 @@ export default class TabixIndexedFile {
 
         // do a small check just to make sure that the lines are really sorted by start coordinate
         if (
-          startCoordinate !== undefined &&
           previousStartCoordinate !== undefined &&
+          startCoordinate !== undefined &&
           previousStartCoordinate > startCoordinate
         )
           throw new Error(
@@ -209,6 +210,7 @@ export default class TabixIndexedFile {
             c.minv.blockPosition * (1 << 8) +
               cpositions[pos] * (1 << 8) -
               dpositions[pos] +
+              c.minv.dataPosition +
               fileOffset,
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
