@@ -205,6 +205,7 @@ export default class TabixIndexedFile {
         linesSinceLastYield += 1
         if (linesSinceLastYield >= this.yieldLimit) {
           await timeout(1)
+          checkAbortSignal(signal)
           linesSinceLastYield = 0
         }
       }
