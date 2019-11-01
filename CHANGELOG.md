@@ -1,5 +1,6 @@
 - Make <TRA> SVs to ignore their usage of the END= INFO field going with the
   since it refers to the other side of a translocation
+- Make stable fileOffset based IDs
 
 <a name="1.3.1"></a>
 ## [1.3.1](https://github.com/GMOD/tabix-js/compare/v1.3.0...v1.3.1) (2019-10-06)
