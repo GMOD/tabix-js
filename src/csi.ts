@@ -3,7 +3,7 @@ import { unzip } from '@gmod/bgzf-filehandle'
 
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
-import { longToNumber, canMergeBlocks } from './util'
+import { longToNumber } from './util'
 
 import IndexFile from './indexFile'
 
@@ -263,7 +263,6 @@ export default class CSI extends IndexFile {
       }
     }
     numOffsets = l + 1
-
 
     return off.slice(0, numOffsets)
   }

@@ -204,6 +204,7 @@ export default class TabixIndexedFile {
         // yield if we have emitted beyond the yield limit
         linesSinceLastYield += 1
         if (linesSinceLastYield >= this.yieldLimit) {
+          await timeout(1)
           linesSinceLastYield = 0
         }
       }
