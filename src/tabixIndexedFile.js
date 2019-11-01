@@ -175,8 +175,8 @@ class TabixIndexedFile {
         if (overlaps) {
           lineCallback(
             line.trim(),
-            c.minv.blockPosition * (1 << 16) +
-              cpositions[pos] * (1 << 16) -
+            c.minv.blockPosition * (1 << 8) +
+              cpositions[pos] * (1 << 8) -
               dpositions[pos] +
               c.minv.dataPosition +
               fileOffset,
