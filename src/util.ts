@@ -1,4 +1,3 @@
-import Chunk from './chunk'
 export function longToNumber(long: Long) {
   if (
     long.greaterThan(Number.MAX_SAFE_INTEGER) ||
@@ -9,6 +8,9 @@ export function longToNumber(long: Long) {
   return long.toNumber()
 }
 
+class AbortError extends Error {
+  public code: string | undefined
+}
 /**
  * Properly check if the given AbortSignal is aborted.
  * Per the standard, if the signal reads as aborted,
@@ -29,9 +31,7 @@ export function checkAbortSignal(signal?: AbortSignal) {
       // eslint-disable-next-line  no-undef
       throw new DOMException('aborted', 'AbortError')
     else {
-      const e = new Error('aborted')
-      // eslint-disable-next-line  @typescript-eslint/ban-ts-ignore
-      //@ts-ignore
+      const e = new AbortError('aborted')
       e.code = 'ERR_ABORTED'
       throw e
     }
@@ -47,12 +47,4 @@ export function checkAbortSignal(signal?: AbortSignal) {
 export async function abortBreakPoint(signal?: AbortSignal) {
   await Promise.resolve()
   checkAbortSignal(signal)
-}
-
-export function canMergeBlocks(block1: Chunk, block2: Chunk) {
-  return (
-    block1.minv.blockPosition === block1.maxv.blockPosition &&
-    block1.maxv.blockPosition === block2.minv.blockPosition &&
-    block2.minv.blockPosition === block2.maxv.blockPosition
-  )
 }

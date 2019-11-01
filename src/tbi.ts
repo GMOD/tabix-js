@@ -162,13 +162,12 @@ export default class TabixIndex extends IndexFile {
   }
 
   parsePseudoBin(bytes: Buffer, offset: number) {
-    // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
-    // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
-    // @ts-ignore
     const lineCount = longToNumber(
-      Long.fromBytesLE(bytes.slice(offset + 16, offset + 24), true),
+      Long.fromBytesLE(
+        (bytes.slice(offset + 16, offset + 24) as unknown) as number[],
+        true,
+      ),
     )
-    // const four = Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true)
     return { lineCount }
   }
 
