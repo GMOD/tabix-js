@@ -5,7 +5,7 @@ import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
 import { longToNumber } from './util'
 
-import IndexFile from './indexFile'
+import IndexFile, { Options } from './indexFile'
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -27,10 +27,7 @@ export default class CSI extends IndexFile {
     this.depth = 0
     this.minShift = 0
   }
-  async lineCount(
-    refName: string,
-    opts: { signal?: AbortSignal } = {},
-  ): Promise<number> {
+  async lineCount(refName: string, opts: Options = {}): Promise<number> {
     const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
@@ -108,7 +105,7 @@ export default class CSI extends IndexFile {
 
   // fetch and parse the index
 
-  async _parse(opts: { signal?: AbortSignal } = {}) {
+  async _parse(opts: Options = {}) {
     const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
 
     // check TBI magic numbers
@@ -191,11 +188,6 @@ export default class CSI extends IndexFile {
   }
 
   parsePseudoBin(bytes: Buffer, offset: number) {
-    // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
-    // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
-    // const three = longToNumber(
-    //   Long.fromBytesLE(bytes.slice(offset + 20, offset + 28), true),
-    // )
     const lineCount = longToNumber(
       Long.fromBytesLE(
         Array.prototype.slice.call(bytes, offset + 28, offset + 36),
@@ -209,8 +201,8 @@ export default class CSI extends IndexFile {
     refName: string,
     beg: number,
     end: number,
-    opts: { signal?: AbortSignal } = {},
-  ): Promise<Chunk[]> {
+    opts: Options = {},
+  ) {
     if (beg < 0) beg = 0
 
     const indexData = await this.parse(opts)

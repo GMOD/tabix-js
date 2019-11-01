@@ -5,7 +5,7 @@ import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
 import { unzip } from '@gmod/bgzf-filehandle'
 import { longToNumber, checkAbortSignal } from './util'
-import IndexFile from './indexFile'
+import IndexFile, { Options } from './indexFile'
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
@@ -41,7 +41,7 @@ export default class TabixIndex extends IndexFile {
     this.renameRefSeq = renameRefSeqs
   }
 
-  async lineCount(refName: string, opts: { signal?: AbortSignal } = {}) {
+  async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
@@ -54,7 +54,7 @@ export default class TabixIndex extends IndexFile {
 
   // memoize
   // fetch and parse the index
-  async _parse(opts: { signal?: AbortSignal } = {}) {
+  async _parse(opts: Options = {}) {
     const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
     checkAbortSignal(opts.signal)
 
@@ -196,7 +196,7 @@ export default class TabixIndex extends IndexFile {
     refName: string,
     beg: number,
     end: number,
-    opts: { signal?: AbortSignal } = {},
+    opts: Options = {},
   ) {
     if (beg < 0) beg = 0
 

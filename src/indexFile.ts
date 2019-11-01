@@ -4,6 +4,12 @@ import { GenericFilehandle } from 'generic-filehandle'
 import VirtualOffset from './virtualOffset'
 import Chunk from './chunk'
 
+export interface Options {
+  // support having some unknown parts of the options
+  [key: string]: unknown
+  signal?: AbortSignal
+}
+
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
   public renameRefSeq: Function
@@ -23,18 +29,20 @@ export default abstract class IndexFile {
     this.filehandle = filehandle
     this.renameRefSeq = renameRefSeq
   }
+
   public abstract async lineCount(
     refName: string,
-    args: { signal?: AbortSignal },
+    args: Options,
   ): Promise<number>
-  protected abstract async _parse(opts: {
-    signal?: AbortSignal
-  }): Promise<{
+
+  protected abstract async _parse(
+    opts: Options,
+  ): Promise<{
     refNameToId: { [key: string]: number }
     refIdToName: string[]
   }>
 
-  public async getMetadata(opts: { signal?: AbortSignal } = {}) {
+  public async getMetadata(opts: Options = {}) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { indices, ...rest } = await this.parse(opts)
     return rest
@@ -44,7 +52,7 @@ export default abstract class IndexFile {
     refName: string,
     start: number,
     end: number,
-    opts: { signal?: AbortSignal },
+    opts: Options,
   ): Promise<Chunk[]>
 
   _findFirstData(
@@ -60,7 +68,7 @@ export default abstract class IndexFile {
     }
   }
 
-  async parse(opts: { signal?: AbortSignal } = {}) {
+  async parse(opts: Options = {}) {
     if (!this._parseCache)
       this._parseCache = new AbortablePromiseCache({
         cache: new QuickLRU({ maxSize: 1 }),
@@ -69,13 +77,7 @@ export default abstract class IndexFile {
     return this._parseCache.get('index', null, opts.signal)
   }
 
-  /**
-   * @param {number} seqId
-   * @param {AbortSignal} [abortSignal]
-   * @returns {Promise} true if the index contains entries for
-   * the given reference sequence ID, false otherwise
-   */
-  async hasRefSeq(seqId: number, opts: { signal?: AbortSignal } = {}) {
+  async hasRefSeq(seqId: number, opts: Options = {}) {
     return !!((await this.parse(opts)).indices[seqId] || {}).binIndex
   }
 }

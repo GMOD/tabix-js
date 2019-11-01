@@ -3,7 +3,7 @@ import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunk } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
-import IndexFile from './indexFile'
+import IndexFile, { Options } from './indexFile'
 import Chunk from './chunk'
 import TBI from './tbi'
 import CSI from './csi'
@@ -117,13 +117,14 @@ export default class TabixIndexedFile {
     opts: { signal?: AbortSignal; lineCallback: Function } | Function,
   ) {
     let signal: AbortSignal | undefined
+    let options: Options = {}
     let callback: Function
     if (typeof opts === 'undefined')
       throw new TypeError('line callback must be provided')
     if (typeof opts === 'function') callback = opts
     else {
+      options = opts
       callback = opts.lineCallback
-      signal = opts.signal
     }
     if (refName === undefined) {
       throw new TypeError('must provide a reference sequence name')
@@ -132,7 +133,7 @@ export default class TabixIndexedFile {
       throw new TypeError('line callback must be provided')
     }
 
-    const metadata = await this.index.getMetadata({ signal })
+    const metadata = await this.index.getMetadata(options)
     checkAbortSignal(signal)
     if (!start) start = 0
     if (!end) end = metadata.maxRefLength
@@ -142,9 +143,7 @@ export default class TabixIndexedFile {
       )
     if (start === end) return
 
-    const chunks = await this.index.blocksForRange(refName, start, end, {
-      signal,
-    })
+    const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
 
     // check the chunks for any that are over the size limit.  if
@@ -231,7 +230,7 @@ export default class TabixIndexedFile {
     }
   }
 
-  async getMetadata(opts: { signal?: AbortSignal } = {}) {
+  async getMetadata(opts: Options = {}) {
     return this.index.getMetadata(opts)
   }
 
@@ -242,7 +241,7 @@ export default class TabixIndexedFile {
    *
    * @returns {Promise} for a buffer
    */
-  async getHeaderBuffer(opts: { signal?: AbortSignal } = {}) {
+  async getHeaderBuffer(opts: Options = {}) {
     const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
       opts,
     )
@@ -286,7 +285,7 @@ export default class TabixIndexedFile {
    *
    * @returns {Promise} for a string
    */
-  async getHeader(opts: { signal?: AbortSignal } = {}) {
+  async getHeader(opts: Options = {}) {
     const bytes = await this.getHeaderBuffer(opts)
     checkAbortSignal(opts.signal)
     return bytes.toString('utf8')
@@ -300,7 +299,7 @@ export default class TabixIndexedFile {
    *
    * @returns {Promise} for an array of string sequence names
    */
-  async getReferenceSequenceNames(opts: { signal?: AbortSignal } = {}) {
+  async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
     return metadata.refIdToName
   }
@@ -420,14 +419,14 @@ export default class TabixIndexedFile {
    * @param {string} refSeq reference sequence name
    * @returns {Promise} for number of data lines present on that reference sequence
    */
-  async lineCount(refName: string, opts: { signal?: AbortSignal } = {}) {
+  async lineCount(refName: string, opts: Options = {}) {
     return this.index.lineCount(refName, opts)
   }
 
   async _readRegion(
     position: number,
     compressedSize: number,
-    opts: { signal?: AbortSignal } = {},
+    opts: Options = {},
   ) {
     const { size: fileSize } = await this.filehandle.stat()
     if (position + compressedSize > fileSize)
@@ -450,7 +449,7 @@ export default class TabixIndexedFile {
    * @param {Chunk} chunk
    * @returns {Promise} for a string chunk of the file
    */
-  async readChunk(chunk: Chunk, opts: { signal?: AbortSignal } = {}) {
+  async readChunk(chunk: Chunk, opts: Options = {}) {
     // fetch the uncompressed data, uncompress carefully a block at a time,
     // and stop when done
 
