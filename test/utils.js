@@ -1,3 +1,4 @@
+//eslint-disable-next-line @typescript-eslint/camelcase
 const fs = typeof __webpack_require__ !== 'function' ? require('fs') : null // eslint-disable-line camelcase
 
 let extended = xit

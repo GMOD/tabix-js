@@ -1,19 +1,20 @@
-const Long = require('long')
-const { unzip } = require('@gmod/bgzf-filehandle')
+import Long from 'long'
+import { GenericFilehandle } from 'generic-filehandle'
 // const { Parser } = require('binary-parser')
-const VirtualOffset = require('./virtualOffset')
-const Chunk = require('./chunk')
+import VirtualOffset, { fromBytes } from './virtualOffset'
+import Chunk from './chunk'
+import { unzip } from '@gmod/bgzf-filehandle'
+import { longToNumber, checkAbortSignal } from './util'
+import IndexFile, { Options } from './indexFile'
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
-
-const { longToNumber, checkAbortSignal } = require('./util')
 
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
  * @returns {Array[number]}
  */
-function reg2bins(beg, end) {
+function reg2bins(beg: number, end: number) {
   beg += 1 // < convert to 1-based closed
   end -= 1
   const list = [0]
@@ -25,17 +26,22 @@ function reg2bins(beg, end) {
   return list
 }
 
-class TabixIndex {
+export default class TabixIndex extends IndexFile {
   /**
    * @param {filehandle} filehandle
    * @param {function} [renameRefSeqs]
    */
-  constructor({ filehandle, renameRefSeqs = n => n }) {
+  constructor(args: {
+    filehandle: GenericFilehandle
+    renameRefSeqs: (n: string) => string
+  }) {
+    const { filehandle, renameRefSeqs = (n: string) => n } = args
+    super(args)
     this.filehandle = filehandle
     this.renameRefSeq = renameRefSeqs
   }
 
-  async lineCount(refName, opts) {
+  async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
@@ -46,46 +52,11 @@ class TabixIndex {
     return -1
   }
 
-  /**
-   * @returns {Promise} for an object like
-   * `{ columnNumbers, metaChar, skipLines, refIdToName, refNameToId, coordinateType, format }`
-   */
-  async getMetadata(opts) {
-    const {
-      columnNumbers,
-      metaChar,
-      format,
-      coordinateType,
-      skipLines,
-      refIdToName,
-      refNameToId,
-      firstDataLine,
-      maxBlockSize,
-      maxBinNumber,
-      maxRefLength,
-    } = await this.parse(opts)
-    return {
-      columnNumbers,
-      metaChar,
-      format,
-      coordinateType,
-      skipLines,
-      refIdToName,
-      refNameToId,
-      firstDataLine,
-      maxBlockSize,
-      maxBinNumber,
-      maxRefLength,
-    }
-  }
-
   // memoize
   // fetch and parse the index
-  async parse(opts) {
-    const signal = opts && opts.signal
-    const data = { depth: 5, maxBlockSize: 1 << 16 }
-    const bytes = await unzip(await this.filehandle.readFile({ signal }))
-    checkAbortSignal(opts)
+  async _parse(opts: Options = {}) {
+    const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
+    checkAbortSignal(opts.signal)
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
@@ -94,47 +65,53 @@ class TabixIndex {
     }
 
     // number of reference sequences in the index
-    data.refCount = bytes.readInt32LE(4)
-    data.formatFlags = bytes.readInt32LE(8)
-    data.coordinateType =
-      data.formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    data.format = { 0: 'generic', 1: 'SAM', 2: 'VCF' }[data.formatFlags & 0xf]
-    if (!data.format)
-      throw new Error(`invalid Tabix preset format flags ${data.formatFlags}`)
-    data.columnNumbers = {
+    const refCount = bytes.readInt32LE(4)
+    const formatFlags = bytes.readInt32LE(8)
+    const coordinateType =
+      formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
+    const formatOpts: { [key: number]: string } = {
+      0: 'generic',
+      1: 'SAM',
+      2: 'VCF',
+    }
+    const format = formatOpts[formatFlags & 0xf]
+    if (!format)
+      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+    const columnNumbers = {
       ref: bytes.readInt32LE(12),
       start: bytes.readInt32LE(16),
       end: bytes.readInt32LE(20),
     }
-    data.metaValue = bytes.readInt32LE(24)
-    data.depth = 5
-    data.maxBinNumber = ((1 << ((data.depth + 1) * 3)) - 1) / 7
-    data.maxRefLength = 2 ** (14 + data.depth * 3)
-    data.metaChar = data.metaValue ? String.fromCharCode(data.metaValue) : null
-    data.skipLines = bytes.readInt32LE(28)
+    const metaValue = bytes.readInt32LE(24)
+    const depth = 5
+    const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
+    const maxRefLength = 2 ** (14 + depth * 3)
+    const metaChar = metaValue ? String.fromCharCode(metaValue) : null
+    const skipLines = bytes.readInt32LE(28)
 
     // read sequence dictionary
     const nameSectionLength = bytes.readInt32LE(32)
-    const names = this._parseNameBytes(bytes.slice(36, 36 + nameSectionLength))
-    Object.assign(data, names)
+    const { refNameToId, refIdToName } = this._parseNameBytes(
+      bytes.slice(36, 36 + nameSectionLength),
+    )
 
     // read the indexes for each reference sequence
-    data.indices = new Array(data.refCount)
     let currOffset = 36 + nameSectionLength
-    for (let i = 0; i < data.refCount; i += 1) {
+    let firstDataLine: VirtualOffset | undefined
+    const indices = new Array(refCount).fill(0).map(() => {
       // the binning index
       const binCount = bytes.readInt32LE(currOffset)
       currOffset += 4
-      const binIndex = {}
+      const binIndex: { [key: number]: Chunk[] } = {}
       let stats
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
         currOffset += 4
-        if (bin > data.maxBinNumber + 1) {
+        if (bin > maxBinNumber + 1) {
           throw new Error(
             'tabix index contains too many bins, please use a CSI index',
           )
-        } else if (bin === data.maxBinNumber + 1) {
+        } else if (bin === maxBinNumber + 1) {
           const chunkCount = bytes.readInt32LE(currOffset)
           currOffset += 4
           if (chunkCount === 2) {
@@ -146,10 +123,10 @@ class TabixIndex {
           currOffset += 4
           const chunks = new Array(chunkCount)
           for (let k = 0; k < chunkCount; k += 1) {
-            const u = VirtualOffset.fromBytes(bytes, currOffset)
-            const v = VirtualOffset.fromBytes(bytes, currOffset + 8)
+            const u = fromBytes(bytes, currOffset)
+            const v = fromBytes(bytes, currOffset + 8)
             currOffset += 16
-            data.firstDataLine = VirtualOffset.min(data.firstDataLine, u)
+            firstDataLine = this._findFirstData(firstDataLine, u)
             chunks[k] = new Chunk(u, v, bin)
           }
           binIndex[bin] = chunks
@@ -161,35 +138,44 @@ class TabixIndex {
       currOffset += 4
       const linearIndex = new Array(linearCount)
       for (let k = 0; k < linearCount; k += 1) {
-        linearIndex[k] = VirtualOffset.fromBytes(bytes, currOffset)
+        linearIndex[k] = fromBytes(bytes, currOffset)
         currOffset += 8
-        data.firstDataLine = VirtualOffset.min(
-          data.firstDataLine,
-          linearIndex[k],
-        )
+        firstDataLine = this._findFirstData(firstDataLine, linearIndex[k])
       }
+      return { binIndex, linearIndex, stats }
+    })
 
-      data.indices[i] = { binIndex, linearIndex, stats }
+    return {
+      indices,
+      metaChar,
+      maxBinNumber,
+      maxRefLength,
+      skipLines,
+      firstDataLine,
+      columnNumbers,
+      coordinateType,
+      format,
+      refIdToName,
+      refNameToId,
+      maxBlockSize: 1 << 16,
     }
-
-    return data
   }
 
-  parsePseudoBin(bytes, offset) {
-    // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
-    // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
+  parsePseudoBin(bytes: Buffer, offset: number) {
     const lineCount = longToNumber(
-      Long.fromBytesLE(bytes.slice(offset + 16, offset + 24), true),
+      Long.fromBytesLE(
+        (bytes.slice(offset + 16, offset + 24) as unknown) as number[],
+        true,
+      ),
     )
-    // const four = Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true)
     return { lineCount }
   }
 
-  _parseNameBytes(namesBytes) {
+  _parseNameBytes(namesBytes: Buffer) {
     let currRefId = 0
     let currNameStart = 0
-    const refIdToName = []
-    const refNameToId = {}
+    const refIdToName: string[] = []
+    const refNameToId: { [key: string]: number } = {}
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
@@ -205,7 +191,12 @@ class TabixIndex {
     return { refNameToId, refIdToName }
   }
 
-  async blocksForRange(refName, beg, end, opts) {
+  async blocksForRange(
+    refName: string,
+    beg: number,
+    end: number,
+    opts: Options = {},
+  ) {
     if (beg < 0) beg = 0
 
     const indexData = await this.parse(opts)
@@ -270,9 +261,12 @@ class TabixIndex {
     numOffsets = l + 1
 
     // resolve overlaps between adjacent blocks; this may happen due to the merge in indexing
-    for (let i = 1; i < numOffsets; i += 1)
-      if (off[i - 1].maxv.compareTo(off[i].minv) >= 0)
+    for (let i = 1; i < numOffsets; i += 1) {
+      if (off[i - 1].maxv.compareTo(off[i].minv) >= 0) {
         off[i - 1].maxv = off[i].minv
+      }
+    }
+
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
@@ -289,19 +283,3 @@ class TabixIndex {
     return off.slice(0, numOffsets)
   }
 }
-
-// this is the stupidest possible memoization, ignores arguments.
-function tinyMemoize(_class, methodName) {
-  const method = _class.prototype[methodName]
-  if (!method)
-    throw new Error(`no method ${methodName} found in class ${_class.name}`)
-  const memoAttrName = `_memo_${methodName}`
-  _class.prototype[methodName] = function _tinyMemoized() {
-    if (!(memoAttrName in this)) this[memoAttrName] = method.call(this)
-    return this[memoAttrName]
-  }
-}
-// memoize index.parse()
-tinyMemoize(TabixIndex, 'parse')
-
-module.exports = TabixIndex

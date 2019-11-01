@@ -1,15 +1,29 @@
 {
-    "presets": [
-        ["@babel/env", {
+  "comments": true,
+  "presets": [
+    "@babel/preset-typescript",
+    [
+      "@babel/preset-env",
+      {
         "targets": {
-          "browsers": ["last 2 versions", "safari >= 9"],
-          "node": "6.10"
+          "node": 6,
+          "browsers": [
+            "> 0.5%",
+            "last 2 versions"
+          ]
         }
-      }]
-    ],
-    "retainLines": true,
-    "sourceMaps": true,
-    "plugins": [
-      ["@babel/transform-runtime", { "corejs": 2 }]
+      }
     ]
+  ],
+  "plugins": [
+    [
+      "@babel/plugin-transform-runtime",
+      {
+        "regenerator": true,
+        "helpers": true,
+        "corejs": 2
+      }
+    ],
+    "@babel/proposal-class-properties"
+  ]
 }

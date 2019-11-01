@@ -151,7 +151,7 @@ describe('tabix file', () => {
     await expect(f.getLines('foo', 32, 24, () => {})).rejects.toThrow(
       /invalid start/,
     )
-    await expect(f.getLines()).rejects.toThrow(/reference/)
+    await expect(f.getLines()).rejects.toThrow(/line callback/)
     await expect(f.getLines('foo', 23, 45)).rejects.toThrow(/callback/)
   })
   it('can query volvox.sort.gff3.gz.1', async () => {
