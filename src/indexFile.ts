@@ -32,9 +32,8 @@ export default abstract class IndexFile {
   }>
 
   public async getMetadata(opts: { signal?: AbortSignal } = {}) {
-    //@ts-ignore
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { indices, ...rest } = await this.parse(opts.signal)
+    const { indices, ...rest } = await this.parse(opts)
     return rest
   }
 
@@ -57,7 +56,7 @@ export default abstract class IndexFile {
     if (!this._parseCache)
       this._parseCache = new AbortablePromiseCache({
         cache: new QuickLRU({ maxSize: 1 }),
-        fill: (data: any, signal: AbortSignal) => this._parse(opts),
+        fill: () => this._parse(opts),
       })
     return this._parseCache.get('index', null, opts.signal)
   }
@@ -68,7 +67,7 @@ export default abstract class IndexFile {
    * @returns {Promise} true if the index contains entries for
    * the given reference sequence ID, false otherwise
    */
-  async hasRefSeq(seqId: number, abortSignal?: AbortSignal) {
-    return !!((await this.parse(abortSignal)).indices[seqId] || {}).binIndex
+  async hasRefSeq(seqId: number, opts: { signal?: AbortSignal } = {}) {
+    return !!((await this.parse(opts)).indices[seqId] || {}).binIndex
   }
 }
