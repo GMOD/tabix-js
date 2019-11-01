@@ -148,7 +148,9 @@ describe('tabix file', () => {
       tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
       yieldLimit: 10,
     })
-    await expect(f.getLines('foo', 32, 24, () => {})).rejects.toThrow(/invalid start/)
+    await expect(f.getLines('foo', 32, 24, () => {})).rejects.toThrow(
+      /invalid start/,
+    )
     await expect(f.getLines()).rejects.toThrow(/line callback/)
     await expect(f.getLines('foo', 23, 45)).rejects.toThrow(/callback/)
   })
@@ -273,9 +275,9 @@ describe('tabix file', () => {
     await f.getLines('1', 1206810423, 1206810423, lines.callback)
     expect(lines.length).toEqual(0)
     lines.clear()
-    await expect(f.getLines('1', 1206808844, 12068500000, lines.callback)).rejects.toThrow(
-      /query .* is too large for current binning scheme/,
-    )
+    await expect(
+      f.getLines('1', 1206808844, 12068500000, lines.callback),
+    ).rejects.toThrow(/query .* is too large for current binning scheme/)
     lines.clear()
     await f.getLines('1', 1206810422, 1206810423, lines.callback)
     expect(lines.length).toEqual(1)
@@ -302,9 +304,13 @@ describe('tabix file', () => {
     })
 
     const headerString = await f.getHeader()
-    const lastBitOfLastHeaderLine = 'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
+    const lastBitOfLastHeaderLine =
+      'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
     expect(
-      headerString.slice(headerString.length - lastBitOfLastHeaderLine.length, headerString.length),
+      headerString.slice(
+        headerString.length - lastBitOfLastHeaderLine.length,
+        headerString.length,
+      ),
     ).toEqual(lastBitOfLastHeaderLine)
     expect(headerString[headerString.length - 1]).toEqual('\n')
     expect(headerString.length).toEqual(5315655)
@@ -339,24 +345,26 @@ describe('tabix file', () => {
     expect(headerString).toBe('')
   })
 
-  extended('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
-    const f = new TabixIndexedFile({
-      path: require.resolve('./extended_data/out.sorted.gff.gz'),
-    })
+  extended(
+    'can fetch NC_000001.11:184099343..184125655 correctly',
+    async () => {
+      const f = new TabixIndexedFile({
+        path: require.resolve('./extended_data/out.sorted.gff.gz'),
+      })
 
-    // const headerString = await f.getHeader()
-    // expect(headerString).toEqual('')
+      // const headerString = await f.getHeader()
+      // expect(headerString).toEqual('')
 
-    const lines = new RecordCollector()
-    await f.getLines('ctgB', 0, Infinity, lines.callback)
-    expect(lines.length).toEqual(0)
+      const lines = new RecordCollector()
+      await f.getLines('ctgB', 0, Infinity, lines.callback)
+      expect(lines.length).toEqual(0)
 
-    await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
-    // expect there to be no duplicate lines
-    lines.expectNoDuplicates()
-    const text = lines.text()
-    expect(text).toEqual(
-      `NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA
+      await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
+      // expect there to be no duplicate lines
+      lines.expectNoDuplicates()
+      const text = lines.text()
+      expect(text).toEqual(
+        `NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA
 NC_000001.11	RefSeq	match	143184588	223558935	.	+	.	Target=NC_000001.11 143184588 223558935 +;gap_count=0;num_mismatch=0;pct_coverage=100;pct_identity_gap=100
 NC_000001.11	Gnomon	exon	184112091	184112377	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
 NC_000001.11	Gnomon	lnc_RNA	184112091	184122540	.	+	.	ID=lnc_RNA1660;Parent=gene3367;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;Name=XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;model_evidence=Supporting evidence includes similarity to: 100%25 coverage of the annotated genomic feature by RNAseq alignments%2C including 2 samples with support for all annotated introns;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
@@ -376,8 +384,9 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1660;Dbxref=Gen
 NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1662;Dbxref=GeneID:102724830,Genbank:XR_426875.3;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
 NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
 `,
-    )
-  })
+      )
+    },
+  )
 
   it('usage of the chr22 ultralong nanopore as a bed file', async () => {
     const ti = new TabixIndexedFile({
@@ -388,7 +397,8 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=Gen
     await ti.getLines('22', 16559999, 16564499, ret1.callback)
     const ret2 = new RecordCollector()
     await ti.getLines('22', 16564499, 16564999, ret2.callback)
-    const findfeat = ({ line }) => line.split('\t')[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5'
+    const findfeat = ({ line }) =>
+      line.split('\t')[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5'
     const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
     expect(r1.fileOffset).toEqual(r2.fileOffset)
   })
@@ -415,7 +425,8 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=Gen
     await ti.getLines('chr1', 110117499, 110119999, ret2.callback)
 
     const findfeat = ({ line }) =>
-      line.split('\t')[3] === 'm131004_105332_42213_c100572142530000001823103304021442_s1_p0/103296'
+      line.split('\t')[3] ===
+      'm131004_105332_42213_c100572142530000001823103304021442_s1_p0/103296'
     const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
     expect(r1.fileOffset).toEqual(r2.fileOffset)
   })

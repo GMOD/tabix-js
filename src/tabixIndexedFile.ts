@@ -66,8 +66,10 @@ export default class TabixIndexedFile {
     else if (path) this.filehandle = new LocalFile(path)
     else throw new TypeError('must provide either filehandle or path')
 
-    if (tbiFilehandle) this.index = new TBI({ filehandle: tbiFilehandle, renameRefSeqs })
-    else if (csiFilehandle) this.index = new CSI({ filehandle: csiFilehandle, renameRefSeqs })
+    if (tbiFilehandle)
+      this.index = new TBI({ filehandle: tbiFilehandle, renameRefSeqs })
+    else if (csiFilehandle)
+      this.index = new CSI({ filehandle: csiFilehandle, renameRefSeqs })
     else if (tbiPath)
       this.index = new TBI({
         filehandle: new LocalFile(tbiPath),
@@ -84,7 +86,9 @@ export default class TabixIndexedFile {
         renameRefSeqs,
       })
     } else {
-      throw new TypeError('must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath')
+      throw new TypeError(
+        'must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath',
+      )
     }
 
     this.chunkSizeLimit = chunkSizeLimit
@@ -114,7 +118,8 @@ export default class TabixIndexedFile {
   ) {
     let signal: AbortSignal | undefined
     let callback: Function
-    if (typeof opts === 'undefined') throw new TypeError('line callback must be provided')
+    if (typeof opts === 'undefined')
+      throw new TypeError('line callback must be provided')
     if (typeof opts === 'function') callback = opts
     else {
       callback = opts.lineCallback
@@ -158,7 +163,11 @@ export default class TabixIndexedFile {
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
-      const { buffer, cpositions, dpositions } = await this.chunkCache.get(c.toString(), c, signal)
+      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
+        c.toString(),
+        c,
+        signal,
+      )
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
@@ -168,11 +177,21 @@ export default class TabixIndexedFile {
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (pos = 0; fileOffset > dpositions[pos] + c.minv.dataPosition; pos++);
+        for (
+          pos = 0;
+          fileOffset > dpositions[pos] + c.minv.dataPosition;
+          pos++
+        );
         pos = Math.min(dpositions.length - 1, pos)
 
         // filter the line for whether it is within the requested range
-        const { startCoordinate, overlaps } = this.checkLine(metadata, refName, start, end, line)
+        const { startCoordinate, overlaps } = this.checkLine(
+          metadata,
+          refName,
+          start,
+          end,
+          line,
+        )
 
         // do a small check just to make sure that the lines are really sorted by start coordinate
         if (
@@ -224,7 +243,9 @@ export default class TabixIndexedFile {
    * @returns {Promise} for a buffer
    */
   async getHeaderBuffer(opts: { signal?: AbortSignal } = {}) {
-    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(opts)
+    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
+      opts,
+    )
     checkAbortSignal(opts.signal)
     const maxFetch =
       firstDataLine && firstDataLine.blockPosition
@@ -239,7 +260,9 @@ export default class TabixIndexedFile {
       bytes = await unzip(bytes)
     } catch (e) {
       console.error(e)
-      throw new Error(`error decompressing block ${e.code} at 0 (length ${maxFetch}) ${e}`)
+      throw new Error(
+        `error decompressing block ${e.code} at 0 (length ${maxFetch}) ${e}`,
+      )
     }
 
     // trim off lines after the last non-meta line
@@ -338,10 +361,12 @@ export default class TabixIndexedFile {
           startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           // we convert to 0-based-half-open
           if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd) return { startCoordinate, overlaps: false }
+          if (startCoordinate >= regionEnd)
+            return { startCoordinate, overlaps: false }
           if (end === 0) {
             // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart) return { startCoordinate, overlaps: false }
+            if (startCoordinate + 1 <= regionStart)
+              return { startCoordinate, overlaps: false }
           }
         } else if (format === 'VCF' && currentColumnNumber === 4) {
           refSeq = line.slice(currentColumnStart, i)
@@ -399,9 +424,14 @@ export default class TabixIndexedFile {
     return this.index.lineCount(refName, opts)
   }
 
-  async _readRegion(position: number, compressedSize: number, opts: { signal?: AbortSignal } = {}) {
+  async _readRegion(
+    position: number,
+    compressedSize: number,
+    opts: { signal?: AbortSignal } = {},
+  ) {
     const { size: fileSize } = await this.filehandle.stat()
-    if (position + compressedSize > fileSize) compressedSize = fileSize - position
+    if (position + compressedSize > fileSize)
+      compressedSize = fileSize - position
 
     const { buffer } = await this.filehandle.read(
       Buffer.alloc(compressedSize),

@@ -3,7 +3,8 @@ const fs = typeof __webpack_require__ !== 'function' ? require('fs') : null // e
 
 let extended = xit
 try {
-  if (fs.existsSync(require.resolve(`./extended_data/out.sorted.gff.gz`))) extended = it
+  if (fs.existsSync(require.resolve(`./extended_data/out.sorted.gff.gz`)))
+    extended = it
 } catch (e) {
   // ignore
   console.warn(

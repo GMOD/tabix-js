@@ -31,7 +31,10 @@ export default class TabixIndex extends IndexFile {
    * @param {filehandle} filehandle
    * @param {function} [renameRefSeqs]
    */
-  constructor(args: { filehandle: GenericFilehandle; renameRefSeqs: (n: string) => string }) {
+  constructor(args: {
+    filehandle: GenericFilehandle
+    renameRefSeqs: (n: string) => string
+  }) {
     const { filehandle, renameRefSeqs = (n: string) => n } = args
     super(args)
     this.filehandle = filehandle
@@ -64,10 +67,16 @@ export default class TabixIndex extends IndexFile {
     // number of reference sequences in the index
     const refCount = bytes.readInt32LE(4)
     const formatFlags = bytes.readInt32LE(8)
-    const coordinateType = formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const formatOpts: { [key: number]: string } = { 0: 'generic', 1: 'SAM', 2: 'VCF' }
+    const coordinateType =
+      formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
+    const formatOpts: { [key: number]: string } = {
+      0: 'generic',
+      1: 'SAM',
+      2: 'VCF',
+    }
     const format = formatOpts[formatFlags & 0xf]
-    if (!format) throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+    if (!format)
+      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     const columnNumbers = {
       ref: bytes.readInt32LE(12),
       start: bytes.readInt32LE(16),
@@ -99,7 +108,9 @@ export default class TabixIndex extends IndexFile {
         const bin = bytes.readUInt32LE(currOffset)
         currOffset += 4
         if (bin > maxBinNumber + 1) {
-          throw new Error('tabix index contains too many bins, please use a CSI index')
+          throw new Error(
+            'tabix index contains too many bins, please use a CSI index',
+          )
         } else if (bin === maxBinNumber + 1) {
           const chunkCount = bytes.readInt32LE(currOffset)
           currOffset += 4
@@ -154,7 +165,9 @@ export default class TabixIndex extends IndexFile {
     // const one = Long.fromBytesLE(bytes.slice(offset + 4, offset + 12), true)
     // const two = Long.fromBytesLE(bytes.slice(offset + 12, offset + 20), true)
     // @ts-ignore
-    const lineCount = longToNumber(Long.fromBytesLE(bytes.slice(offset + 16, offset + 24), true))
+    const lineCount = longToNumber(
+      Long.fromBytesLE(bytes.slice(offset + 16, offset + 24), true),
+    )
     // const four = Long.fromBytesLE(bytes.slice(offset + 28, offset + 36), true)
     return { lineCount }
   }
@@ -224,7 +237,11 @@ export default class TabixIndex extends IndexFile {
       if (chunks)
         for (let j = 0; j < chunks.length; j += 1)
           if (minOffset.compareTo(chunks[j].maxv) < 0) {
-            off[numOffsets] = new Chunk(chunks[j].minv, chunks[j].maxv, chunks[j].bin)
+            off[numOffsets] = new Chunk(
+              chunks[j].minv,
+              chunks[j].maxv,
+              chunks[j].bin,
+            )
             numOffsets += 1
           }
     }
@@ -254,7 +271,8 @@ export default class TabixIndex extends IndexFile {
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.blockPosition === off[i].minv.blockPosition) off[l].maxv = off[i].maxv
+      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
+        off[l].maxv = off[i].maxv
       else {
         l += 1
         off[l].minv = off[i].minv

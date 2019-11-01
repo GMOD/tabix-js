@@ -27,7 +27,10 @@ export default class CSI extends IndexFile {
     this.depth = 0
     this.minShift = 0
   }
-  async lineCount(refName: string, opts: { signal?: AbortSignal } = {}): Promise<number> {
+  async lineCount(
+    refName: string,
+    opts: { signal?: AbortSignal } = {},
+  ): Promise<number> {
     const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
@@ -51,11 +54,13 @@ export default class CSI extends IndexFile {
     }
 
     const formatFlags = bytes.readInt32LE(offset)
-    const coordinateType = formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const format = ({ 0: 'generic', 1: 'SAM', 2: 'VCF' } as { [key: number]: string })[
-      formatFlags & 0xf
-    ]
-    if (!format) throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+    const coordinateType =
+      formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
+    const format = ({ 0: 'generic', 1: 'SAM', 2: 'VCF' } as {
+      [key: number]: string
+    })[formatFlags & 0xf]
+    if (!format)
+      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     const columnNumbers = {
       ref: bytes.readInt32LE(offset + 4),
       start: bytes.readInt32LE(offset + 8),
@@ -123,7 +128,10 @@ export default class CSI extends IndexFile {
     const maxRefLength = 2 ** (this.minShift + this.depth * 3)
 
     const auxLength = bytes.readInt32LE(12)
-    let aux: { refIdToName: string[]; refNameToId: { [key: string]: number } } = {
+    let aux: {
+      refIdToName: string[]
+      refNameToId: { [key: string]: number }
+    } = {
       refIdToName: [],
       refNameToId: {},
     }
@@ -189,7 +197,10 @@ export default class CSI extends IndexFile {
     //   Long.fromBytesLE(bytes.slice(offset + 20, offset + 28), true),
     // )
     const lineCount = longToNumber(
-      Long.fromBytesLE(Array.prototype.slice.call(bytes, offset + 28, offset + 36), true),
+      Long.fromBytesLE(
+        Array.prototype.slice.call(bytes, offset + 28, offset + 36),
+        true,
+      ),
     )
     return { lineCount }
   }
@@ -226,7 +237,11 @@ export default class CSI extends IndexFile {
       const chunks = binIndex[bins[i]]
       if (chunks)
         for (let j = 0; j < chunks.length; j += 1) {
-          off[numOffsets] = new Chunk(chunks[j].minv, chunks[j].maxv, chunks[j].bin)
+          off[numOffsets] = new Chunk(
+            chunks[j].minv,
+            chunks[j].maxv,
+            chunks[j].bin,
+          )
           numOffsets += 1
         }
     }
@@ -256,7 +271,8 @@ export default class CSI extends IndexFile {
     // merge adjacent blocks
     l = 0
     for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.blockPosition === off[i].minv.blockPosition) off[l].maxv = off[i].maxv
+      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
+        off[l].maxv = off[i].maxv
       else {
         l += 1
         off[l].minv = off[i].minv

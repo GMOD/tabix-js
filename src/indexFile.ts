@@ -23,7 +23,10 @@ export default abstract class IndexFile {
     this.filehandle = filehandle
     this.renameRefSeq = renameRefSeq
   }
-  public abstract async lineCount(refName: string, args: { signal?: AbortSignal }): Promise<number>
+  public abstract async lineCount(
+    refName: string,
+    args: { signal?: AbortSignal },
+  ): Promise<number>
   protected abstract async _parse(opts: {
     signal?: AbortSignal
   }): Promise<{
@@ -44,9 +47,14 @@ export default abstract class IndexFile {
     opts: { signal?: AbortSignal },
   ): Promise<Chunk[]>
 
-  _findFirstData(currentFdl: VirtualOffset | undefined, virtualOffset: VirtualOffset) {
+  _findFirstData(
+    currentFdl: VirtualOffset | undefined,
+    virtualOffset: VirtualOffset,
+  ) {
     if (currentFdl) {
-      return currentFdl.compareTo(virtualOffset) > 0 ? virtualOffset : currentFdl
+      return currentFdl.compareTo(virtualOffset) > 0
+        ? virtualOffset
+        : currentFdl
     } else {
       return virtualOffset
     }
