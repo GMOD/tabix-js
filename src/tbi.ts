@@ -39,7 +39,7 @@ export default class TabixIndex extends IndexFile {
   }
 
   async lineCount(refName: string, opts: { signal?: AbortSignal } = {}) {
-    const indexData = await this.parse(opts.signal)
+    const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
@@ -51,9 +51,9 @@ export default class TabixIndex extends IndexFile {
 
   // memoize
   // fetch and parse the index
-  async _parse(signal?: AbortSignal) {
-    const bytes = await unzip((await this.filehandle.readFile({ signal })) as Buffer)
-    checkAbortSignal(signal)
+  async _parse(opts: { signal?: AbortSignal } = {}) {
+    const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
+    checkAbortSignal(opts.signal)
 
     // check TBI magic numbers
     if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
@@ -187,7 +187,7 @@ export default class TabixIndex extends IndexFile {
   ) {
     if (beg < 0) beg = 0
 
-    const indexData = await this.parse(opts.signal)
+    const indexData = await this.parse(opts)
     if (!indexData) return []
     const refId = indexData.refNameToId[refName]
     const indexes = indexData.indices[refId]

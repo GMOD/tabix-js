@@ -24,12 +24,13 @@ export default abstract class IndexFile {
     this.renameRefSeq = renameRefSeq
   }
   public abstract async lineCount(refName: string, args: { signal?: AbortSignal }): Promise<number>
-  protected abstract async _parse(
-    signal?: AbortSignal,
-  ): Promise<{
+  protected abstract async _parse(opts: {
+    signal?: AbortSignal
+  }): Promise<{
     refNameToId: { [key: string]: number }
     refIdToName: string[]
   }>
+
   public async getMetadata(opts: { signal?: AbortSignal } = {}) {
     //@ts-ignore
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -52,13 +53,13 @@ export default abstract class IndexFile {
     }
   }
 
-  async parse(abortSignal?: AbortSignal) {
+  async parse(opts: { signal?: AbortSignal } = {}) {
     if (!this._parseCache)
       this._parseCache = new AbortablePromiseCache({
         cache: new QuickLRU({ maxSize: 1 }),
-        fill: (data: any, signal: AbortSignal) => this._parse(signal),
+        fill: (data: any, signal: AbortSignal) => this._parse(opts),
       })
-    return this._parseCache.get('index', null, abortSignal)
+    return this._parseCache.get('index', null, opts.signal)
   }
 
   /**

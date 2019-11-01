@@ -28,7 +28,7 @@ export default class CSI extends IndexFile {
     this.minShift = 0
   }
   async lineCount(refName: string, opts: { signal?: AbortSignal } = {}): Promise<number> {
-    const indexData = await this.parse(opts.signal)
+    const indexData = await this.parse(opts)
     if (!indexData) return -1
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
@@ -102,8 +102,9 @@ export default class CSI extends IndexFile {
   }
 
   // fetch and parse the index
-  async _parse(abortSignal?: AbortSignal) {
-    const bytes = await unzip((await this.filehandle.readFile({ signal: abortSignal })) as Buffer)
+
+  async _parse(opts: { signal?: AbortSignal } = {}) {
+    const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
 
     // check TBI magic numbers
     let csiVersion
@@ -201,7 +202,7 @@ export default class CSI extends IndexFile {
   ): Promise<Chunk[]> {
     if (beg < 0) beg = 0
 
-    const indexData = await this.parse(opts.signal)
+    const indexData = await this.parse(opts)
     if (!indexData) return []
     const refId = indexData.refNameToId[refName]
     const indexes = indexData.indices[refId]
