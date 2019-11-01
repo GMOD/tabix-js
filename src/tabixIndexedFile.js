@@ -228,7 +228,7 @@ class TabixIndexedFile {
     try {
       bytes = await unzip(bytes)
     } catch (e) {
-      console.log(e)
+      console.error(e)
       throw new Error(
         `error decompressing block ${e.code} at 0 (length ${maxFetch})`,
         e,
