@@ -153,7 +153,11 @@ class TabixIndexedFile {
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (pos = 0; fileOffset > dpositions[pos]; pos += 1);
+        for (
+          pos = 0;
+          fileOffset > dpositions[pos] - c.minv.dataPosition;
+          pos += 1
+        );
         pos = Math.min(dpositions.length - 1, pos)
 
         // filter the line for whether it is within the requested range
