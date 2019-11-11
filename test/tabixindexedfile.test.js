@@ -1,8 +1,6 @@
 import TabixIndexedFile from '../src/tabixIndexedFile'
 import VirtualOffset from '../src/virtualOffset'
 
-import { extended } from './utils'
-
 class RecordCollector {
   constructor() {
     this.clear()
@@ -345,26 +343,24 @@ describe('tabix file', () => {
     expect(headerString).toBe('')
   })
 
-  extended(
-    'can fetch NC_000001.11:184099343..184125655 correctly',
-    async () => {
-      const f = new TabixIndexedFile({
-        path: require.resolve('./extended_data/out.sorted.gff.gz'),
-      })
+  it('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
+    const f = new TabixIndexedFile({
+      path: require.resolve('./data/ncbi_human.sorted.gff.gz'),
+    })
 
-      // const headerString = await f.getHeader()
-      // expect(headerString).toEqual('')
+    // const headerString = await f.getHeader()
+    // expect(headerString).toEqual('')
 
-      const lines = new RecordCollector()
-      await f.getLines('ctgB', 0, Infinity, lines.callback)
-      expect(lines.length).toEqual(0)
+    const lines = new RecordCollector()
+    await f.getLines('ctgB', 0, Infinity, lines.callback)
+    expect(lines.length).toEqual(0)
 
-      await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
-      // expect there to be no duplicate lines
-      lines.expectNoDuplicates()
-      const text = lines.text()
-      expect(text).toEqual(
-        `NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA
+    await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
+    // expect there to be no duplicate lines
+    lines.expectNoDuplicates()
+    const text = lines.text()
+    expect(text).toEqual(
+      `NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA
 NC_000001.11	RefSeq	match	143184588	223558935	.	+	.	Target=NC_000001.11 143184588 223558935 +;gap_count=0;num_mismatch=0;pct_coverage=100;pct_identity_gap=100
 NC_000001.11	Gnomon	exon	184112091	184112377	.	+	.	Parent=lnc_RNA1660;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
 NC_000001.11	Gnomon	lnc_RNA	184112091	184122540	.	+	.	ID=lnc_RNA1660;Parent=gene3367;Dbxref=GeneID:102724830,Genbank:XR_001738323.1;Name=XR_001738323.1;gbkey=ncRNA;gene=LOC102724830;model_evidence=Supporting evidence includes similarity to: 100%25 coverage of the annotated genomic feature by RNAseq alignments%2C including 2 samples with support for all annotated introns;product=uncharacterized LOC102724830%2C transcript variant X2;transcript_id=XR_001738323.1
@@ -384,9 +380,8 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1660;Dbxref=Gen
 NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1662;Dbxref=GeneID:102724830,Genbank:XR_426875.3;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X1;transcript_id=XR_426875.3
 NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=GeneID:102724830,Genbank:XR_001738324.1;gbkey=ncRNA;gene=LOC102724830;product=uncharacterized LOC102724830%2C transcript variant X3;transcript_id=XR_001738324.1
 `,
-      )
-    },
-  )
+    )
+  })
 
   it('usage of the chr22 ultralong nanopore as a bed file', async () => {
     const ti = new TabixIndexedFile({
