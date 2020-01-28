@@ -146,6 +146,7 @@ describe('tabix file', () => {
       tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
       yieldLimit: 10,
     })
+    //eslint-disable-next-line @typescript-eslint/no-empty-function
     await expect(f.getLines('foo', 32, 24, () => {})).rejects.toThrow(
       /invalid start/,
     )
