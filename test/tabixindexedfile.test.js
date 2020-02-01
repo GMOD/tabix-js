@@ -426,4 +426,18 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=Gen
     const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
     expect(r1.fileOffset).toEqual(r2.fileOffset)
   })
+
+  it('fake large chromosome', async () => {
+    const ti = new TabixIndexedFile({
+      path: require.resolve('./data/fake_large_chromosome/test.gff3.gz'),
+      csiPath: require.resolve('./data/fake_large_chromosome/test.gff3.gz.csi'),
+    })
+    await ti.getHeader()
+
+    const [rangeStart, rangeEnd] = [1000001055, 1000002500]
+
+    const items = new RecordCollector()
+    await ti.getLines('1', rangeStart, rangeEnd, items.callback)
+    expect(items.length).toEqual(24)
+  })
 })
