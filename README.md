@@ -22,9 +22,11 @@ const tbiIndexed = new TabixIndexedFile({ path: 'path/to/my/file.gz' })
 // can also provide `tbiPath` if the TBI is named differently
 
 // can also open tabix files that have a .csi index
+// also trims chr off the chr names
 const csiIndexed = new TabixIndexedFile({
   path: 'path/to/my/file.gz',
   csiPath: 'path/to/my/file.gz.csi'
+  renameRefSeqs: (refSeq) => { return refSeq.replace('chr','') }
 })
 
 // use a remote file or other filehandle, note RemoteFile comes from https://github.com/GMOD/generic-filehandle
