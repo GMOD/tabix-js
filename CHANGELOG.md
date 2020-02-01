@@ -1,3 +1,5 @@
+- Remove a runtime dependency on a @types module
+
 <a name="1.4.0"></a>
 # [1.4.0](https://github.com/GMOD/tabix-js/compare/v1.3.2...v1.4.0) (2020-02-01)
 
