@@ -18,7 +18,7 @@ export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   private chunkSizeLimit: number
-  private renameRefSeqCallback: (n: string) => string
+  private renameRefSeq: (n: string) => string
   private yieldLimit: number
   private chunkCache: any
   /**
@@ -67,9 +67,15 @@ export default class TabixIndexedFile {
     else throw new TypeError('must provide either filehandle or path')
 
     if (tbiFilehandle)
-      this.index = new TBI({ filehandle: tbiFilehandle, renameRefSeqs })
+      this.index = new TBI({
+        filehandle: tbiFilehandle,
+        renameRefSeqs,
+      })
     else if (csiFilehandle)
-      this.index = new CSI({ filehandle: csiFilehandle, renameRefSeqs })
+      this.index = new CSI({
+        filehandle: csiFilehandle,
+        renameRefSeqs,
+      })
     else if (tbiPath)
       this.index = new TBI({
         filehandle: new LocalFile(tbiPath),
@@ -93,7 +99,7 @@ export default class TabixIndexedFile {
 
     this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
-    this.renameRefSeqCallback = renameRefSeqs
+    this.renameRefSeq = renameRefSeqs
     this.chunkCache = new AbortablePromiseCache({
       cache: new LRU({
         maxSize: Math.floor(chunkCacheSize / (1 << 16)),
@@ -356,7 +362,7 @@ export default class TabixIndexedFile {
       if (line[i] === '\t' || i === line.length) {
         if (currentColumnNumber === ref) {
           let refName = line.slice(currentColumnStart, i)
-          refName = this.renameRefSeqCallback(refName)
+          refName = this.renameRefSeq(refName)
           if (refName !== regionRefName) return { overlaps: false }
         } else if (currentColumnNumber === start) {
           startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)

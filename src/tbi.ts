@@ -27,20 +27,6 @@ function reg2bins(beg: number, end: number) {
 }
 
 export default class TabixIndex extends IndexFile {
-  /**
-   * @param {filehandle} filehandle
-   * @param {function} [renameRefSeqs]
-   */
-  constructor(args: {
-    filehandle: GenericFilehandle
-    renameRefSeqs: (n: string) => string
-  }) {
-    const { filehandle, renameRefSeqs = (n: string) => n } = args
-    super(args)
-    this.filehandle = filehandle
-    this.renameRefSeq = renameRefSeqs
-  }
-
   async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
     if (!indexData) return -1

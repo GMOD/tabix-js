@@ -21,13 +21,13 @@ export default abstract class IndexFile {
    */
   constructor({
     filehandle,
-    renameRefSeq = (n: string) => n,
+    renameRefSeqs = (n: string) => n,
   }: {
     filehandle: GenericFilehandle
-    renameRefSeq?: (a: string) => string
+    renameRefSeqs?: (a: string) => string
   }) {
     this.filehandle = filehandle
-    this.renameRefSeq = renameRefSeq
+    this.renameRefSeq = renameRefSeqs
   }
 
   public abstract async lineCount(
