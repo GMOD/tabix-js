@@ -1,3 +1,6 @@
+- Add typescripting of the codebase
+- Drop Node 6 support due to changes in our dependencies
+
 <a name="1.3.2"></a>
 ## [1.3.2](https://github.com/GMOD/tabix-js/compare/v1.3.1...v1.3.2) (2019-11-01)
 
