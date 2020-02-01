@@ -1,6 +1,4 @@
 import Long from 'long'
-import { GenericFilehandle } from 'generic-filehandle'
-// const { Parser } = require('binary-parser')
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
 import { unzip } from '@gmod/bgzf-filehandle'
