@@ -1,3 +1,5 @@
+- Fix optional param for constructor for typescript
+
 <a name="1.4.2"></a>
 ## [1.4.2](https://github.com/GMOD/tabix-js/compare/v1.4.1...v1.4.2) (2020-02-01)
 

@@ -59,7 +59,7 @@ export default class TabixIndexedFile {
     csiFilehandle?: GenericFilehandle
     chunkSizeLimit?: number
     yieldLimit?: number
-    renameRefSeqs: (n: string) => string
+    renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
     if (filehandle) this.filehandle = filehandle
