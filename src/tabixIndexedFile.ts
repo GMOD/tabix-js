@@ -1,7 +1,7 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
-import { unzip, unzipChunk } from '@gmod/bgzf-filehandle'
+import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 import Chunk from './chunk'
@@ -460,9 +460,9 @@ export default class TabixIndexedFile {
       opts,
     )
     try {
-      return unzipChunk(compressedData, chunk)
+      return unzipChunkSlice(compressedData, chunk)
     } catch (e) {
-      throw new Error(`error decompressing chunk ${chunk.toString()}`)
+      throw new Error(`error decompressing chunk ${chunk.toString()} ${e}`)
     }
   }
 }
