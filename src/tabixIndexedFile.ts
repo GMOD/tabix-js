@@ -168,16 +168,15 @@ export default class TabixIndexedFile {
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
-      const { buffer: b, cpositions, dpositions } = await this.chunkCache.get(
+      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
         signal,
       )
-      const buffer = b.slice(c.minv.dataPosition)
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
-      let blockStart = c.minv.dataPosition
+      let blockStart = 0 //c.minv.dataPosition
       let pos
 
       for (let i = 0; i < lines.length; i += 1) {
