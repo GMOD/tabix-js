@@ -182,7 +182,7 @@ export default class TabixIndexedFile {
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (pos = 0; blockStart > dpositions[pos]; pos += 1);
+        for (pos = 0; blockStart >= dpositions[pos]; pos += 1);
 
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
