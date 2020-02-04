@@ -176,13 +176,17 @@ export default class TabixIndexedFile {
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
-      let blockStart = c.minv.dataPosition
+      let blockStart = 0
       let pos
 
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (pos = 0; blockStart >= dpositions[pos]; pos += 1);
+        for (
+          pos = 0;
+          blockStart + c.minv.dataPosition >= dpositions[pos];
+          pos += 1
+        );
 
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
@@ -207,10 +211,10 @@ export default class TabixIndexedFile {
         if (overlaps) {
           callback(
             line.trim(),
-            c.minv.blockPosition * (1 << 8) +
-              cpositions[pos] * (1 << 8) -
+            cpositions[pos] * (1 << 8) -
               dpositions[pos] +
-              blockStart,
+              blockStart +
+              c.minv.dataPosition,
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
