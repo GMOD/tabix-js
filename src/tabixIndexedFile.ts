@@ -1,7 +1,7 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
-import { unzip, unzipChunk } from '@gmod/bgzf-filehandle'
+import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 import Chunk from './chunk'
@@ -168,16 +168,15 @@ export default class TabixIndexedFile {
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
-      const { buffer: b, cpositions, dpositions } = await this.chunkCache.get(
+      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
         signal,
       )
-      const buffer = b.slice(c.minv.dataPosition)
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
-      let fileOffset = 0
+      let blockStart = 0
       let pos
 
       for (let i = 0; i < lines.length; i += 1) {
@@ -185,10 +184,9 @@ export default class TabixIndexedFile {
 
         for (
           pos = 0;
-          fileOffset > dpositions[pos] - c.minv.dataPosition;
+          blockStart + c.minv.dataPosition >= dpositions[pos];
           pos += 1
         );
-        pos = Math.min(dpositions.length - 1, pos)
 
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
@@ -213,11 +211,10 @@ export default class TabixIndexedFile {
         if (overlaps) {
           callback(
             line.trim(),
-            c.minv.blockPosition * (1 << 8) +
-              cpositions[pos] * (1 << 8) -
+            cpositions[pos] * (1 << 8) -
               dpositions[pos] +
-              c.minv.dataPosition +
-              fileOffset,
+              blockStart +
+              c.minv.dataPosition,
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
@@ -225,7 +222,7 @@ export default class TabixIndexedFile {
           // processing data now
           return
         }
-        fileOffset += line.length + 1
+        blockStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
         linesSinceLastYield += 1
@@ -467,9 +464,9 @@ export default class TabixIndexedFile {
       opts,
     )
     try {
-      return unzipChunk(compressedData, chunk)
+      return unzipChunkSlice(compressedData, chunk)
     } catch (e) {
-      throw new Error(`error decompressing chunk ${chunk.toString()}`)
+      throw new Error(`error decompressing chunk ${chunk.toString()} ${e}`)
     }
   }
 }
