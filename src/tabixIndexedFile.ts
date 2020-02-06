@@ -2,6 +2,8 @@ import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
+const flate = require('wasm-flate')
+
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 import Chunk from './chunk'
@@ -176,17 +178,13 @@ export default class TabixIndexedFile {
       const lines = buffer.toString().split('\n')
       lines.pop()
       checkAbortSignal(signal)
-      let blockStart = 0
+      let blockStart = c.minv.dataPosition
       let pos
 
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (
-          pos = 0;
-          blockStart + c.minv.dataPosition >= dpositions[pos];
-          pos += 1
-        );
+        for (pos = 0; blockStart >= dpositions[pos]; pos += 1);
 
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
@@ -211,10 +209,15 @@ export default class TabixIndexedFile {
         if (overlaps) {
           callback(
             line.trim(),
-            cpositions[pos] * (1 << 8) -
-              dpositions[pos] +
-              blockStart +
-              c.minv.dataPosition,
+            // cpositions[pos] refers to actual file offset of a bgzip block boundaries
+            //
+            // we multiply by (1 <<8) in order to make sure each block has a "unique"
+            // address space so that data in that block could never overlap
+            //
+            // then the blockStart-dpositions is an uncompressed file offset from
+            // that bgzip block boundary, and since the cpositions are multiplied by
+            // (1 << 8) these uncompressed offsets get a unique space
+            cpositions[pos] * (1 << 8) + (blockStart - dpositions[pos]),
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
@@ -464,7 +467,8 @@ export default class TabixIndexedFile {
       opts,
     )
     try {
-      return unzipChunkSlice(compressedData, chunk)
+      //return unzipChunkSlice(compressedData, chunk)
+      return flate.deflate_decode_raw(compressedData)
     } catch (e) {
       throw new Error(`error decompressing chunk ${chunk.toString()} ${e}`)
     }
