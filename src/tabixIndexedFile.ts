@@ -2,7 +2,6 @@ import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
-const flate = require('wasm-flate')
 
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
@@ -467,8 +466,7 @@ export default class TabixIndexedFile {
       opts,
     )
     try {
-      //return unzipChunkSlice(compressedData, chunk)
-      return flate.deflate_decode_raw(compressedData)
+      return unzipChunkSlice(compressedData, chunk)
     } catch (e) {
       throw new Error(`error decompressing chunk ${chunk.toString()} ${e}`)
     }
