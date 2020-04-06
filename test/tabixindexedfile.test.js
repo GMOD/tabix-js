@@ -440,4 +440,15 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=Gen
     await ti.getLines('1', rangeStart, rangeEnd, items.callback)
     expect(items.length).toEqual(24)
   })
+  it('start equal to end in tabix columns', async () => {
+    const ti = new TabixIndexedFile({
+      path: require.resolve('./data/out.bed.gz'),
+      tbiPath: require.resolve('./data/out.bed.gz.tbi'),
+    })
+    await ti.getHeader()
+
+    const items = new RecordCollector()
+    await ti.getLines('ctgA', 26499, 26625, items.callback)
+    expect(items.records[0].line).toBe('ctgA	26499	C	21	0	21	0	0	0:11:0:0')
+  })
 })
