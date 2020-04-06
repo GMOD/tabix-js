@@ -142,8 +142,12 @@ export default class TabixIndexedFile {
 
     const metadata = await this.index.getMetadata(options)
     checkAbortSignal(signal)
-    if (!start) start = 0
-    if (!end) end = metadata.maxRefLength
+    if (!start) {
+      start = 0
+    }
+    if (!end) {
+      end = metadata.maxRefLength
+    }
     if (!(start <= end))
       throw new TypeError(
         'invalid start and end coordinates. start must be less than or equal to end',
@@ -339,7 +343,9 @@ export default class TabixIndexedFile {
     line: string,
   ) {
     // skip meta lines
-    if (line.charAt(0) === metaChar) return { overlaps: false }
+    if (line.charAt(0) === metaChar) {
+      return { overlaps: false }
+    }
 
     // check ref/start/end using column metadata from index
     let { ref, start, end } = columnNumbers
@@ -360,37 +366,50 @@ export default class TabixIndexedFile {
     for (let i = 0; i < line.length + 1; i += 1) {
       if (line[i] === '\t' || i === line.length) {
         if (currentColumnNumber === ref) {
-          let refName = line.slice(currentColumnStart, i)
-          refName = this.renameRefSeq(refName)
-          if (refName !== regionRefName) return { overlaps: false }
+          if (
+            this.renameRefSeq(line.slice(currentColumnStart, i)) !==
+            regionRefName
+          ) {
+            return { overlaps: false }
+          }
         } else if (currentColumnNumber === start) {
           startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
           // we convert to 0-based-half-open
-          if (coordinateType === '1-based-closed') startCoordinate -= 1
-          if (startCoordinate >= regionEnd)
+          if (coordinateType === '1-based-closed') {
+            startCoordinate -= 1
+          }
+          if (startCoordinate >= regionEnd) {
             return { startCoordinate, overlaps: false }
-          if (end === 0) {
+          }
+          if (end === 0 || end === start) {
             // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart)
+            if (startCoordinate + 1 <= regionStart) {
               return { startCoordinate, overlaps: false }
+            }
           }
         } else if (format === 'VCF' && currentColumnNumber === 4) {
           refSeq = line.slice(currentColumnStart, i)
         } else if (currentColumnNumber === end) {
           let endCoordinate
           // this will never match if there is no end column
-          if (format === 'VCF')
+          if (format === 'VCF') {
             endCoordinate = this._getVcfEnd(
               startCoordinate,
               refSeq,
               line.slice(currentColumnStart, i),
             )
-          else endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
-          if (endCoordinate <= regionStart) return { overlaps: false }
+          } else {
+            endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
+          }
+          if (endCoordinate <= regionStart) {
+            return { overlaps: false }
+          }
         }
         currentColumnStart = i + 1
         currentColumnNumber += 1
-        if (currentColumnNumber > maxColumn) break
+        if (currentColumnNumber > maxColumn) {
+          break
+        }
       }
     }
     return { startCoordinate, overlaps: true }
