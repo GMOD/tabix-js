@@ -1,3 +1,6 @@
+- Remove the filehandle size() call because this is unnecessary and would indicate a corrupt index,
+  and because it additionally has a CORS configuration overhead
+
 <a name="1.4.4"></a>
 ## [1.4.4](https://github.com/GMOD/tabix-js/compare/v1.4.3...v1.4.4) (2020-04-06)
 
