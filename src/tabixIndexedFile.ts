@@ -454,7 +454,7 @@ export default class TabixIndexedFile {
     compressedSize: number,
     opts: Options = {},
   ) {
-    const { buffer } = await this.filehandle.read(
+    const { bytesRead, buffer } = await this.filehandle.read(
       Buffer.alloc(compressedSize),
       0,
       compressedSize,
@@ -462,7 +462,7 @@ export default class TabixIndexedFile {
       opts,
     )
 
-    return buffer
+    return bytesRead < compressedSize ? buffer.slice(0, bytesRead) : buffer
   }
 
   /**
