@@ -1,3 +1,8 @@
+<a name="1.4.6"></a>
+## [1.4.6](https://github.com/GMOD/tabix-js/compare/v1.4.5...v1.4.6) (2020-04-30)
+
+
+
 - Fix regression with browser only version of tabix-js not being able to parse results in 1.4.5
 
 <a name="1.4.5"></a>
