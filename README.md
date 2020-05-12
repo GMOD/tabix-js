@@ -36,6 +36,14 @@ const remoteTbiIndexed = new TabixIndexedFile({
   tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi') // can also be csiFilehandle
 })
 
+
+// for node.js you have to manually supply a fetch function e.g. node-fetch to RemoteFile
+const fetch = require('node-fetch')
+const remoteTbiIndexedForNodeJs = new TabixIndexedFile({
+  filehandle: new RemoteFile('http://yourhost/file.vcf.gz', {fetch}),
+  tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi', {fetch}) // can also be csiFilehandle
+})
+
 // iterate over lines in the specified region
 const lines = []
 await tbiIndexed.getLines('ctgA',200,300, (line, fileOffset) => lines.push(line))
