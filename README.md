@@ -2,7 +2,6 @@
 
 [![NPM version](https://img.shields.io/npm/v/@gmod/tabix.svg?style=flat-square)](https://npmjs.org/package/@gmod/tabix)
 [![Build Status](https://img.shields.io/travis/GMOD/tabix-js/master.svg?style=flat-square)](https://travis-ci.org/GMOD/tabix-js)
-[![Greenkeeper badge](https://badges.greenkeeper.io/GMOD/tabix-js.svg)](https://greenkeeper.io/)
 [![codecov](https://codecov.io/gh/GMOD/tabix-js/branch/master/graph/badge.svg)](https://codecov.io/gh/GMOD/tabix-js)
 
 
