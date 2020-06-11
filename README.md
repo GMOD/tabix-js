@@ -14,8 +14,6 @@ Read Tabix-indexed files using either .tbi or .csi indexes.
 
 ## Usage
 
-The basic usage
-
 
 ### Importing the module
 
