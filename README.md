@@ -85,7 +85,7 @@ const remoteTbiIndexedForNodeJs = new TabixIndexedFile({
 ```
 
 
-### `getLines`
+### getLines
 
 
 The basic function this module provides is just called `getLines` and it returns text contents from the tabix file (it unzips the bgzipped data) and supplies it to a callback that you provide one line at a time.
@@ -126,14 +126,18 @@ Notes about the returned values of `getLines`:
 - commented (meta) lines are skipped.
 - line strings do not include any trailing whitespace characters.
 - the callback is also called with a `fileOffset` that can be used to uniquely identify lines based on their virtual file offset where the line is found in the file
+- if getLines is called with an undefined `end` parameter it gets all lines from start going to the end of the contig e.g.
+
+```
+const lines = []
+await tbiIndexed.getLines('ctgA', 0, undefined, line=>lines.push(line))`
+console.log(lines)
+```
 
 
 
-### Other methods provided by this module
 
-
-
-#### `lineCount`
+### lineCount
 
 
 ```
@@ -146,7 +150,7 @@ const numLines = await tbiIndexed.lineCount('ctgA')
 ```
 
 
-#### `getHeader`
+### getHeader
 
 ```
 // get the "header text" string from the file, which is the first contiguous
@@ -155,27 +159,13 @@ const headerText = await tbiIndexed.getHeader()
 // or const headerText = await tbiIndexed.getHeader({ signal: aborter.signal })
 ```
 
-#### `getHeaderBuffer`
+#### getHeaderBuffer
 
 ```
 // or if you want a nodejs Buffer object instead, there is getHeaderBuffer()
 const headerBuffer = await tbiIndexed.getHeaderBuffer()
 // or const headerBuffer = await tbiIndexed.getHeaderBuffer({ signal: aborter.signal })
 ```
-
-
-#### Special invocation of getLines
-
-
-You may also use getLines with an undefined `end` parameter to get all lines from the start going to the end of the contig
-
-```
-const lines = []
-await tbiIndexed.getLines('ctgA', 0, undefined, line=>lines.push(line))`
-console.log(lines)
-```
-
-This would fetch all lines from ctgA
 
 
 ## Academic Use
