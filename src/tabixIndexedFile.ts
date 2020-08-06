@@ -18,7 +18,6 @@ function timeout(time: number) {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
-  private chunkSizeLimit: number
   private renameRefSeq: (n: string) => string
   private yieldLimit: number
   private chunkCache: any
@@ -30,7 +29,6 @@ export default class TabixIndexedFile {
    * @param {filehandle} [args.tbiFilehandle]
    * @param {string} [args.csiPath]
    * @param {filehandle} [args.csiFilehandle]
-   * @param {number} [args.chunkSizeLimit] maximum number of bytes to fetch in a single `getLines` call.
    * default 2MiB
    * @param {number} [args.yieldLimit] maximum number of lines to parse without yielding.
    * this avoids having a large read prevent any other work getting done on the thread.  default 300 lines.
@@ -47,7 +45,6 @@ export default class TabixIndexedFile {
     tbiFilehandle,
     csiPath,
     csiFilehandle,
-    chunkSizeLimit = 2000000,
     yieldLimit = 300,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
@@ -58,7 +55,6 @@ export default class TabixIndexedFile {
     tbiFilehandle?: GenericFilehandle
     csiPath?: string
     csiFilehandle?: GenericFilehandle
-    chunkSizeLimit?: number
     yieldLimit?: number
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
@@ -98,7 +94,6 @@ export default class TabixIndexedFile {
       )
     }
 
-    this.chunkSizeLimit = chunkSizeLimit
     this.yieldLimit = yieldLimit
     this.renameRefSeq = renameRefSeqs
     this.chunkCache = new AbortablePromiseCache({
@@ -157,17 +152,6 @@ export default class TabixIndexedFile {
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
 
-    // check the chunks for any that are over the size limit.  if
-    // any are, don't fetch any of them
-    for (let i = 0; i < chunks.length; i += 1) {
-      const size = chunks[i].fetchedSize()
-      if (size > this.chunkSizeLimit) {
-        throw new Error(
-          `Too much data. Chunk size ${size.toLocaleString()} bytes exceeds chunkSizeLimit of ${this.chunkSizeLimit.toLocaleString()}.`,
-        )
-      }
-    }
-
     // now go through each chunk and parse and filter the lines out of it
     let linesSinceLastYield = 0
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
@@ -178,7 +162,7 @@ export default class TabixIndexedFile {
         c,
         signal,
       )
-      const lines = buffer.toString().split('\n')
+      const lines = buffer.toString('ascii').split('\n')
       lines.pop()
       checkAbortSignal(signal)
       let blockStart = c.minv.dataPosition
