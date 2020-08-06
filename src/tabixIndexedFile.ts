@@ -162,8 +162,11 @@ export default class TabixIndexedFile {
         c,
         signal,
       )
-      const decoder = new TextDecoder('utf-8')
-      const lines = decoder.decode(buffer.buffer).split('\n')
+
+      const lines = TextDecoder
+        ? new TextDecoder('utf-8').decode(buffer.buffer).split('\n')
+        : buffer.toString()
+
       lines.pop()
       checkAbortSignal(signal)
       let blockStart = c.minv.dataPosition
