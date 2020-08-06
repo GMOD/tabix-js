@@ -153,7 +153,7 @@ export default class TabixIndexedFile {
     checkAbortSignal(signal)
 
     // now go through each chunk and parse and filter the lines out of it
-    const linesSinceLastYield = 0
+    let last = performance.now()
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
@@ -219,12 +219,10 @@ export default class TabixIndexedFile {
         blockStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
-        // linesSinceLastYield += 1
-        // if (linesSinceLastYield >= this.yieldLimit) {
-        //   await timeout(1)
-        //   checkAbortSignal(signal)
-        //   linesSinceLastYield = 0
-        // }
+        if (last - performance.now() > 10000) {
+          last = performance.now()
+          await timeout(1)
+        }
       }
     }
   }
