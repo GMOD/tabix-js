@@ -5,10 +5,7 @@ import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 
-const perf =
-  typeof performance !== 'undefined'
-    ? performance
-    : require('perf_hooks').performance
+const perf = typeof performance !== 'undefined' ? performance : Date
 
 import Chunk from './chunk'
 import TBI from './tbi'
