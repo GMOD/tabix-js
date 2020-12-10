@@ -3,7 +3,7 @@ import { unzip } from '@gmod/bgzf-filehandle'
 
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
-import { longToNumber } from './util'
+import { longToNumber, optimizeChunks } from './util'
 
 import IndexFile, { Options } from './indexFile'
 
@@ -199,81 +199,40 @@ export default class CSI extends IndexFile {
 
   async blocksForRange(
     refName: string,
-    beg: number,
-    end: number,
+    min: number,
+    max: number,
     opts: Options = {},
   ) {
-    if (beg < 0) beg = 0
+    if (min < 0) {
+      min = 0
+    }
 
     const indexData = await this.parse(opts)
-    if (!indexData) return []
+    if (!indexData) {
+      return []
+    }
     const refId = indexData.refNameToId[refName]
-    const indexes = indexData.indices[refId]
-    if (!indexes) return []
-
-    const { binIndex } = indexes
-
-    const bins = this.reg2bins(beg, end)
-
-    let l
-    let numOffsets = 0
-    for (let i = 0; i < bins.length; i += 1) {
-      if (binIndex[bins[i]]) numOffsets += binIndex[bins[i]].length
+    const ba = indexData.indices[refId]
+    if (!ba) {
+      return []
     }
 
-    if (numOffsets === 0) return []
+    // const { linearIndex, binIndex } = indexes
 
-    let off = []
-    numOffsets = 0
-    for (let i = 0; i < bins.length; i += 1) {
-      const chunks = binIndex[bins[i]]
-      if (chunks)
-        for (let j = 0; j < chunks.length; j += 1) {
-          off[numOffsets] = new Chunk(
-            chunks[j].minv,
-            chunks[j].maxv,
-            chunks[j].bin,
-          )
-          numOffsets += 1
+    const overlappingBins = this.reg2bins(min, max) // List of bin #s that overlap min, max
+    const chunks: Chunk[] = []
+
+    // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
+    overlappingBins.forEach(function(bin) {
+      if (ba.binIndex[bin]) {
+        const binChunks = ba.binIndex[bin]
+        for (let c = 0; c < binChunks.length; ++c) {
+          chunks.push(new Chunk(binChunks[c].minv, binChunks[c].maxv, bin))
         }
-    }
-
-    if (!off.length) return []
-
-    off = off.sort((a, b) => a.compareTo(b))
-
-    // resolve completely contained adjacent blocks
-    l = 0
-    for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.compareTo(off[i].maxv) < 0) {
-        l += 1
-        off[l].minv = off[i].minv
-        off[l].maxv = off[i].maxv
       }
-    }
-    numOffsets = l + 1
+    })
 
-    // resolve overlaps between adjacent blocks; this may happen due to the merge in indexing
-    for (let i = 1; i < numOffsets; i += 1) {
-      if (off[i - 1].maxv.compareTo(off[i].minv) >= 0) {
-        off[i - 1].maxv = off[i].minv
-      }
-    }
-
-    // merge adjacent blocks
-    l = 0
-    for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
-        off[l].maxv = off[i].maxv
-      else {
-        l += 1
-        off[l].minv = off[i].minv
-        off[l].maxv = off[i].maxv
-      }
-    }
-    numOffsets = l + 1
-
-    return off.slice(0, numOffsets)
+    return optimizeChunks(chunks, new VirtualOffset(0, 0))
   }
 
   /**

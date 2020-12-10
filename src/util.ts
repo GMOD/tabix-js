@@ -1,3 +1,6 @@
+import Chunk from './chunk'
+import VirtualOffset from './virtualOffset'
+
 export function longToNumber(long: Long) {
   if (
     long.greaterThan(Number.MAX_SAFE_INTEGER) ||
@@ -47,4 +50,52 @@ export function checkAbortSignal(signal?: AbortSignal) {
 export async function abortBreakPoint(signal?: AbortSignal) {
   await Promise.resolve()
   checkAbortSignal(signal)
+}
+
+export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
+  return (
+    chunk2.minv.blockPosition - chunk1.maxv.blockPosition < 65000 &&
+    chunk2.maxv.blockPosition - chunk1.minv.blockPosition < 5000000
+  )
+}
+
+export function optimizeChunks(chunks: Chunk[], lowest: VirtualOffset) {
+  const mergedChunks: Chunk[] = []
+  let lastChunk: Chunk | null = null
+
+  if (chunks.length === 0) {
+    return chunks
+  }
+
+  chunks.sort(function(c0, c1) {
+    const dif = c0.minv.blockPosition - c1.minv.blockPosition
+    if (dif !== 0) {
+      return dif
+    } else {
+      return c0.minv.dataPosition - c1.minv.dataPosition
+    }
+  })
+
+  chunks.forEach(chunk => {
+    if (!lowest || chunk.maxv.compareTo(lowest) > 0) {
+      if (lastChunk === null) {
+        mergedChunks.push(chunk)
+        lastChunk = chunk
+      } else {
+        if (canMergeBlocks(lastChunk, chunk)) {
+          if (chunk.maxv.compareTo(lastChunk.maxv) > 0) {
+            lastChunk.maxv = chunk.maxv
+          }
+        } else {
+          mergedChunks.push(chunk)
+          lastChunk = chunk
+        }
+      }
+    }
+    // else {
+    //   console.log(`skipping chunk ${chunk}`)
+    // }
+  })
+
+  return mergedChunks
 }
