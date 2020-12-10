@@ -2,7 +2,7 @@ import Long from 'long'
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
 import { unzip } from '@gmod/bgzf-filehandle'
-import { longToNumber, checkAbortSignal } from './util'
+import { longToNumber, optimizeChunks, checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 
 const TBI_MAGIC = 21578324 // TBI\1
@@ -15,13 +15,14 @@ const TAD_LIDX_SHIFT = 14
 function reg2bins(beg: number, end: number) {
   beg += 1 // < convert to 1-based closed
   end -= 1
-  const list = [0]
-  for (let k = 1 + (beg >> 26); k <= 1 + (end >> 26); k += 1) list.push(k)
-  for (let k = 9 + (beg >> 23); k <= 9 + (end >> 23); k += 1) list.push(k)
-  for (let k = 73 + (beg >> 20); k <= 73 + (end >> 20); k += 1) list.push(k)
-  for (let k = 585 + (beg >> 17); k <= 585 + (end >> 17); k += 1) list.push(k)
-  for (let k = 4681 + (beg >> 14); k <= 4681 + (end >> 14); k += 1) list.push(k)
-  return list
+  return [
+    [0, 0],
+    [1 + (beg >> 26), 1 + (end >> 26)],
+    [9 + (beg >> 23), 9 + (end >> 23)],
+    [73 + (beg >> 20), 73 + (end >> 20)],
+    [585 + (beg >> 17), 585 + (end >> 17)],
+    [4681 + (beg >> 14), 4681 + (end >> 14)],
+  ]
 }
 
 export default class TabixIndex extends IndexFile {
@@ -177,93 +178,66 @@ export default class TabixIndex extends IndexFile {
 
   async blocksForRange(
     refName: string,
-    beg: number,
-    end: number,
+    min: number,
+    max: number,
     opts: Options = {},
   ) {
-    if (beg < 0) beg = 0
+    if (min < 0) {
+      min = 0
+    }
 
     const indexData = await this.parse(opts)
-    if (!indexData) return []
+    if (!indexData) {
+      return []
+    }
     const refId = indexData.refNameToId[refName]
-    const indexes = indexData.indices[refId]
-    if (!indexes) return []
+    const ba = indexData.indices[refId]
+    if (!ba) {
+      return []
+    }
 
-    const { linearIndex, binIndex } = indexes
-
-    const bins = reg2bins(beg, end)
-
-    const minOffset = linearIndex.length
-      ? linearIndex[
-          beg >> TAD_LIDX_SHIFT >= linearIndex.length
-            ? linearIndex.length - 1
-            : beg >> TAD_LIDX_SHIFT
+    const minOffset = ba.linearIndex.length
+      ? ba.linearIndex[
+          min >> TAD_LIDX_SHIFT >= ba.linearIndex.length
+            ? ba.linearIndex.length - 1
+            : min >> TAD_LIDX_SHIFT
         ]
       : new VirtualOffset(0, 0)
     if (!minOffset) {
       console.warn('querying outside of possible tabix range')
-      return []
     }
 
-    let l
-    let numOffsets = 0
-    for (let i = 0; i < bins.length; i += 1) {
-      if (binIndex[bins[i]]) numOffsets += binIndex[bins[i]].length
-    }
+    // const { linearIndex, binIndex } = indexes
 
-    if (numOffsets === 0) return []
+    const overlappingBins = reg2bins(min, max) // List of bin #s that overlap min, max
+    const chunks: Chunk[] = []
 
-    let off = []
-    numOffsets = 0
-    for (let i = 0; i < bins.length; i += 1) {
-      const chunks = binIndex[bins[i]]
-      if (chunks)
-        for (let j = 0; j < chunks.length; j += 1)
-          if (minOffset.compareTo(chunks[j].maxv) < 0) {
-            off[numOffsets] = new Chunk(
-              chunks[j].minv,
-              chunks[j].maxv,
-              chunks[j].bin,
-            )
-            numOffsets += 1
+    // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
+    for (const [start, end] of overlappingBins) {
+      for (let bin = start; bin <= end; bin++) {
+        if (ba.binIndex[bin]) {
+          const binChunks = ba.binIndex[bin]
+          for (let c = 0; c < binChunks.length; ++c) {
+            chunks.push(new Chunk(binChunks[c].minv, binChunks[c].maxv, bin))
           }
-    }
-
-    if (!off.length) return []
-
-    off = off.sort((a, b) => a.compareTo(b))
-
-    // resolve completely contained adjacent blocks
-    l = 0
-    for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.compareTo(off[i].maxv) < 0) {
-        l += 1
-        off[l].minv = off[i].minv
-        off[l].maxv = off[i].maxv
-      }
-    }
-    numOffsets = l + 1
-
-    // resolve overlaps between adjacent blocks; this may happen due to the merge in indexing
-    for (let i = 1; i < numOffsets; i += 1) {
-      if (off[i - 1].maxv.compareTo(off[i].minv) >= 0) {
-        off[i - 1].maxv = off[i].minv
+        }
       }
     }
 
-    // merge adjacent blocks
-    l = 0
-    for (let i = 1; i < numOffsets; i += 1) {
-      if (off[l].maxv.blockPosition === off[i].minv.blockPosition)
-        off[l].maxv = off[i].maxv
-      else {
-        l += 1
-        off[l].minv = off[i].minv
-        off[l].maxv = off[i].maxv
+    // Use the linear index to find minimum file position of chunks that could contain alignments in the region
+    const nintv = ba.linearIndex.length
+    let lowest = null
+    const minLin = Math.min(min >> 14, nintv - 1)
+    const maxLin = Math.min(max >> 14, nintv - 1)
+    for (let i = minLin; i <= maxLin; ++i) {
+      const vp = ba.linearIndex[i]
+      if (vp) {
+        if (!lowest || vp.compareTo(lowest) < 0) {
+          lowest = vp
+        }
       }
     }
-    numOffsets = l + 1
 
-    return off.slice(0, numOffsets)
+    return optimizeChunks(chunks, lowest)
   }
 }
