@@ -216,7 +216,7 @@ export default class TabixIndexedFile {
         blockStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
-        if (last - perf.now() > 10000) {
+        if (last - perf.now() > 500) {
           last = perf.now()
           await timeout(1)
         }
