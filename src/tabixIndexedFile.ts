@@ -218,6 +218,7 @@ export default class TabixIndexedFile {
         // yield if we have emitted beyond the yield limit
         if (last - perf.now() > 500) {
           last = perf.now()
+          checkAbortSignal(signal)
           await timeout(1)
         }
       }
