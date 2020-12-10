@@ -12,16 +12,17 @@ const TAD_LIDX_SHIFT = 14
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
  * @returns {Array[number]}
  */
-function reg2bins(beg: number, end: number): number[] {
+function reg2bins(beg: number, end: number) {
   beg += 1 // < convert to 1-based closed
   end -= 1
-  const list = [0]
-  for (let k = 1 + (beg >> 26); k <= 1 + (end >> 26); k += 1) list.push(k)
-  for (let k = 9 + (beg >> 23); k <= 9 + (end >> 23); k += 1) list.push(k)
-  for (let k = 73 + (beg >> 20); k <= 73 + (end >> 20); k += 1) list.push(k)
-  for (let k = 585 + (beg >> 17); k <= 585 + (end >> 17); k += 1) list.push(k)
-  for (let k = 4681 + (beg >> 14); k <= 4681 + (end >> 14); k += 1) list.push(k)
-  return list
+  return [
+    [0, 0],
+    [1 + (beg >> 26), 1 + (end >> 26)],
+    [9 + (beg >> 23), 9 + (end >> 23)],
+    [73 + (beg >> 20), 73 + (end >> 20)],
+    [585 + (beg >> 17), 585 + (end >> 17)],
+    [4681 + (beg >> 14), 4681 + (end >> 14)],
+  ]
 }
 
 export default class TabixIndex extends IndexFile {
@@ -212,14 +213,16 @@ export default class TabixIndex extends IndexFile {
     const chunks: Chunk[] = []
 
     // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
-    overlappingBins.forEach(function(bin) {
-      if (ba.binIndex[bin]) {
-        const binChunks = ba.binIndex[bin]
-        for (let c = 0; c < binChunks.length; ++c) {
-          chunks.push(new Chunk(binChunks[c].minv, binChunks[c].maxv, bin))
+    for (const [start, end] of overlappingBins) {
+      for (let bin = start; bin <= end; bin++) {
+        if (ba.binIndex[bin]) {
+          const binChunks = ba.binIndex[bin]
+          for (let c = 0; c < binChunks.length; ++c) {
+            chunks.push(new Chunk(binChunks[c].minv, binChunks[c].maxv, bin))
+          }
         }
       }
-    })
+    }
 
     // Use the linear index to find minimum file position of chunks that could contain alignments in the region
     const nintv = ba.linearIndex.length
