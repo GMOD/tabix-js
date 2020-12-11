@@ -5,8 +5,6 @@ import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 
-const perf = typeof performance !== 'undefined' ? performance : Date
-
 import Chunk from './chunk'
 import TBI from './tbi'
 import CSI from './csi'
@@ -19,6 +17,7 @@ function timeout(time: number) {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
+  private chunkSizeLimit: number
   private renameRefSeq: (n: string) => string
   private chunkCache: any
   /**
@@ -44,6 +43,7 @@ export default class TabixIndexedFile {
     tbiFilehandle,
     csiPath,
     csiFilehandle,
+    chunkSizeLimit = 50000000,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
@@ -53,6 +53,7 @@ export default class TabixIndexedFile {
     tbiFilehandle?: GenericFilehandle
     csiPath?: string
     csiFilehandle?: GenericFilehandle
+    chunkSizeLimit?: number
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
@@ -91,6 +92,7 @@ export default class TabixIndexedFile {
       )
     }
 
+    this.chunkSizeLimit = chunkSizeLimit
     this.renameRefSeq = renameRefSeqs
     this.chunkCache = new AbortablePromiseCache({
       cache: new LRU({
@@ -148,8 +150,19 @@ export default class TabixIndexedFile {
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
 
+    // check the chunks for any that are over the size limit.  if
+    // any are, don't fetch any of them
+    for (let i = 0; i < chunks.length; i += 1) {
+      const size = chunks[i].fetchedSize()
+      if (size > this.chunkSizeLimit) {
+        throw new Error(
+          `Too much data. Chunk size ${size.toLocaleString()} bytes exceeds chunkSizeLimit of ${this.chunkSizeLimit.toLocaleString()}.`,
+        )
+      }
+    }
+
     // now go through each chunk and parse and filter the lines out of it
-    let last = perf.now()
+    let last = Date.now()
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
@@ -216,8 +229,8 @@ export default class TabixIndexedFile {
         blockStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
-        if (last - perf.now() > 500) {
-          last = perf.now()
+        if (last - Date.now() > 500) {
+          last = Date.now()
           checkAbortSignal(signal)
           await timeout(1)
         }
