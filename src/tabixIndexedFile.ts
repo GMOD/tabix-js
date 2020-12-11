@@ -28,8 +28,7 @@ export default class TabixIndexedFile {
    * @param {filehandle} [args.tbiFilehandle]
    * @param {string} [args.csiPath]
    * @param {filehandle} [args.csiFilehandle]
-   * default 2MiB
-   * this avoids having a large read prevent any other work getting done on the thread.  default 300 lines.
+   * @param {chunkSizeLimit} default 50MiB
    * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
    * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
    * not altered, just the names of the reference sequences that are used for querying.
