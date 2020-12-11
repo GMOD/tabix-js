@@ -1,3 +1,8 @@
+<a name="1.5.0"></a>
+# [1.5.0](https://github.com/GMOD/tabix-js/compare/v1.4.6...v1.5.0) (2020-12-11)
+
+
+
 - Use TextDecoder for chunk decoding for small speedup
 - Use canMergeChunks logic to avoid too large of chunks being used
 - Use time based yield instead of number-of-line based yield
