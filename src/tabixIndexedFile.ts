@@ -2,9 +2,9 @@ import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
-
 import { checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
+
 import Chunk from './chunk'
 import TBI from './tbi'
 import CSI from './csi'
@@ -14,13 +14,11 @@ function timeout(time: number) {
     setTimeout(resolve, time)
   })
 }
-
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   private chunkSizeLimit: number
   private renameRefSeq: (n: string) => string
-  private yieldLimit: number
   private chunkCache: any
   /**
    * @param {object} args
@@ -30,10 +28,7 @@ export default class TabixIndexedFile {
    * @param {filehandle} [args.tbiFilehandle]
    * @param {string} [args.csiPath]
    * @param {filehandle} [args.csiFilehandle]
-   * @param {number} [args.chunkSizeLimit] maximum number of bytes to fetch in a single `getLines` call.
-   * default 2MiB
-   * @param {number} [args.yieldLimit] maximum number of lines to parse without yielding.
-   * this avoids having a large read prevent any other work getting done on the thread.  default 300 lines.
+   * @param {chunkSizeLimit} default 50MiB
    * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
    * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
    * not altered, just the names of the reference sequences that are used for querying.
@@ -47,8 +42,7 @@ export default class TabixIndexedFile {
     tbiFilehandle,
     csiPath,
     csiFilehandle,
-    chunkSizeLimit = 2000000,
-    yieldLimit = 300,
+    chunkSizeLimit = 50000000,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
@@ -59,7 +53,6 @@ export default class TabixIndexedFile {
     csiPath?: string
     csiFilehandle?: GenericFilehandle
     chunkSizeLimit?: number
-    yieldLimit?: number
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
@@ -99,7 +92,6 @@ export default class TabixIndexedFile {
     }
 
     this.chunkSizeLimit = chunkSizeLimit
-    this.yieldLimit = yieldLimit
     this.renameRefSeq = renameRefSeqs
     this.chunkCache = new AbortablePromiseCache({
       cache: new LRU({
@@ -169,7 +161,7 @@ export default class TabixIndexedFile {
     }
 
     // now go through each chunk and parse and filter the lines out of it
-    let linesSinceLastYield = 0
+    let last = Date.now()
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
       let previousStartCoordinate: number | undefined
       const c = chunks[chunkNum]
@@ -178,8 +170,13 @@ export default class TabixIndexedFile {
         c,
         signal,
       )
-      const lines = buffer.toString().split('\n')
+
+      const lines = (typeof TextDecoder !== 'undefined'
+        ? new TextDecoder('utf-8').decode(buffer)
+        : buffer.toString()
+      ).split('\n')
       lines.pop()
+
       checkAbortSignal(signal)
       let blockStart = c.minv.dataPosition
       let pos
@@ -231,11 +228,10 @@ export default class TabixIndexedFile {
         blockStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
-        linesSinceLastYield += 1
-        if (linesSinceLastYield >= this.yieldLimit) {
-          await timeout(1)
+        if (last - Date.now() > 500) {
+          last = Date.now()
           checkAbortSignal(signal)
-          linesSinceLastYield = 0
+          await timeout(1)
         }
       }
     }
