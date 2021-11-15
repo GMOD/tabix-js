@@ -30,12 +30,9 @@ export default abstract class IndexFile {
     this.renameRefSeq = renameRefSeqs
   }
 
-  public abstract async lineCount(
-    refName: string,
-    args: Options,
-  ): Promise<number>
+  public abstract lineCount(refName: string, args: Options): Promise<number>
 
-  protected abstract async _parse(
+  protected abstract _parse(
     opts: Options,
   ): Promise<{
     refNameToId: { [key: string]: number }
@@ -48,7 +45,7 @@ export default abstract class IndexFile {
     return rest
   }
 
-  public abstract async blocksForRange(
+  public abstract blocksForRange(
     refName: string,
     start: number,
     end: number,
@@ -69,11 +66,12 @@ export default abstract class IndexFile {
   }
 
   async parse(opts: Options = {}) {
-    if (!this._parseCache)
+    if (!this._parseCache) {
       this._parseCache = new AbortablePromiseCache({
         cache: new QuickLRU({ maxSize: 1 }),
         fill: () => this._parse(opts),
       })
+    }
     return this._parseCache.get('index', null, opts.signal)
   }
 

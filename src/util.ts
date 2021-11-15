@@ -26,14 +26,16 @@ class AbortError extends Error {
  * @returns nothing
  */
 export function checkAbortSignal(signal?: AbortSignal) {
-  if (!signal) return
+  if (!signal) {
+    return
+  }
 
   if (signal.aborted) {
     // console.log('bam aborted!')
-    if (typeof DOMException !== 'undefined')
+    if (typeof DOMException !== 'undefined') {
       // eslint-disable-next-line  no-undef
       throw new DOMException('aborted', 'AbortError')
-    else {
+    } else {
       const e = new AbortError('aborted')
       e.code = 'ERR_ABORTED'
       throw e

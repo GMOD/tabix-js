@@ -28,12 +28,18 @@ function reg2bins(beg: number, end: number) {
 export default class TabixIndex extends IndexFile {
   async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
-    if (!indexData) return -1
+    if (!indexData) {
+      return -1
+    }
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
-    if (!idx) return -1
+    if (!idx) {
+      return -1
+    }
     const { stats } = indexData.indices[refId]
-    if (stats) return stats.lineCount
+    if (stats) {
+      return stats.lineCount
+    }
     return -1
   }
 
@@ -60,8 +66,9 @@ export default class TabixIndex extends IndexFile {
       2: 'VCF',
     }
     const format = formatOpts[formatFlags & 0xf]
-    if (!format)
+    if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+    }
     const columnNumbers = {
       ref: bytes.readInt32LE(12),
       start: bytes.readInt32LE(16),
