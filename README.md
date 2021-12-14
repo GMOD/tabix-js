@@ -1,8 +1,9 @@
 # @gmod/tabix
 
 [![NPM version](https://img.shields.io/npm/v/@gmod/tabix.svg?style=flat-square)](https://npmjs.org/package/@gmod/tabix)
-[![Build Status](https://img.shields.io/travis/GMOD/tabix-js/master.svg?style=flat-square)](https://travis-ci.org/GMOD/tabix-js)
-[![codecov](https://codecov.io/gh/GMOD/tabix-js/branch/master/graph/badge.svg)](https://codecov.io/gh/GMOD/tabix-js)
+[![Coverage Status](https://img.shields.io/codecov/c/github/GMOD/tabix-js/master.svg?style=flat-square)](https://codecov.io/gh/GMOD/tabix-js/branch/master)
+[![Build Status](https://img.shields.io/github/workflow/status/GMOD/tabix-js/Push/master?logo=github&style=flat-query)](https://github.com/GMOD/tabix-js/actions?query=branch%3Amaster+workflow%3APush+)
+
 
 
 Read Tabix-indexed files using either .tbi or .csi indexes.
