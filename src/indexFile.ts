@@ -12,7 +12,7 @@ export interface Options {
 
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
-  public renameRefSeq: Function
+  public renameRefSeq: (arg0: string) => string
   private _parseCache: any
 
   /**
@@ -70,7 +70,7 @@ export default abstract class IndexFile {
         fill: () => this._parse(opts),
       })
     }
-    return this._parseCache.get('index', null, opts.signal)
+    return this._parseCache.get('index', null, undefined)
   }
 
   async hasRefSeq(seqId: number, opts: Options = {}) {

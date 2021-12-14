@@ -129,7 +129,7 @@ export default class TabixIndexedFile {
   ) {
     let signal: AbortSignal | undefined
     let options: Options = {}
-    let callback: Function
+    let callback: (line: string, lineOffset: number) => void
     if (typeof opts === 'undefined') {
       throw new TypeError('line callback must be provided')
     }

@@ -1,6 +1,5 @@
 //@ts-nocheck
-//eslint-disable-next-line @typescript-eslint/camelcase
-const fs = typeof __webpack_require__ !== 'function' ? require('fs') : null // eslint-disable-line camelcase
+const fs = typeof __webpack_require__ !== 'function' ? require('fs') : null
 
 const REWRITE_EXPECTED_DATA =
   typeof process !== 'undefined' &&

@@ -10,7 +10,6 @@ const TAD_LIDX_SHIFT = 14
 
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
- * @returns {Array[number]}
  */
 function reg2bins(beg: number, end: number) {
   beg += 1 // < convert to 1-based closed
@@ -231,7 +230,8 @@ export default class TabixIndex extends IndexFile {
       }
     }
 
-    // Use the linear index to find minimum file position of chunks that could contain alignments in the region
+    // Use the linear index to find minimum file position of chunks that could
+    // contain alignments in the region
     const nintv = ba.linearIndex.length
     let lowest = null
     const minLin = Math.min(min >> 14, nintv - 1)

@@ -248,7 +248,6 @@ export default class CSI extends IndexFile {
 
   /**
    * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
-   * @returns {Array[number]}
    */
   reg2bins(beg: number, end: number) {
     beg -= 1 // < convert to 1-based closed
