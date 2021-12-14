@@ -9,6 +9,14 @@ import Chunk from './chunk'
 import TBI from './tbi'
 import CSI from './csi'
 
+type GetLinesCallback = (line: string, fileOffset: number) => Promise<void>
+
+interface GetLinesOpts {
+  [key: string]: unknown
+  signal?: AbortSignal
+  lineCallback: GetLinesCallback
+}
+
 function timeout(time: number) {
   return new Promise(resolve => {
     setTimeout(resolve, time)
@@ -56,31 +64,35 @@ export default class TabixIndexedFile {
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
-    if (filehandle) this.filehandle = filehandle
-    else if (path) this.filehandle = new LocalFile(path)
-    else throw new TypeError('must provide either filehandle or path')
+    if (filehandle) {
+      this.filehandle = filehandle
+    } else if (path) {
+      this.filehandle = new LocalFile(path)
+    } else {
+      throw new TypeError('must provide either filehandle or path')
+    }
 
-    if (tbiFilehandle)
+    if (tbiFilehandle) {
       this.index = new TBI({
         filehandle: tbiFilehandle,
         renameRefSeqs,
       })
-    else if (csiFilehandle)
+    } else if (csiFilehandle) {
       this.index = new CSI({
         filehandle: csiFilehandle,
         renameRefSeqs,
       })
-    else if (tbiPath)
+    } else if (tbiPath) {
       this.index = new TBI({
         filehandle: new LocalFile(tbiPath),
         renameRefSeqs,
       })
-    else if (csiPath)
+    } else if (csiPath) {
       this.index = new CSI({
         filehandle: new LocalFile(csiPath),
         renameRefSeqs,
       })
-    else if (path) {
+    } else if (path) {
       this.index = new TBI({
         filehandle: new LocalFile(`${path}.tbi`),
         renameRefSeqs,
@@ -113,15 +125,17 @@ export default class TabixIndexedFile {
     refName: string,
     start: number,
     end: number,
-    opts: { signal?: AbortSignal; lineCallback: Function } | Function,
+    opts: GetLinesOpts | GetLinesCallback,
   ) {
     let signal: AbortSignal | undefined
     let options: Options = {}
     let callback: Function
-    if (typeof opts === 'undefined')
+    if (typeof opts === 'undefined') {
       throw new TypeError('line callback must be provided')
-    if (typeof opts === 'function') callback = opts
-    else {
+    }
+    if (typeof opts === 'function') {
+      callback = opts
+    } else {
       options = opts
       callback = opts.lineCallback
     }
@@ -140,11 +154,14 @@ export default class TabixIndexedFile {
     if (!end) {
       end = metadata.maxRefLength
     }
-    if (!(start <= end))
+    if (!(start <= end)) {
       throw new TypeError(
         'invalid start and end coordinates. start must be less than or equal to end',
       )
-    if (start === end) return
+    }
+    if (start === end) {
+      return
+    }
 
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
@@ -184,7 +201,7 @@ export default class TabixIndexedFile {
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]
 
-        for (pos = 0; blockStart >= dpositions[pos]; pos += 1);
+        for (pos = 0; blockStart >= dpositions[pos]; pos += 1) {}
 
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
@@ -200,10 +217,11 @@ export default class TabixIndexedFile {
           previousStartCoordinate !== undefined &&
           startCoordinate !== undefined &&
           previousStartCoordinate > startCoordinate
-        )
+        ) {
           throw new Error(
             `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
           )
+        }
         previousStartCoordinate = startCoordinate
 
         if (overlaps) {
@@ -267,6 +285,7 @@ export default class TabixIndexedFile {
     } catch (e) {
       console.error(e)
       throw new Error(
+        //@ts-ignore
         `error decompressing block ${e.code} at 0 (length ${maxFetch}) ${e}`,
       )
     }
@@ -278,8 +297,12 @@ export default class TabixIndexedFile {
       const newlineByte = '\n'.charCodeAt(0)
       const metaByte = metaChar.charCodeAt(0)
       for (let i = 0; i < bytes.length; i += 1) {
-        if (i === lastNewline + 1 && bytes[i] !== metaByte) break
-        if (bytes[i] === newlineByte) lastNewline = i
+        if (i === lastNewline + 1 && bytes[i] !== metaByte) {
+          break
+        }
+        if (bytes[i] === newlineByte) {
+          lastNewline = i
+        }
       }
       bytes = bytes.slice(0, lastNewline + 1)
     }
@@ -345,10 +368,18 @@ export default class TabixIndexedFile {
 
     // check ref/start/end using column metadata from index
     let { ref, start, end } = columnNumbers
-    if (!ref) ref = 0
-    if (!start) start = 0
-    if (!end) end = 0
-    if (format === 'VCF') end = 8
+    if (!ref) {
+      ref = 0
+    }
+    if (!start) {
+      start = 0
+    }
+    if (!end) {
+      end = 0
+    }
+    if (format === 'VCF') {
+      end = 8
+    }
     const maxColumn = Math.max(ref, start, end)
 
     // this code is kind of complex, but it is fairly fast.
@@ -424,7 +455,9 @@ export default class TabixIndexedFile {
       for (let j = 0; j < info.length; j += 1) {
         if (prevChar === ';' && info.slice(j, j + 4) === 'END=') {
           let valueEnd = info.indexOf(';', j)
-          if (valueEnd === -1) valueEnd = info.length
+          if (valueEnd === -1) {
+            valueEnd = info.length
+          }
           endCoordinate = parseInt(info.slice(j + 4, valueEnd), 10)
           break
         }

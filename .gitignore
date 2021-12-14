@@ -6,3 +6,4 @@ coverage/
 *.uncompressed
 .eslintcache
 *.swp
+esm

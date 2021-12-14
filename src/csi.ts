@@ -29,12 +29,18 @@ export default class CSI extends IndexFile {
   }
   async lineCount(refName: string, opts: Options = {}): Promise<number> {
     const indexData = await this.parse(opts)
-    if (!indexData) return -1
+    if (!indexData) {
+      return -1
+    }
     const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
-    if (!idx) return -1
+    if (!idx) {
+      return -1
+    }
     const { stats } = indexData.indices[refId]
-    if (stats) return stats.lineCount
+    if (stats) {
+      return stats.lineCount
+    }
     return -1
   }
   async indexCov() {
@@ -56,8 +62,9 @@ export default class CSI extends IndexFile {
     const format = ({ 0: 'generic', 1: 'SAM', 2: 'VCF' } as {
       [key: number]: string
     })[formatFlags & 0xf]
-    if (!format)
+    if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+    }
     const columnNumbers = {
       ref: bytes.readInt32LE(offset + 4),
       start: bytes.readInt32LE(offset + 8),
@@ -243,8 +250,12 @@ export default class CSI extends IndexFile {
    */
   reg2bins(beg: number, end: number) {
     beg -= 1 // < convert to 1-based closed
-    if (beg < 1) beg = 1
-    if (end > 2 ** 50) end = 2 ** 34 // 17 GiB ought to be enough for anybody
+    if (beg < 1) {
+      beg = 1
+    }
+    if (end > 2 ** 50) {
+      end = 2 ** 34
+    } // 17 GiB ought to be enough for anybody
     end -= 1
     let l = 0
     let t = 0
@@ -253,10 +264,11 @@ export default class CSI extends IndexFile {
     for (; l <= this.depth; s -= 3, t += lshift(1, l * 3), l += 1) {
       const b = t + rshift(beg, s)
       const e = t + rshift(end, s)
-      if (e - b + bins.length > this.maxBinNumber)
+      if (e - b + bins.length > this.maxBinNumber) {
         throw new Error(
           `query ${beg}-${end} is too large for current binning scheme (shift ${this.minShift}, depth ${this.depth}), try a smaller query or a coarser index binning scheme`,
         )
+      }
       bins.push([b, e])
     }
     return bins
