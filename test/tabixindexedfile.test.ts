@@ -1,3 +1,4 @@
+//@ts-nocheck
 import TabixIndexedFile from '../src/tabixIndexedFile'
 import VirtualOffset from '../src/virtualOffset'
 

@@ -156,7 +156,7 @@ export default class TabixIndex extends IndexFile {
   parsePseudoBin(bytes: Buffer, offset: number) {
     const lineCount = longToNumber(
       Long.fromBytesLE(
-        (bytes.slice(offset + 16, offset + 24) as unknown) as number[],
+        bytes.slice(offset + 16, offset + 24) as unknown as number[],
         true,
       ),
     )

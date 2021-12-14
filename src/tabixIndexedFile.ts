@@ -188,9 +188,10 @@ export default class TabixIndexedFile {
         signal,
       )
 
-      const lines = (typeof TextDecoder !== 'undefined'
-        ? new TextDecoder('utf-8').decode(buffer)
-        : buffer.toString()
+      const lines = (
+        typeof TextDecoder !== 'undefined'
+          ? new TextDecoder('utf-8').decode(buffer)
+          : buffer.toString()
       ).split('\n')
       lines.pop()
 

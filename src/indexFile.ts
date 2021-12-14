@@ -32,9 +32,7 @@ export default abstract class IndexFile {
 
   public abstract lineCount(refName: string, args: Options): Promise<number>
 
-  protected abstract _parse(
-    opts: Options,
-  ): Promise<{
+  protected abstract _parse(opts: Options): Promise<{
     refNameToId: { [key: string]: number }
     refIdToName: string[]
   }>
