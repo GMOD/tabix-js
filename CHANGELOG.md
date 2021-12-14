@@ -1,3 +1,5 @@
+- Add esm module with less babelification for smaller bundle size
+
 <a name="1.5.0"></a>
 # [1.5.0](https://github.com/GMOD/tabix-js/compare/v1.4.6...v1.5.0) (2020-12-11)
 
