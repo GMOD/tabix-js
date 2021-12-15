@@ -9,7 +9,7 @@ import Chunk from './chunk'
 import TBI from './tbi'
 import CSI from './csi'
 
-type GetLinesCallback = (line: string, fileOffset: number) => Promise<void>
+type GetLinesCallback = (line: string, fileOffset: number) => void
 
 interface GetLinesOpts {
   [key: string]: unknown
