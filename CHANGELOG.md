@@ -1,3 +1,8 @@
+<a name="1.5.2"></a>
+## [1.5.2](https://github.com/GMOD/tabix-js/compare/v1.5.1...v1.5.2) (2021-12-15)
+
+
+
 - Change typescript signature of lineCallback from Promise<void> to void
 
 <a name="1.5.1"></a>
