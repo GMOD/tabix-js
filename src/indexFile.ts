@@ -76,4 +76,13 @@ export default abstract class IndexFile {
   async hasRefSeq(seqId: number, opts: Options = {}) {
     return !!((await this.parse(opts)).indices[seqId] || {}).binIndex
   }
+
+  async estimateByteSize(
+    seqName: string,
+    start: number,
+    end: number,
+    opts: Options = {},
+  ): Promise<number> {
+    return -1
+  }
 }

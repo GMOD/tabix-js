@@ -516,4 +516,14 @@ export default class TabixIndexedFile {
       throw new Error(`error decompressing chunk ${chunk.toString()} ${e}`)
     }
   }
+
+  async estimateByteSize(
+    seqName: string,
+    start: number,
+    end: number,
+    opts: Options = {},
+  ) {
+    await this.index.parse()
+    return this.index.estimateByteSize(seqName, start, end, opts)
+  }
 }

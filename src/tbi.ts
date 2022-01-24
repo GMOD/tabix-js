@@ -8,6 +8,13 @@ import IndexFile, { Options } from './indexFile'
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
+function roundDown(n: number, multiple: number) {
+  return n - (n % multiple)
+}
+function roundUp(n: number, multiple: number) {
+  return n - (n % multiple) + multiple
+}
+
 /**
  * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
  */
@@ -128,6 +135,7 @@ export default class TabixIndex extends IndexFile {
       const linearCount = bytes.readInt32LE(currOffset)
       currOffset += 4
       const linearIndex = new Array(linearCount)
+      console.log({ linearCount })
       for (let k = 0; k < linearCount; k += 1) {
         linearIndex[k] = fromBytes(bytes, currOffset)
         currOffset += 8
@@ -182,6 +190,53 @@ export default class TabixIndex extends IndexFile {
     return { refNameToId, refIdToName }
   }
 
+  async estimateByteSize(
+    seqName: string,
+    start: number,
+    end: number,
+    options: Options = {},
+  ) {
+    const v = 16384
+    const indexData = await this.parse()
+    const id = indexData.refNameToId[seqName]
+    console.log({ seqName, id })
+    const seqIdx = indexData.indices[indexData.refNameToId[seqName]]
+    if (!seqIdx) {
+      return -1
+    }
+    const { linearIndex = [] } = seqIdx
+    if (!linearIndex.length) {
+      return -1
+    }
+    const e = roundUp(end, v)
+    const s = roundDown(start, v)
+
+    console.log({ linearIndex })
+
+    // console.log(
+    //   linearIndex,
+    //   e / v,
+    //   s / v,
+    //   linearIndex[e / v]?.blockPosition || 0,
+    // )
+    // console.log(linearIndex[s / v]?.blockPosition || 0)
+    let bytes = 0
+
+    console.log(linearIndex[e / v], linearIndex[s / v])
+    // for (let i = Math.floor(s / v), j = 0; i < Math.floor(e / v); i++, j++) {
+    //   const currentBlock = linearIndex[i]?.blockPosition || 0
+    //   const nextBlock = linearIndex[i + 1]?.blockPosition || 0
+    //   console.log({ i, currentBlock, nextBlock, linearIndex })
+    //   bytes += currentBlock - nextBlock
+    // }
+
+    // if (bytes === 0) {
+    //   bytes += linearIndex[0]?.dataPosition
+    // }
+
+    return bytes
+  }
+
   async blocksForRange(
     refName: string,
     min: number,
@@ -212,8 +267,6 @@ export default class TabixIndex extends IndexFile {
     if (!minOffset) {
       console.warn('querying outside of possible tabix range')
     }
-
-    // const { linearIndex, binIndex } = indexes
 
     const overlappingBins = reg2bins(min, max) // List of bin #s that overlap min, max
     const chunks: Chunk[] = []
