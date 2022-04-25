@@ -1,3 +1,7 @@
+## [1.5.3](https://github.com/GMOD/tabix-js/compare/v1.5.2...v1.5.3) (2022-04-25)
+
+
+
 - Fix esm module build to use ESM instead of CJS
 
 <a name="1.5.2"></a>
