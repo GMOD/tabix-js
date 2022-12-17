@@ -24,7 +24,9 @@ import { TabixIndexedFile } from '@gmod/tabix'
 
 ### TabixIndexedFile constructor
 
-Basic usage of TabixIndexedFile under node.js supplies a path and optionally a tbiPath to the constructor. If no tbiPath is supplied, it assumes that the path+'.tbi' is the location of the tbiPath.
+Basic usage of TabixIndexedFile under node.js supplies a path and optionally a
+tbiPath to the constructor. If no tbiPath is supplied, it assumes that the
+path+'.tbi' is the location of the tbiPath.
 
 ```
 // basic usage under node.js provides a file path on the filesystem to bgzipped file
@@ -36,7 +38,10 @@ const tbiIndexed = new TabixIndexedFile({
 
 ```
 
-You can also use CSI indexes. Note also the usage of the renameRefSeqs callback. The renameRefSeqs callback makes it so that you can use file.getLines('1',0,100,...) even when the file itself contains names like 'chr1' (can also do the reverse by customizing the renameRefSeqs callback)
+You can also use CSI indexes. Note also the usage of the renameRefSeqs callback.
+The renameRefSeqs callback makes it so that you can use
+file.getLines('1',0,100,...) even when the file itself contains names like
+'chr1' (can also do the reverse by customizing the renameRefSeqs callback)
 
 ```
 // can also open tabix files that have a .csi index
@@ -50,7 +55,9 @@ const csiIndexed = new TabixIndexedFile({
 
 #### TabixIndexedFile constructor with remote files
 
-The basic usage of fetching remote files is done by supplying a [generic-filehandle](https://github.com/GMOD/generic-filehandle) module RemoteFile filehandle, as seen below
+The basic usage of fetching remote files is done by supplying a
+[generic-filehandle](https://github.com/GMOD/generic-filehandle) module
+RemoteFile filehandle, as seen below
 
 ```
 // use a remote file or other filehandle, note RemoteFile comes from https://github.com/GMOD/generic-filehandle
@@ -61,7 +68,9 @@ const remoteTbiIndexed = new TabixIndexedFile({
 })
 ```
 
-This works in both the browser and in node.js, but note that in node.js you have to also supply a custom fetch function to the RemoteFile constructor e.g. like this
+This works in both the browser and in node.js, but note that in node.js you have
+to also supply a custom fetch function to the RemoteFile constructor e.g. like
+this
 
 ```
 // for node.js you have to manually supply a fetch function e.g. node-fetch to RemoteFile
@@ -74,9 +83,13 @@ const remoteTbiIndexedForNodeJs = new TabixIndexedFile({
 
 ### getLines
 
-The basic function this module provides is just called `getLines` and it returns text contents from the tabix file (it unzips the bgzipped data) and supplies it to a callback that you provide one line at a time.
+The basic function this module provides is just called `getLines` and it returns
+text contents from the tabix file (it unzips the bgzipped data) and supplies it
+to a callback that you provide one line at a time.
 
-Important: the `start` and `end` values that are supplied to `getLines` are 0-based half-open coordinates. This is different from the 1-based values that are supplied to the tabix command line tool
+Important: the `start` and `end` values that are supplied to `getLines` are
+0-based half-open coordinates. This is different from the 1-based values that
+are supplied to the tabix command line tool
 
 ```
 // iterate over lines in the specified region
@@ -87,9 +100,11 @@ await tbiIndexed.getLines('ctgA',200,300, function(line, fileOffset) {
 
 ```
 
-After running this, your `lines` array would contain an array of lines from the file that match your query range
+After running this, your `lines` array would contain an array of lines from the
+file that match your query range
 
-You can also supply some extra arguments to getLines with this format, but these are sort of obscure and only used in some circumstances
+You can also supply some extra arguments to getLines with this format, but these
+are sort of obscure and only used in some circumstances
 
 ```
 const lines = []
@@ -101,14 +116,18 @@ await tbiIndexed.getLines('ctgA',200,300, {
 
 ```
 
-After running the above demo, lines is now an array of strings, containing the lines from the tabix file
+After running the above demo, lines is now an array of strings, containing the
+lines from the tabix file
 
 Notes about the returned values of `getLines`:
 
 - commented (meta) lines are skipped.
 - line strings do not include any trailing whitespace characters.
-- the callback is also called with a `fileOffset` that can be used to uniquely identify lines based on their virtual file offset where the line is found in the file
-- if getLines is called with an undefined `end` parameter it gets all lines from start going to the end of the contig e.g.
+- the callback is also called with a `fileOffset` that can be used to uniquely
+  identify lines based on their virtual file offset where the line is found in
+  the file
+- if getLines is called with an undefined `end` parameter it gets all lines from
+  start going to the end of the contig e.g.
 
 ```
 const lines = []
@@ -146,7 +165,10 @@ const headerBuffer = await tbiIndexed.getHeaderBuffer()
 
 ## Academic Use
 
-This package was written with funding from the [NHGRI](http://genome.gov) as part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic project that you publish, please cite the most recent JBrowse paper, which will be linked from [jbrowse.org](http://jbrowse.org).
+This package was written with funding from the [NHGRI](http://genome.gov) as
+part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
+project that you publish, please cite the most recent JBrowse paper, which will
+be linked from [jbrowse.org](http://jbrowse.org).
 
 ## License
 
