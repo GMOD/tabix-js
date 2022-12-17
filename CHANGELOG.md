@@ -1,3 +1,7 @@
+## [1.5.5](https://github.com/GMOD/tabix-js/compare/v1.5.4...v1.5.5) (2022-12-17)
+
+
+
 - Use es2015 for nodejs build
 
 ## [1.5.4](https://github.com/GMOD/tabix-js/compare/v1.5.3...v1.5.4) (2022-07-18)
