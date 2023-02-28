@@ -11,6 +11,9 @@ import CSI from './csi'
 
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
+const decoder =
+  typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : undefined
+
 interface GetLinesOpts {
   [key: string]: unknown
   signal?: AbortSignal
@@ -188,21 +191,21 @@ export default class TabixIndexedFile {
         signal,
       )
 
-      const lines = (
-        typeof TextDecoder !== 'undefined'
-          ? new TextDecoder('utf-8').decode(buffer)
-          : buffer.toString()
-      ).split('\n')
-      lines.pop()
-
       checkAbortSignal(signal)
-      let blockStart = c.minv.dataPosition
-      let pos
+      let blockStart = 0
+      let pos = 0
+      while (blockStart < buffer.length) {
+        const n = buffer.indexOf('\n', blockStart)
+        if (n === -1) {
+          break
+        }
+        const b = buffer.subarray(blockStart, n)
+        const line = decoder?.decode(b) || b.toString()
 
-      for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i]
-
-        for (pos = 0; blockStart >= dpositions[pos]; pos += 1) {}
+        if (dpositions) {
+          while (blockStart + c.minv.dataPosition >= dpositions[pos++]) {}
+          pos--
+        }
 
         // filter the line for whether it is within the requested range
         const { startCoordinate, overlaps } = this.checkLine(
@@ -213,7 +216,8 @@ export default class TabixIndexedFile {
           line,
         )
 
-        // do a small check just to make sure that the lines are really sorted by start coordinate
+        // do a small check just to make sure that the lines are really sorted
+        // by start coordinate
         if (
           previousStartCoordinate !== undefined &&
           startCoordinate !== undefined &&
@@ -236,7 +240,10 @@ export default class TabixIndexedFile {
             // then the blockStart-dpositions is an uncompressed file offset from
             // that bgzip block boundary, and since the cpositions are multiplied by
             // (1 << 8) these uncompressed offsets get a unique space
-            cpositions[pos] * (1 << 8) + (blockStart - dpositions[pos]),
+            cpositions[pos] * (1 << 8) +
+              (blockStart - dpositions[pos]) +
+              c.minv.dataPosition +
+              1,
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
           // the lines were overlapping the region, but now have stopped, so
@@ -244,7 +251,6 @@ export default class TabixIndexedFile {
           // processing data now
           return
         }
-        blockStart += line.length + 1
 
         // yield if we have emitted beyond the yield limit
         if (last - Date.now() > 500) {
@@ -252,6 +258,7 @@ export default class TabixIndexedFile {
           checkAbortSignal(signal)
           await timeout(1)
         }
+        blockStart = n + 1
       }
     }
   }
