@@ -78,7 +78,7 @@ export default class CSI extends IndexFile {
     const nameSectionLength = bytes.readInt32LE(offset + 24)
 
     const { refIdToName, refNameToId } = this._parseNameBytes(
-      bytes.slice(offset + 28, offset + 28 + nameSectionLength),
+      bytes.subarray(offset + 28, offset + 28 + nameSectionLength),
     )
 
     return {
@@ -199,7 +199,7 @@ export default class CSI extends IndexFile {
   parsePseudoBin(bytes: Buffer, offset: number) {
     const lineCount = longToNumber(
       Long.fromBytesLE(
-        Array.prototype.slice.call(bytes, offset + 28, offset + 36),
+        bytes.subarray(offset + 28, offset + 36) as unknown as number[],
         true,
       ),
     )
