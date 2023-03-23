@@ -3,7 +3,7 @@ import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
-import IndexFile, { Options } from './indexFile'
+import IndexFile, { Options, IndexData } from './indexFile'
 
 import Chunk from './chunk'
 import TBI from './tbi'
@@ -20,17 +20,23 @@ interface GetLinesOpts {
   lineCallback: GetLinesCallback
 }
 
+interface ReadChunk {
+  buffer: Buffer
+  cpositions: number[]
+  dpositions: number[]
+}
+
 function timeout(time: number) {
-  return new Promise(resolve => {
-    setTimeout(resolve, time)
-  })
+  return new Promise(resolve => setTimeout(resolve, time))
 }
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   private chunkSizeLimit: number
+  private yieldTime: number
   private renameRefSeq: (n: string) => string
-  private chunkCache: any
+  private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
+
   /**
    * @param {object} args
    * @param {string} [args.path]
@@ -39,12 +45,10 @@ export default class TabixIndexedFile {
    * @param {filehandle} [args.tbiFilehandle]
    * @param {string} [args.csiPath]
    * @param {filehandle} [args.csiFilehandle]
-   * @param {chunkSizeLimit} default 50MiB
+   * @param {number} [args.yieldTime] yield to main thread after N milliseconds if reading features is taking a long time to avoid hanging main thread
    * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
    * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
    * not altered, just the names of the reference sequences that are used for querying.
-   * @param {number} [args.chunkCacheSize] maximum size in bytes of the chunk cache. default 5MB
-   * @param {number} [args.blockCacheSize] maximum size in bytes of the block cache. default 5MB
    */
   constructor({
     path,
@@ -53,6 +57,7 @@ export default class TabixIndexedFile {
     tbiFilehandle,
     csiPath,
     csiFilehandle,
+    yieldTime = 500,
     chunkSizeLimit = 50000000,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
@@ -63,6 +68,7 @@ export default class TabixIndexedFile {
     tbiFilehandle?: GenericFilehandle
     csiPath?: string
     csiFilehandle?: GenericFilehandle
+    yieldTime: number
     chunkSizeLimit?: number
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
@@ -108,21 +114,20 @@ export default class TabixIndexedFile {
 
     this.chunkSizeLimit = chunkSizeLimit
     this.renameRefSeq = renameRefSeqs
-    this.chunkCache = new AbortablePromiseCache({
-      cache: new LRU({
-        maxSize: Math.floor(chunkCacheSize / (1 << 16)),
-      }),
-
-      fill: this.readChunk.bind(this),
+    this.yieldTime = yieldTime
+    this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
+      cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
+      fill: (args: Chunk, signal?: AbortSignal) =>
+        this.readChunk(args, { signal }),
     })
   }
 
   /**
-   * @param {string} refName name of the reference sequence
-   * @param {number} start start of the region (in 0-based half-open coordinates)
-   * @param {number} end end of the region (in 0-based half-open coordinates)
-   * @param {function|object} lineCallback callback called for each line in the region. can also pass a object param containing obj.lineCallback, obj.signal, etc
-   * @returns {Promise} resolved when the whole read is finished, rejected on error
+   * @param refName name of the reference sequence
+   * @param start start of the region (in 0-based half-open coordinates)
+   * @param end end of the region (in 0-based half-open coordinates)
+   * @param opts callback called for each line in the region. can also pass a object param containing obj.lineCallback, obj.signal, etc
+   * @returns promise that is resolved when the whole read is finished, rejected on error
    */
   async getLines(
     refName: string,
@@ -188,7 +193,6 @@ export default class TabixIndexedFile {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
-        signal,
       )
 
       checkAbortSignal(signal)
@@ -253,7 +257,7 @@ export default class TabixIndexedFile {
         }
 
         // yield if we have emitted beyond the yield limit
-        if (last - Date.now() > 500) {
+        if (this.yieldTime && last - Date.now() > this.yieldTime) {
           last = Date.now()
           checkAbortSignal(signal)
           await timeout(1)
@@ -271,18 +275,13 @@ export default class TabixIndexedFile {
    * get a buffer containing the "header" region of
    * the file, which are the bytes up to the first
    * non-meta line
-   *
-   * @returns {Promise} for a buffer
    */
   async getHeaderBuffer(opts: Options = {}) {
     const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
       opts,
     )
     checkAbortSignal(opts.signal)
-    const maxFetch =
-      firstDataLine && firstDataLine.blockPosition
-        ? firstDataLine.blockPosition + maxBlockSize
-        : maxBlockSize
+    const maxFetch = (firstDataLine?.blockPosition || 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header
     // actually takes up more than one block? this case is not covered here
 
@@ -312,7 +311,7 @@ export default class TabixIndexedFile {
           lastNewline = i
         }
       }
-      bytes = bytes.slice(0, lastNewline + 1)
+      bytes = bytes.subarray(0, lastNewline + 1)
     }
     return bytes
   }
@@ -325,17 +324,13 @@ export default class TabixIndexedFile {
    */
   async getHeader(opts: Options = {}) {
     const bytes = await this.getHeaderBuffer(opts)
-    checkAbortSignal(opts.signal)
     return bytes.toString('utf8')
   }
 
   /**
    * get an array of reference sequence names, in the order in which
-   * they occur in the file.
-   *
-   * reference sequence renaming is not applied to these names.
-   *
-   * @returns {Promise} for an array of string sequence names
+   * they occur in the file. reference sequence renaming is not applied
+   * to these names.
    */
   async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
@@ -353,22 +348,13 @@ export default class TabixIndexedFile {
    * true if line is a data line that overlaps the given region
    */
   checkLine(
-    {
-      columnNumbers,
-      metaChar,
-      coordinateType,
-      format,
-    }: {
-      columnNumbers: { ref: number; start: number; end: number }
-      metaChar: string
-      coordinateType: string
-      format: string
-    },
+    metadata: IndexData,
     regionRefName: string,
     regionStart: number,
     regionEnd: number,
     line: string,
   ) {
+    const { columnNumbers, metaChar, coordinateType, format } = metadata
     // skip meta lines
     if (line.charAt(0) === metaChar) {
       return { overlaps: false }
@@ -479,48 +465,43 @@ export default class TabixIndexedFile {
 
   /**
    * return the approximate number of data lines in the given reference sequence
-   * @param {string} refSeq reference sequence name
-   * @returns {Promise} for number of data lines present on that reference sequence
+   * @param refSeq reference sequence name
+   * @returns number of data lines present on that reference sequence
    */
   async lineCount(refName: string, opts: Options = {}) {
     return this.index.lineCount(refName, opts)
   }
 
-  async _readRegion(
-    position: number,
-    compressedSize: number,
-    opts: Options = {},
-  ) {
+  async _readRegion(pos: number, size: number, opts: Options = {}) {
+    const b = Buffer.alloc(size)
     const { bytesRead, buffer } = await this.filehandle.read(
-      Buffer.alloc(compressedSize),
+      b,
       0,
-      compressedSize,
-      position,
+      size,
+      pos,
       opts,
     )
 
-    return bytesRead < compressedSize ? buffer.slice(0, bytesRead) : buffer
+    return buffer.subarray(0, bytesRead)
   }
 
   /**
    * read and uncompress the data in a chunk (composed of one or more
    * contiguous bgzip blocks) of the file
-   * @param {Chunk} chunk
-   * @returns {Promise} for a string chunk of the file
    */
-  async readChunk(chunk: Chunk, opts: Options = {}) {
+  async readChunk(c: Chunk, opts: Options = {}) {
     // fetch the uncompressed data, uncompress carefully a block at a time,
     // and stop when done
 
-    const compressedData = await this._readRegion(
-      chunk.minv.blockPosition,
-      chunk.fetchedSize(),
+    const data = await this._readRegion(
+      c.minv.blockPosition,
+      c.fetchedSize(),
       opts,
     )
     try {
-      return unzipChunkSlice(compressedData, chunk)
+      return unzipChunkSlice(data, c)
     } catch (e) {
-      throw new Error(`error decompressing chunk ${chunk.toString()} ${e}`)
+      throw new Error(`error decompressing c ${c.toString()} ${e}`)
     }
   }
 }
