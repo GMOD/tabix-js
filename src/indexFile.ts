@@ -1,5 +1,3 @@
-import AbortablePromiseCache from 'abortable-promise-cache'
-import QuickLRU from 'quick-lru'
 import { GenericFilehandle } from 'generic-filehandle'
 import VirtualOffset from './virtualOffset'
 import Chunk from './chunk'
@@ -10,15 +8,21 @@ export interface Options {
   signal?: AbortSignal
 }
 
+export interface IndexData {
+  refNameToId: { [key: string]: number }
+  refIdToName: string[]
+  metaChar: string | null
+  columnNumbers: { ref: number; start: number; end: number }
+  coordinateType: string
+  format: string
+  [key: string]: any
+}
+
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
   public renameRefSeq: (arg0: string) => string
-  private _parseCache: any
+  private parseP?: Promise<IndexData>
 
-  /**
-   * @param {filehandle} filehandle
-   * @param {function} [renameRefSeqs]
-   */
   constructor({
     filehandle,
     renameRefSeqs = (n: string) => n,
@@ -32,10 +36,7 @@ export default abstract class IndexFile {
 
   public abstract lineCount(refName: string, args: Options): Promise<number>
 
-  protected abstract _parse(opts: Options): Promise<{
-    refNameToId: { [key: string]: number }
-    refIdToName: string[]
-  }>
+  protected abstract _parse(opts: Options): Promise<IndexData>
 
   public async getMetadata(opts: Options = {}) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -64,13 +65,13 @@ export default abstract class IndexFile {
   }
 
   async parse(opts: Options = {}) {
-    if (!this._parseCache) {
-      this._parseCache = new AbortablePromiseCache({
-        cache: new QuickLRU({ maxSize: 1 }),
-        fill: () => this._parse(opts),
+    if (!this.parseP) {
+      this.parseP = this._parse(opts).catch(e => {
+        this.parseP = undefined
+        throw e
       })
     }
-    return this._parseCache.get('index', null, undefined)
+    return this.parseP
   }
 
   async hasRefSeq(seqId: number, opts: Options = {}) {

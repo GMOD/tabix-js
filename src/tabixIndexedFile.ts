@@ -3,7 +3,7 @@ import LRU from 'quick-lru'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
-import IndexFile, { Options } from './indexFile'
+import IndexFile, { Options, IndexData } from './indexFile'
 
 import Chunk from './chunk'
 import TBI from './tbi'
@@ -20,23 +20,23 @@ interface GetLinesOpts {
   lineCallback: GetLinesCallback
 }
 
+interface ReadChunk {
+  buffer: Buffer
+  cpositions: number[]
+  dpositions: number[]
+}
+
 function timeout(time: number) {
-  return new Promise(resolve => {
-    setTimeout(resolve, time)
-  })
+  return new Promise(resolve => setTimeout(resolve, time))
 }
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
+  private chunkSizeLimit: number
   private yieldTime: number
   private renameRefSeq: (n: string) => string
-  private chunkCache = new AbortablePromiseCache({
-    cache: new LRU({
-      maxSize: 50,
-    }),
+  private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
 
-    fill: this.readChunk.bind(this),
-  })
   /**
    * @param {object} args
    * @param {string} [args.path]
@@ -45,6 +45,7 @@ export default class TabixIndexedFile {
    * @param {filehandle} [args.tbiFilehandle]
    * @param {string} [args.csiPath]
    * @param {filehandle} [args.csiFilehandle]
+   * @param {number} [args.yieldTime] yield to main thread after N milliseconds if reading features is taking a long time to avoid hanging main thread
    * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
    * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
    * not altered, just the names of the reference sequences that are used for querying.
@@ -57,7 +58,9 @@ export default class TabixIndexedFile {
     csiPath,
     csiFilehandle,
     yieldTime = 500,
+    chunkSizeLimit = 50000000,
     renameRefSeqs = n => n,
+    chunkCacheSize = 5 * 2 ** 20,
   }: {
     path?: string
     filehandle?: GenericFilehandle
@@ -66,7 +69,9 @@ export default class TabixIndexedFile {
     csiPath?: string
     csiFilehandle?: GenericFilehandle
     yieldTime: number
+    chunkSizeLimit?: number
     renameRefSeqs?: (n: string) => string
+    chunkCacheSize?: number
   }) {
     if (filehandle) {
       this.filehandle = filehandle
@@ -107,8 +112,14 @@ export default class TabixIndexedFile {
       )
     }
 
+    this.chunkSizeLimit = chunkSizeLimit
     this.renameRefSeq = renameRefSeqs
     this.yieldTime = yieldTime
+    this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
+      cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
+      fill: (args: Chunk, signal?: AbortSignal) =>
+        this.readChunk(args, { signal }),
+    })
   }
 
   /**
@@ -163,6 +174,17 @@ export default class TabixIndexedFile {
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
 
+    // check the chunks for any that are over the size limit.  if
+    // any are, don't fetch any of them
+    for (let i = 0; i < chunks.length; i += 1) {
+      const size = chunks[i].fetchedSize()
+      if (size > this.chunkSizeLimit) {
+        throw new Error(
+          `Too much data. Chunk size ${size.toLocaleString()} bytes exceeds chunkSizeLimit of ${this.chunkSizeLimit.toLocaleString()}.`,
+        )
+      }
+    }
+
     // now go through each chunk and parse and filter the lines out of it
     let last = Date.now()
     for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
@@ -171,7 +193,6 @@ export default class TabixIndexedFile {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
-        signal,
       )
 
       checkAbortSignal(signal)
@@ -236,7 +257,7 @@ export default class TabixIndexedFile {
         }
 
         // yield if we have emitted beyond the yield limit
-        if (last - Date.now() > this.yieldTime) {
+        if (this.yieldTime && last - Date.now() > this.yieldTime) {
           last = Date.now()
           checkAbortSignal(signal)
           await timeout(1)
@@ -260,10 +281,7 @@ export default class TabixIndexedFile {
       opts,
     )
     checkAbortSignal(opts.signal)
-    const maxFetch =
-      firstDataLine && firstDataLine.blockPosition
-        ? firstDataLine.blockPosition + maxBlockSize
-        : maxBlockSize
+    const maxFetch = (firstDataLine?.blockPosition || 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header
     // actually takes up more than one block? this case is not covered here
 
@@ -306,7 +324,6 @@ export default class TabixIndexedFile {
    */
   async getHeader(opts: Options = {}) {
     const bytes = await this.getHeaderBuffer(opts)
-    checkAbortSignal(opts.signal)
     return bytes.toString('utf8')
   }
 
@@ -317,7 +334,7 @@ export default class TabixIndexedFile {
    */
   async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
-    return metadata.refIdToName as string[]
+    return metadata.refIdToName
   }
 
   /**
@@ -331,22 +348,13 @@ export default class TabixIndexedFile {
    * true if line is a data line that overlaps the given region
    */
   checkLine(
-    {
-      columnNumbers,
-      metaChar,
-      coordinateType,
-      format,
-    }: {
-      columnNumbers: { ref: number; start: number; end: number }
-      metaChar: string
-      coordinateType: string
-      format: string
-    },
+    metadata: IndexData,
     regionRefName: string,
     regionStart: number,
     regionEnd: number,
     line: string,
   ) {
+    const { columnNumbers, metaChar, coordinateType, format } = metadata
     // skip meta lines
     if (line.charAt(0) === metaChar) {
       return { overlaps: false }

@@ -42,10 +42,10 @@ export default class TabixIndex extends IndexFile {
     return -1
   }
 
-  // memoize
   // fetch and parse the index
   async _parse(opts: Options = {}) {
-    const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
+    const buf = await this.filehandle.readFile(opts)
+    const bytes = await unzip(buf)
     checkAbortSignal(opts.signal)
 
     // check TBI magic numbers

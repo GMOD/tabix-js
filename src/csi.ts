@@ -45,25 +45,13 @@ export default class CSI extends IndexFile {
   }
   async indexCov() {
     throw new Error('CSI indexes do not support indexcov')
-    return []
   }
 
-  parseAuxData(bytes: Buffer, offset: number, auxLength: number) {
-    if (auxLength < 30) {
-      return {
-        refIdToName: [],
-        refNameToId: {},
-      }
-    }
-
+  parseAuxData(bytes: Buffer, offset: number) {
     const formatFlags = bytes.readInt32LE(offset)
     const coordinateType =
       formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const format = (
-      { 0: 'generic', 1: 'SAM', 2: 'VCF' } as {
-        [key: number]: string
-      }
-    )[formatFlags & 0xf]
+    const format = { 0: 'generic', 1: 'SAM', 2: 'VCF' }[formatFlags & 0xf]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
@@ -73,7 +61,7 @@ export default class CSI extends IndexFile {
       end: bytes.readInt32LE(offset + 12),
     }
     const metaValue = bytes.readInt32LE(offset + 16)
-    const metaChar = metaValue ? String.fromCharCode(metaValue) : ''
+    const metaChar = metaValue ? String.fromCharCode(metaValue) : null
     const skipLines = bytes.readInt32LE(offset + 20)
     const nameSectionLength = bytes.readInt32LE(offset + 24)
 
@@ -132,18 +120,18 @@ export default class CSI extends IndexFile {
     this.depth = bytes.readInt32LE(8)
     this.maxBinNumber = ((1 << ((this.depth + 1) * 3)) - 1) / 7
     const maxRefLength = 2 ** (this.minShift + this.depth * 3)
-
     const auxLength = bytes.readInt32LE(12)
-    let aux: {
-      refIdToName: string[]
-      refNameToId: { [key: string]: number }
-    } = {
-      refIdToName: [],
-      refNameToId: {},
-    }
-    if (auxLength) {
-      aux = this.parseAuxData(bytes, 16, auxLength)
-    }
+    const aux =
+      auxLength && auxLength >= 30
+        ? this.parseAuxData(bytes, 16)
+        : {
+            refIdToName: [],
+            refNameToId: {},
+            metaChar: null,
+            columnNumbers: { ref: 0, start: 1, end: 2 },
+            coordinateType: 'zero-based-half-open',
+            format: 'generic',
+          }
     const refCount = bytes.readInt32LE(16 + auxLength)
 
     // read the indexes for each reference sequence
