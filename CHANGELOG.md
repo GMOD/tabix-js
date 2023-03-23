@@ -1,45 +1,37 @@
+- Add yieldTime paramter
+- Improve typescripting
+
 ## [1.5.6](https://github.com/GMOD/tabix-js/compare/v1.5.5...v1.5.6) (2023-02-28)
-
-
 
 - Add fix for fileOffset being stable in presence of Unicode characters (#137)
 
 ## [1.5.5](https://github.com/GMOD/tabix-js/compare/v1.5.4...v1.5.5) (2022-12-17)
 
-
-
 - Use es2015 for nodejs build
 
 ## [1.5.4](https://github.com/GMOD/tabix-js/compare/v1.5.3...v1.5.4) (2022-07-18)
-
-
 
 - Bump generic-filehandle 2->3
 
 ## [1.5.3](https://github.com/GMOD/tabix-js/compare/v1.5.2...v1.5.3) (2022-04-25)
 
-
-
 - Fix esm module build to use ESM instead of CJS
 
 <a name="1.5.2"></a>
+
 ## [1.5.2](https://github.com/GMOD/tabix-js/compare/v1.5.1...v1.5.2) (2021-12-15)
-
-
 
 - Change typescript signature of lineCallback from Promise<void> to void
 
 <a name="1.5.1"></a>
+
 ## [1.5.1](https://github.com/GMOD/tabix-js/compare/v1.5.0...v1.5.1) (2021-12-15)
-
-
 
 - Add esm module with less babelification for smaller bundle size
 
 <a name="1.5.0"></a>
+
 # [1.5.0](https://github.com/GMOD/tabix-js/compare/v1.4.6...v1.5.0) (2020-12-11)
-
-
 
 - Use TextDecoder for chunk decoding for small speedup
 - Use canMergeChunks logic to avoid too large of chunks being used
@@ -49,14 +41,16 @@
 
 ## [1.4.6](https://github.com/GMOD/tabix-js/compare/v1.4.5...v1.4.6) (2020-04-30)
 
-- Fix regression with browser only version of tabix-js not being able to parse results in 1.4.5
+- Fix regression with browser only version of tabix-js not being able to parse
+  results in 1.4.5
 
 <a name="1.4.5"></a>
 
 ## [1.4.5](https://github.com/GMOD/tabix-js/compare/v1.4.4...v1.4.5) (2020-04-28)
 
-- Remove the filehandle size() call because this is unnecessary and would indicate a corrupt index,
-  and because it additionally has a CORS configuration overhead
+- Remove the filehandle size() call because this is unnecessary and would
+  indicate a corrupt index, and because it additionally has a CORS configuration
+  overhead
 
 <a name="1.4.4"></a>
 
@@ -69,7 +63,8 @@
 ## [1.4.3](https://github.com/GMOD/tabix-js/compare/v1.4.2...v1.4.3) (2020-02-04)
 
 - Fix optional param for constructor for typescript
-- Update method of calculating fileOffset based IDs using updated @gmod/bgzf-filehandle
+- Update method of calculating fileOffset based IDs using updated
+  @gmod/bgzf-filehandle
 
 <a name="1.4.2"></a>
 
@@ -121,11 +116,13 @@
 
 ## [1.1.8](https://github.com/GMOD/tabix-js/compare/v1.1.7...v1.1.8) (2019-06-06)
 
-- Add a fix for a bgzf unzipping thing that could result in duplicate features being returned
+- Add a fix for a bgzf unzipping thing that could result in duplicate features
+  being returned
 
 ## [1.1.7](https://github.com/GMOD/tabix-js/compare/v1.1.6...v1.1.7) (2019-06-04)
 
-- Removed chunk merging from header file parsing which now results in smaller bgzf unzip calls being streamed out to clients
+- Removed chunk merging from header file parsing which now results in smaller
+  bgzf unzip calls being streamed out to clients
 
 ## [1.1.6](https://github.com/GMOD/tabix-js/compare/v1.1.5...v1.1.6) (2019-05-31)
 
@@ -134,7 +131,8 @@
 
 ## [1.1.5](https://github.com/GMOD/tabix-js/compare/v1.1.4...v1.1.5) (2019-03-05)
 
-- Fix parsing on a tabix file that should be csi files (e.g. too long of chromosomes)
+- Fix parsing on a tabix file that should be csi files (e.g. too long of
+  chromosomes)
 
 ## [1.1.4](https://github.com/GMOD/tabix-js/compare/v1.1.3...v1.1.4) (2019-02-23)
 
@@ -142,7 +140,8 @@
 
 ## [1.1.3](https://github.com/GMOD/tabix-js/compare/v1.1.2...v1.1.3) (2018-11-23)
 
-- Change to es6-promisify and quick-lru which can be babelified to IE11 (util.promisify and lru-cache used Object.defineProperty('length', ...))
+- Change to es6-promisify and quick-lru which can be babelified to IE11
+  (util.promisify and lru-cache used Object.defineProperty('length', ...))
 
 ## [1.1.2](https://github.com/GMOD/tabix-js/compare/v1.1.1...v1.1.2) (2018-10-26)
 
