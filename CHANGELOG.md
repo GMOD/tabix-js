@@ -1,3 +1,7 @@
+## [1.5.7](https://github.com/GMOD/tabix-js/compare/v1.5.6...v1.5.7) (2023-03-24)
+
+
+
 - Add yieldTime parameter
 - Improve typescripting
 
