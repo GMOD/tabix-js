@@ -68,7 +68,7 @@ export default class TabixIndexedFile {
     tbiFilehandle?: GenericFilehandle
     csiPath?: string
     csiFilehandle?: GenericFilehandle
-    yieldTime: number
+    yieldTime?: number
     chunkSizeLimit?: number
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
