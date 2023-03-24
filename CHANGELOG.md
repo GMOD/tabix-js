@@ -1,4 +1,4 @@
-- Add yieldTime paramter
+- Add yieldTime parameter
 - Improve typescripting
 
 ## [1.5.6](https://github.com/GMOD/tabix-js/compare/v1.5.5...v1.5.6) (2023-02-28)
