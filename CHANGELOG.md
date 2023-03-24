@@ -1,3 +1,7 @@
+## [1.5.8](https://github.com/GMOD/tabix-js/compare/v1.5.7...v1.5.8) (2023-03-24)
+
+
+
 - Make yieldTime optional
 
 ## [1.5.7](https://github.com/GMOD/tabix-js/compare/v1.5.6...v1.5.7) (2023-03-24)
