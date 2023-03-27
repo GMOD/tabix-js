@@ -203,7 +203,7 @@ export default class TabixIndexedFile {
         if (n === -1) {
           break
         }
-        const b = buffer.subarray(blockStart, n)
+        const b = buffer.slice(blockStart, n)
         const line = decoder?.decode(b) || b.toString()
 
         if (dpositions) {
@@ -311,7 +311,7 @@ export default class TabixIndexedFile {
           lastNewline = i
         }
       }
-      bytes = bytes.subarray(0, lastNewline + 1)
+      bytes = bytes.slice(0, lastNewline + 1)
     }
     return bytes
   }
@@ -482,7 +482,7 @@ export default class TabixIndexedFile {
       opts,
     )
 
-    return buffer.subarray(0, bytesRead)
+    return buffer.slice(0, bytesRead)
   }
 
   /**

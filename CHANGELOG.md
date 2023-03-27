@@ -1,3 +1,5 @@
+- Revert the Buffer::slice -> Buffer::subarray change due to use with polyfills
+
 ## [1.5.8](https://github.com/GMOD/tabix-js/compare/v1.5.7...v1.5.8) (2023-03-24)
 
 

@@ -83,7 +83,7 @@ export default class TabixIndex extends IndexFile {
     // read sequence dictionary
     const nameSectionLength = bytes.readInt32LE(32)
     const { refNameToId, refIdToName } = this._parseNameBytes(
-      bytes.subarray(36, 36 + nameSectionLength),
+      bytes.slice(36, 36 + nameSectionLength),
     )
 
     // read the indexes for each reference sequence
@@ -155,7 +155,7 @@ export default class TabixIndex extends IndexFile {
   parsePseudoBin(bytes: Buffer, offset: number) {
     const lineCount = longToNumber(
       Long.fromBytesLE(
-        bytes.subarray(offset + 16, offset + 24) as unknown as number[],
+        bytes.slice(offset + 16, offset + 24) as unknown as number[],
         true,
       ),
     )
