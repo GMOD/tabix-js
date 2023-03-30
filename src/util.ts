@@ -31,7 +31,6 @@ export function checkAbortSignal(signal?: AbortSignal) {
   }
 
   if (signal.aborted) {
-    // console.log('bam aborted!')
     if (typeof DOMException !== 'undefined') {
       // eslint-disable-next-line  no-undef
       throw new DOMException('aborted', 'AbortError')
@@ -94,9 +93,6 @@ export function optimizeChunks(chunks: Chunk[], lowest: VirtualOffset) {
         }
       }
     }
-    // else {
-    //   console.log(`skipping chunk ${chunk}`)
-    // }
   })
 
   return mergedChunks

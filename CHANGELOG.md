@@ -1,3 +1,5 @@
+- Remove stray console.log
+
 ## [1.5.9](https://github.com/GMOD/tabix-js/compare/v1.5.8...v1.5.9) (2023-03-27)
 
 
