@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer'
 export default class VirtualOffset {
   public blockPosition: number
   public dataPosition: number
