@@ -1,5 +1,6 @@
 import AbortablePromiseCache from 'abortable-promise-cache'
 import LRU from 'quick-lru'
+import { Buffer } from 'buffer'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
