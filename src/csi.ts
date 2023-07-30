@@ -1,10 +1,9 @@
-import Long from 'long'
 import { Buffer } from 'buffer'
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
-import { longToNumber, optimizeChunks } from './util'
+import { optimizeChunks } from './util'
 
 import IndexFile, { Options } from './indexFile'
 
@@ -186,13 +185,7 @@ export default class CSI extends IndexFile {
   }
 
   parsePseudoBin(bytes: Buffer, offset: number) {
-    const lineCount = longToNumber(
-      Long.fromBytesLE(
-        bytes.slice(offset + 28, offset + 36) as unknown as number[],
-        true,
-      ),
-    )
-    return { lineCount }
+    return { lineCount: Number(bytes.readBigInt64LE(offset + 28)) }
   }
 
   async blocksForRange(

@@ -1,9 +1,8 @@
-import Long from 'long'
 import { Buffer } from 'buffer'
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
 import { unzip } from '@gmod/bgzf-filehandle'
-import { longToNumber, optimizeChunks, checkAbortSignal } from './util'
+import { optimizeChunks, checkAbortSignal } from './util'
 import IndexFile, { Options } from './indexFile'
 
 const TBI_MAGIC = 21578324 // TBI\1
@@ -154,13 +153,7 @@ export default class TabixIndex extends IndexFile {
   }
 
   parsePseudoBin(bytes: Buffer, offset: number) {
-    const lineCount = longToNumber(
-      Long.fromBytesLE(
-        bytes.slice(offset + 16, offset + 24) as unknown as number[],
-        true,
-      ),
-    )
-    return { lineCount }
+    return { lineCount: Number(bytes.readBigUInt64LE(offset + 16)) }
   }
 
   _parseNameBytes(namesBytes: Buffer) {
