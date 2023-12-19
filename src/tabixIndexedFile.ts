@@ -281,17 +281,8 @@ export default class TabixIndexedFile {
     // TODO: what if we don't have a firstDataLine, and the header
     // actually takes up more than one block? this case is not covered here
 
-    let bytes = await this._readRegion(0, maxFetch, opts)
-    checkAbortSignal(opts.signal)
-    try {
-      bytes = await unzip(bytes)
-    } catch (e) {
-      console.error(e)
-      throw new Error(
-        //@ts-ignore
-        `error decompressing block ${e.code} at 0 (length ${maxFetch}) ${e}`,
-      )
-    }
+    const buf = await this._readRegion(0, maxFetch, opts)
+    const bytes = await unzip(buf)
 
     // trim off lines after the last non-meta line
     if (metaChar) {
@@ -307,7 +298,7 @@ export default class TabixIndexedFile {
           lastNewline = i
         }
       }
-      bytes = bytes.slice(0, lastNewline + 1)
+      return bytes.slice(0, lastNewline + 1)
     }
     return bytes
   }
