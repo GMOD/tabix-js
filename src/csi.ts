@@ -44,7 +44,7 @@ export default class CSI extends IndexFile {
     }
     return -1
   }
-  async indexCov() {
+  indexCov() {
     throw new Error('CSI indexes do not support indexcov')
   }
 
@@ -85,7 +85,7 @@ export default class CSI extends IndexFile {
     let currRefId = 0
     let currNameStart = 0
     const refIdToName = []
-    const refNameToId: { [key: string]: number } = {}
+    const refNameToId: Record<string, number> = {}
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
@@ -104,7 +104,7 @@ export default class CSI extends IndexFile {
   // fetch and parse the index
 
   async _parse(opts: Options = {}) {
-    const bytes = await unzip((await this.filehandle.readFile(opts)) as Buffer)
+    const bytes = await unzip(await this.filehandle.readFile(opts))
 
     // check TBI magic numbers
     let csiVersion
@@ -142,7 +142,7 @@ export default class CSI extends IndexFile {
       // the binning index
       const binCount = bytes.readInt32LE(currOffset)
       currOffset += 4
-      const binIndex: { [key: string]: Chunk[] } = {}
+      const binIndex: Record<string, Chunk[]> = {}
       let stats // < provided by parsing a pseudo-bin, if present
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
@@ -224,9 +224,8 @@ export default class CSI extends IndexFile {
     for (const [start, end] of overlappingBins) {
       for (let bin = start; bin <= end; bin++) {
         if (ba.binIndex[bin]) {
-          const binChunks = ba.binIndex[bin]
-          for (let c = 0; c < binChunks.length; ++c) {
-            chunks.push(new Chunk(binChunks[c].minv, binChunks[c].maxv, bin))
+          for (const c of ba.binIndex[bin]) {
+            chunks.push(new Chunk(c.minv, c.maxv, bin))
           }
         }
       }

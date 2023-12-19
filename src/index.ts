@@ -1,5 +1,3 @@
-import TabixIndexedFile from './tabixIndexedFile'
-import TBI from './tbi'
-import CSI from './csi'
-
-export { TabixIndexedFile, TBI, CSI }
+export { default as TabixIndexedFile } from './tabixIndexedFile'
+export { default as CSI } from './csi'
+export { default as TBI } from './tbi'

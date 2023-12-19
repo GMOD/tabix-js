@@ -9,7 +9,7 @@ export interface Options {
 }
 
 export interface IndexData {
-  refNameToId: { [key: string]: number }
+  refNameToId: Record<string, number>
   refIdToName: string[]
   metaChar: string | null
   columnNumbers: { ref: number; start: number; end: number }
@@ -39,8 +39,7 @@ export default abstract class IndexFile {
   protected abstract _parse(opts: Options): Promise<IndexData>
 
   public async getMetadata(opts: Options = {}) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { indices, ...rest } = await this.parse(opts)
+    const { indices: _indices, ...rest } = await this.parse(opts)
     return rest
   }
 
@@ -75,6 +74,7 @@ export default abstract class IndexFile {
   }
 
   async hasRefSeq(seqId: number, opts: Options = {}) {
-    return !!((await this.parse(opts)).indices[seqId] || {}).binIndex
+    const idx = await this.parse(opts)
+    return !!idx.indices[seqId]?.binIndex
   }
 }

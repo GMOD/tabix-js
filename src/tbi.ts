@@ -60,7 +60,7 @@ export default class TabixIndex extends IndexFile {
     const formatFlags = bytes.readInt32LE(8)
     const coordinateType =
       formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const formatOpts: { [key: number]: string } = {
+    const formatOpts: Record<number, string> = {
       0: 'generic',
       1: 'SAM',
       2: 'VCF',
@@ -94,7 +94,7 @@ export default class TabixIndex extends IndexFile {
       // the binning index
       const binCount = bytes.readInt32LE(currOffset)
       currOffset += 4
-      const binIndex: { [key: number]: Chunk[] } = {}
+      const binIndex: Record<number, Chunk[]> = {}
       let stats
       for (let j = 0; j < binCount; j += 1) {
         const bin = bytes.readUInt32LE(currOffset)
@@ -167,7 +167,7 @@ export default class TabixIndex extends IndexFile {
     let currRefId = 0
     let currNameStart = 0
     const refIdToName: string[] = []
-    const refNameToId: { [key: string]: number } = {}
+    const refNameToId: Record<string, number> = {}
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
@@ -223,9 +223,8 @@ export default class TabixIndex extends IndexFile {
     for (const [start, end] of overlappingBins) {
       for (let bin = start; bin <= end; bin++) {
         if (ba.binIndex[bin]) {
-          const binChunks = ba.binIndex[bin]
-          for (let c = 0; c < binChunks.length; ++c) {
-            chunks.push(new Chunk(binChunks[c].minv, binChunks[c].maxv, bin))
+          for (const c of ba.binIndex[bin]) {
+            chunks.push(new Chunk(c.minv, c.maxv, bin))
           }
         }
       }

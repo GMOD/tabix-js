@@ -7,12 +7,6 @@ export default class Chunk {
   public bin: number
   public _fetchedSize?: number
 
-  /**
-   * @param {VirtualOffset} minv
-   * @param {VirtualOffset} maxv
-   * @param {number} bin
-   * @param {number} [fetchedSize]
-   */
   constructor(
     minv: VirtualOffset,
     maxv: VirtualOffset,
@@ -26,6 +20,7 @@ export default class Chunk {
   }
 
   toUniqueString() {
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     return `${this.minv}..${this.maxv} (bin ${
       this.bin
     }, fetchedSize ${this.fetchedSize()})`

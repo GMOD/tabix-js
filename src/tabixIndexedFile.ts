@@ -13,7 +13,7 @@ import CSI from './csi'
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
 const decoder =
-  typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : undefined
+  typeof TextDecoder !== 'undefined' ? new TextDecoder('utf8') : undefined
 
 interface GetLinesOpts {
   [key: string]: unknown
@@ -139,7 +139,7 @@ export default class TabixIndexedFile {
     let signal: AbortSignal | undefined
     let options: Options = {}
     let callback: (line: string, lineOffset: number) => void
-    if (typeof opts === 'undefined') {
+    if (opts === undefined) {
       throw new TypeError('line callback must be provided')
     }
     if (typeof opts === 'function') {
@@ -157,8 +157,8 @@ export default class TabixIndexedFile {
 
     const metadata = await this.index.getMetadata(options)
     checkAbortSignal(signal)
-    const start = s === undefined ? 0 : s
-    const end = e === undefined ? metadata.maxRefLength : e
+    const start = s ?? 0
+    const end = e ?? metadata.maxRefLength
     if (!(start <= end)) {
       throw new TypeError(
         'invalid start and end coordinates. start must be less than or equal to end',
@@ -173,8 +173,8 @@ export default class TabixIndexedFile {
 
     // check the chunks for any that are over the size limit.  if
     // any are, don't fetch any of them
-    for (let i = 0; i < chunks.length; i += 1) {
-      const size = chunks[i].fetchedSize()
+    for (const chunk of chunks) {
+      const size = chunk.fetchedSize()
       if (size > this.chunkSizeLimit) {
         throw new Error(
           `Too much data. Chunk size ${size.toLocaleString()} bytes exceeds chunkSizeLimit of ${this.chunkSizeLimit.toLocaleString()}.`,
@@ -184,9 +184,8 @@ export default class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     let last = Date.now()
-    for (let chunkNum = 0; chunkNum < chunks.length; chunkNum += 1) {
+    for (const c of chunks) {
       let previousStartCoordinate: number | undefined
-      const c = chunks[chunkNum]
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
@@ -201,7 +200,7 @@ export default class TabixIndexedFile {
           break
         }
         const b = buffer.slice(blockStart, n)
-        const line = decoder?.decode(b) || b.toString()
+        const line = decoder?.decode(b) ?? b.toString()
 
         if (dpositions) {
           while (blockStart + c.minv.dataPosition >= dpositions[pos++]) {}
@@ -343,7 +342,7 @@ export default class TabixIndexedFile {
   ) {
     const { columnNumbers, metaChar, coordinateType, format } = metadata
     // skip meta lines
-    if (line.charAt(0) === metaChar) {
+    if (metaChar && line.startsWith(metaChar)) {
       return { overlaps: false }
     }
 
@@ -398,17 +397,15 @@ export default class TabixIndexedFile {
         } else if (format === 'VCF' && currentColumnNumber === 4) {
           refSeq = line.slice(currentColumnStart, i)
         } else if (currentColumnNumber === end) {
-          let endCoordinate
           // this will never match if there is no end column
-          if (format === 'VCF') {
-            endCoordinate = this._getVcfEnd(
-              startCoordinate,
-              refSeq,
-              line.slice(currentColumnStart, i),
-            )
-          } else {
-            endCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
-          }
+          const endCoordinate =
+            format === 'VCF'
+              ? this._getVcfEnd(
+                  startCoordinate,
+                  refSeq,
+                  line.slice(currentColumnStart, i),
+                )
+              : parseInt(line.slice(currentColumnStart, i), 10)
           if (endCoordinate <= regionStart) {
             return { overlaps: false }
           }
@@ -425,12 +422,12 @@ export default class TabixIndexedFile {
 
   _getVcfEnd(startCoordinate: number, refSeq: string, info: any) {
     let endCoordinate = startCoordinate + refSeq.length
-    // ignore TRA features as they specify CHR2 and END
-    // as being on a different chromosome
-    // if CHR2 is on the same chromosome, still ignore it
-    // because there should be another pairwise feature
-    // at the end of this one
-    const isTRA = info.indexOf('SVTYPE=TRA') !== -1
+    // ignore TRA features as they specify CHR2 and END as being on a different
+    // chromosome
+    //
+    // if CHR2 is on the same chromosome, still ignore it because there should
+    // be another pairwise feature at the end of this one
+    const isTRA = info.includes('SVTYPE=TRA')
     if (info[0] !== '.' && !isTRA) {
       let prevChar = ';'
       for (let j = 0; j < info.length; j += 1) {
@@ -485,10 +482,6 @@ export default class TabixIndexedFile {
       c.fetchedSize(),
       opts,
     )
-    try {
-      return unzipChunkSlice(data, c)
-    } catch (e) {
-      throw new Error(`error decompressing c ${c.toString()} ${e}`)
-    }
+    return unzipChunkSlice(data, c)
   }
 }

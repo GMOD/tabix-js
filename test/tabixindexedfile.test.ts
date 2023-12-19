@@ -282,16 +282,11 @@ test('can fetch the entire header for a very large vcf header', async () => {
     path: require.resolve('./data/large_vcf_header.vcf.gz'),
   })
 
-  const headerString = await f.getHeader()
-  const lastBitOfLastHeaderLine = 'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
-  expect(
-    headerString.slice(
-      headerString.length - lastBitOfLastHeaderLine.length,
-      headerString.length,
-    ),
-  ).toEqual(lastBitOfLastHeaderLine)
-  expect(headerString[headerString.length - 1]).toEqual('\n')
-  expect(headerString.length).toEqual(5315655)
+  const h = await f.getHeader()
+  const lastBit = 'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
+  expect(h.slice(h.length - lastBit.length, h.length)).toEqual(lastBit)
+  expect(h[h.length - 1]).toEqual('\n')
+  expect(h.length).toEqual(5315655)
 })
 
 test('can fetch a CNV with length defined by END in INFO field', async () => {
