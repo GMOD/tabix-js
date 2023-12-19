@@ -132,8 +132,8 @@ export default class TabixIndexedFile {
    */
   async getLines(
     refName: string,
-    start: number,
-    end: number,
+    s: number | undefined,
+    e: number | undefined,
     opts: GetLinesOpts | GetLinesCallback,
   ) {
     let signal: AbortSignal | undefined
@@ -157,12 +157,8 @@ export default class TabixIndexedFile {
 
     const metadata = await this.index.getMetadata(options)
     checkAbortSignal(signal)
-    if (!start) {
-      start = 0
-    }
-    if (!end) {
-      end = metadata.maxRefLength
-    }
+    const start = s === undefined ? 0 : s
+    const end = e === undefined ? metadata.maxRefLength : e
     if (!(start <= end)) {
       throw new TypeError(
         'invalid start and end coordinates. start must be less than or equal to end',
@@ -278,9 +274,8 @@ export default class TabixIndexedFile {
    * non-meta line
    */
   async getHeaderBuffer(opts: Options = {}) {
-    const { firstDataLine, metaChar, maxBlockSize } = await this.getMetadata(
-      opts,
-    )
+    const { firstDataLine, metaChar, maxBlockSize } =
+      await this.getMetadata(opts)
     checkAbortSignal(opts.signal)
     const maxFetch = (firstDataLine?.blockPosition || 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header

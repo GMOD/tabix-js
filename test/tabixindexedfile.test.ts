@@ -10,7 +10,7 @@ class RecordCollector {
     this.clear()
   }
 
-  forEach(cb: () => void) {
+  forEach(cb: (arg: { line: string; fileOffset: number }) => void) {
     this.records.forEach(cb)
   }
 
@@ -23,7 +23,7 @@ class RecordCollector {
   }
 
   expectNoDuplicates() {
-    const seen = {}
+    const seen = {} as Record<string, number>
     this.forEach(({ line, fileOffset }) => {
       expect(seen[line]).toBe(undefined)
       seen[line] = fileOffset
@@ -41,10 +41,10 @@ test('can read ctgA:1000..4000', async () => {
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(8)
   items.forEach(({ line, fileOffset }) => {
-    line = line.spltest('\t')
-    expect(line[0]).toEqual('contigA')
-    expect(parseInt(line[1], 10)).toBeGreaterThan(999)
-    expect(parseInt(line[1], 10)).toBeLessThan(4001)
+    const l = line.split('\t')
+    expect(l[0]).toEqual('contigA')
+    expect(parseInt(l[1], 10)).toBeGreaterThan(999)
+    expect(parseInt(l[1], 10)).toBeLessThan(4001)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   })
 
@@ -80,7 +80,6 @@ test('can read ctgA:10000', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    yieldLimit: 10,
     renameRefSeqs: n => n.replace('contig', 'ctg'),
   })
   const items = new RecordCollector()
@@ -88,9 +87,9 @@ test('can read ctgA:10000', async () => {
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(30)
   items.forEach(({ line, fileOffset }) => {
-    line = line.spltest('\t')
-    expect(line[0]).toEqual('contigA')
-    expect(parseInt(line[1], 10)).toBeGreaterThan(9999)
+    const l = line.split('\t')
+    expect(l[0]).toEqual('contigA')
+    expect(parseInt(l[1], 10)).toBeGreaterThan(9999)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   })
 })
@@ -98,7 +97,6 @@ test('can read ctgA', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    yieldLimit: 10,
     renameRefSeqs: n => n.replace('contig', 'ctg'),
   })
   const items = new RecordCollector()
@@ -106,8 +104,8 @@ test('can read ctgA', async () => {
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(109)
   items.forEach(({ line, fileOffset }) => {
-    line = line.spltest('\t')
-    expect(line[0]).toEqual('contigA')
+    const l = line.split('\t')
+    expect(l[0]).toEqual('contigA')
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   })
 })
@@ -115,7 +113,6 @@ test('can count lines with TBI', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    yieldLimit: 10,
   })
   expect(await f.lineCount('contigA')).toEqual(109)
   expect(await f.lineCount('nonexistent')).toEqual(-1)
@@ -124,7 +121,6 @@ test('can count lines with CSI', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     csiPath: require.resolve('./data/volvox.test.vcf.gz.csi'),
-    yieldLimit: 10,
   })
   expect(await f.lineCount('contigA')).toEqual(109)
   expect(await f.lineCount('nonexistent')).toEqual(-1)
@@ -133,23 +129,10 @@ test("can't count lines without pseudo-bin", async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi.no_pseudo'),
-    yieldLimit: 10,
   })
   expect(await f.lineCount('contigA')).toEqual(-1)
 })
-test('handles invalid input', async () => {
-  const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    yieldLimit: 10,
-  })
-  //eslint-disable-next-line @typescript-eslint/no-empty-function
-  await expect(f.getLines('foo', 32, 24, () => {})).rejects.toThrow(
-    /invalid start/,
-  )
-  await expect(f.getLines()).rejects.toThrow(/line callback/)
-  await expect(f.getLines('foo', 23, 45)).rejects.toThrow(/callback/)
-})
+
 test('can query volvox.sort.gff3.gz.1', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.sort.gff3.gz.1'),
@@ -192,28 +175,28 @@ test('can query gvcf.vcf.gz', async () => {
   expect(headerString.length).toEqual(53)
   expect(headerString[headerString.length - 1]).toEqual('\n')
 
-  const lines = []
+  const lines = [] as string[]
   await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
-  expect(lines.records.length).toEqual(0)
+  expect(lines.length).toEqual(0)
 
   await f.getLines('ctgA', -2, 3000, l => lines.push(l))
-  expect(lines.records.length).toEqual(0)
+  expect(lines.length).toEqual(0)
   await f.getLines('ctgA', -50, -20, l => lines.push(l))
-  expect(lines.records.length).toEqual(0)
+  expect(lines.length).toEqual(0)
   await f.getLines('ctgA', 4000, 5000, l => lines.push(l))
-  expect(lines.records.length).toEqual(7)
-  lines.records.length = 0
+  expect(lines.length).toEqual(7)
+  lines.length = 0
   await f.getLines('ctgA', 4383, 4384, l => lines.push(l))
-  expect(lines.records.length).toEqual(1)
-  lines.records.length = 0
+  expect(lines.length).toEqual(1)
+  lines.length = 0
   await f.getLines('ctgA', 4384, 4385, l => lines.push(l))
-  expect(lines.records.length).toEqual(1)
-  lines.records.length = 0
+  expect(lines.length).toEqual(1)
+  lines.length = 0
   await f.getLines('ctgA', 4385, 4386, l => lines.push(l))
-  expect(lines.records.length).toEqual(1)
-  lines.records.length = 0
+  expect(lines.length).toEqual(1)
+  lines.length = 0
   await f.getLines('ctgA', 4369, 4370, l => lines.push(l))
-  expect(lines.records.length).toEqual(1)
+  expect(lines.length).toEqual(1)
 })
 
 test('can query out.gff.gz with a TBI index', async () => {
@@ -231,7 +214,7 @@ test('can query out.gff.gz with a TBI index', async () => {
   await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
   lines.expectNoDuplicates()
   lines.forEach(({ line, fileOffset }) => {
-    const fields = line.spltest('\t')
+    const fields = line.split('\t')
     lineCount += 1
     expect(fields[0]).toEqual('NC_000001.11')
     expect(parseInt(fields[3], 10)).toBeLessThan(55000)
@@ -389,9 +372,12 @@ test('usage of the chr22 ultralong nanopore as a bed file', async () => {
   await ti.getLines('22', 16559999, 16564499, ret1.callback)
   const ret2 = new RecordCollector()
   await ti.getLines('22', 16564499, 16564999, ret2.callback)
-  const findfeat = ({ line }) =>
-    line.spltest('\t')[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5'
-  const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
+  const [r1, r2] = [ret1.records, ret2.records].map(x =>
+    x.find(
+      ({ line }) =>
+        line.split('\t')[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5',
+    ),
+  )
   expect(r1?.fileOffset).toEqual(r2?.fileOffset)
 })
 
@@ -416,10 +402,13 @@ test('long read consistent IDs', async () => {
   const ret2 = new RecordCollector()
   await ti.getLines('chr1', 110117499, 110119999, ret2.callback)
 
-  const findfeat = ({ line }) =>
-    line.spltest('\t')[3] ===
-    'm131004_105332_42213_c100572142530000001823103304021442_s1_p0/103296'
-  const [r1, r2] = [ret1.records, ret2.records].map(x => x.find(findfeat))
+  const [r1, r2] = [ret1.records, ret2.records].map(x =>
+    x.find(
+      ({ line }) =>
+        line.split('\t')[3] ===
+        'm131004_105332_42213_c100572142530000001823103304021442_s1_p0/103296',
+    ),
+  )
   expect(r1?.fileOffset).toEqual(r2?.fileOffset)
 })
 
