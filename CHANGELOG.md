@@ -1,13 +1,14 @@
-## [1.5.11](https://github.com/GMOD/tabix-js/compare/v1.5.10...v1.5.11) (2023-07-10)
+- Add missing abort signal to the abortable-promise-cache fetch for tabix chunks
+  (#143)
 
+## [1.5.11](https://github.com/GMOD/tabix-js/compare/v1.5.10...v1.5.11) (2023-07-10)
 
 ### Features
 
-* explicit buffer import ([#140](https://github.com/GMOD/tabix-js/issues/140)) ([fb80ac8](https://github.com/GMOD/tabix-js/commit/fb80ac813a0d40255556de3ab28dae1940f59c1d))
+- explicit buffer import ([#140](https://github.com/GMOD/tabix-js/issues/140))
+  ([fb80ac8](https://github.com/GMOD/tabix-js/commit/fb80ac813a0d40255556de3ab28dae1940f59c1d))
 
-
-
-- Add explicit buffer import
+* Add explicit buffer import
 
 ## [1.5.10](https://github.com/GMOD/tabix-js/compare/v1.5.9...v1.5.10) (2023-03-30)
 
