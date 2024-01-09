@@ -189,6 +189,7 @@ export default class TabixIndexedFile {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
+        signal,
       )
 
       checkAbortSignal(signal)
