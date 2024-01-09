@@ -147,6 +147,7 @@ export default class TabixIndexedFile {
     } else {
       options = opts
       callback = opts.lineCallback
+      signal = opts.signal
     }
     if (refName === undefined) {
       throw new TypeError('must provide a reference sequence name')
