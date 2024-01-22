@@ -60,7 +60,7 @@ test('can read ctgA:1000..4000', async () => {
 
   const headerString = await f.getHeader()
   expect(headerString.length).toEqual(10431)
-  expect(headerString[headerString.length - 1]).toEqual('\n')
+  expect(headerString.at(-1)).toEqual('\n')
 
   expect(await f.getMetadata()).toEqual({
     columnNumbers: { end: 0, ref: 1, start: 2 },
@@ -140,7 +140,7 @@ test('can query volvox.sort.gff3.gz.1', async () => {
   })
 
   const headerString = await f.getHeader()
-  expect(headerString[headerString.length - 1]).toEqual('\n')
+  expect(headerString.at(-1)).toEqual('\n')
   expect(headerString.length).toEqual(130)
 
   const lines = new RecordCollector()
@@ -173,7 +173,7 @@ test('can query gvcf.vcf.gz', async () => {
 
   const headerString = await f.getHeader()
   expect(headerString.length).toEqual(53)
-  expect(headerString[headerString.length - 1]).toEqual('\n')
+  expect(headerString.at(-1)).toEqual('\n')
 
   const lines = [] as string[]
   await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
@@ -238,7 +238,7 @@ test('can query test.vcf.gz with a CSI index', async () => {
 
   const headerString = await f.getHeader()
   expect(headerString.length).toEqual(2560)
-  expect(headerString[headerString.length - 1]).toEqual('\n')
+  expect(headerString.at(-1)).toEqual('\n')
 
   const lines = new RecordCollector()
   await f.getLines('ctgB', 0, Infinity, lines.callback)
@@ -285,7 +285,7 @@ test('can fetch the entire header for a very large vcf header', async () => {
   const h = await f.getHeader()
   const lastBit = 'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
   expect(h.slice(h.length - lastBit.length, h.length)).toEqual(lastBit)
-  expect(h[h.length - 1]).toEqual('\n')
+  expect(h.at(-1)).toEqual('\n')
   expect(h.length).toEqual(5315655)
 })
 
