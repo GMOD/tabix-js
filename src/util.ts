@@ -32,6 +32,7 @@ export function checkAbortSignal(signal?: AbortSignal) {
 
   if (signal.aborted) {
     if (typeof DOMException !== 'undefined') {
+      // eslint-disable-next-line  no-undef
       throw new DOMException('aborted', 'AbortError')
     } else {
       const e = new AbortError('aborted')

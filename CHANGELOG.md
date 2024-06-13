@@ -1,5 +1,7 @@
 ## [1.5.13](https://github.com/GMOD/tabix-js/compare/v1.5.12...v1.5.13) (2024-01-09)
 
+
+
 - Another fix for abort signal in getLines
 
 ## [1.5.12](https://github.com/GMOD/tabix-js/compare/v1.5.11...v1.5.12) (2024-01-09)
