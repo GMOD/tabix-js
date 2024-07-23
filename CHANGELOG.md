@@ -1,10 +1,19 @@
+## [1.5.14](https://github.com/GMOD/tabix-js/compare/v1.5.13...v1.5.14) (2024-07-23)
+
+
+### Reverts
+
+* Revert "Bump to eslint 9" ([9bd49b1](https://github.com/GMOD/tabix-js/commit/9bd49b1132f632b0e7847d9b95cf3cb08c424360))
+
+
+
 ## [1.5.13](https://github.com/GMOD/tabix-js/compare/v1.5.12...v1.5.13) (2024-01-09)
 
 - Another fix for abort signal in getLines
 
 ## [1.5.12](https://github.com/GMOD/tabix-js/compare/v1.5.11...v1.5.12) (2024-01-09)
 
-- Add missing abort signal to the abortable-promise-cache fetch for tabix chunks
+- Add missing abort signal to the @gmod/abortable-promise-cache fetch for tabix chunks
   (#143)
 
 ## [1.5.11](https://github.com/GMOD/tabix-js/compare/v1.5.10...v1.5.11) (2023-07-10)
