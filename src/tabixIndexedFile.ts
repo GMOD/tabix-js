@@ -1,4 +1,4 @@
-import AbortablePromiseCache from 'abortable-promise-cache'
+import AbortablePromiseCache from '@gmod/abortable-promise-cache'
 import LRU from 'quick-lru'
 import { Buffer } from 'buffer'
 import { GenericFilehandle, LocalFile } from 'generic-filehandle'
