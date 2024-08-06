@@ -4,6 +4,15 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
+    ignores: [
+      'webpack.config.js',
+      'dist/*',
+      'esm/*',
+      'example/*',
+      'eslint.config.mjs',
+    ],
+  },
+  {
     languageOptions: {
       parserOptions: {
         project: ['./tsconfig.lint.json'],
@@ -73,12 +82,16 @@ export default tseslint.config(
       'unicorn/escape-case': 'off',
       'unicorn/prefer-number-properties': 'off',
       'unicorn/no-process-exit': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
+      '@typescript-eslint/no-deprecated': 'off',
+      'no-empty': 'off',
     },
   },
 )

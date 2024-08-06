@@ -15,14 +15,15 @@ class AbortError extends Error {
   public code: string | undefined
 }
 /**
- * Properly check if the given AbortSignal is aborted.
- * Per the standard, if the signal reads as aborted,
- * this function throws either a DOMException AbortError, or a regular error
- * with a `code` attribute set to `ERR_ABORTED`.
+ * Properly check if the given AbortSignal is aborted. Per the standard, if the
+ * signal reads as aborted, this function throws either a DOMException
+ * AbortError, or a regular error with a `code` attribute set to `ERR_ABORTED`.
  *
  * For convenience, passing `undefined` is a no-op
  *
- * @param {AbortSignal} [signal] an AbortSignal, or anything with an `aborted` attribute
+ * @param {AbortSignal} [signal] an AbortSignal, or anything with an `aborted`
+ * attribute
+ *
  * @returns nothing
  */
 export function checkAbortSignal(signal?: AbortSignal) {
@@ -59,7 +60,7 @@ export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
   )
 }
 
-export function optimizeChunks(chunks: Chunk[], lowest: VirtualOffset) {
+export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
   const mergedChunks: Chunk[] = []
   let lastChunk: Chunk | null = null
 

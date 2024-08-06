@@ -1,3 +1,4 @@
+import { vi, expect, test } from 'vitest'
 import { LocalFile } from 'generic-filehandle'
 import VirtualOffset from '../src/virtualOffset'
 import TBI from '../src/tbi'
@@ -31,7 +32,7 @@ test('loads', async () => {
     skipLines: 0,
     maxRefLength: 536870912,
   })
-  console.warn = jest.fn()
+  console.warn = vi.fn()
   expect(await ti.blocksForRange('contigA', 7334998796, 8104229566)).toEqual([])
   expect(console.warn).toHaveBeenCalledWith(
     'querying outside of possible tabix range',

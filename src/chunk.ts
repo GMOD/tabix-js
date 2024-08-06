@@ -20,7 +20,7 @@ export default class Chunk {
   }
 
   toUniqueString() {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+     
     return `${this.minv}..${this.maxv} (bin ${
       this.bin
     }, fetchedSize ${this.fetchedSize()})`

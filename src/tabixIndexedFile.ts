@@ -33,23 +33,32 @@ function timeout(time: number) {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
-  private chunkSizeLimit: number
   private yieldTime: number
   private renameRefSeq: (n: string) => string
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
 
   /**
    * @param {object} args
+   *
    * @param {string} [args.path]
+   *
    * @param {filehandle} [args.filehandle]
+   *
    * @param {string} [args.tbiPath]
+   *
    * @param {filehandle} [args.tbiFilehandle]
+   *
    * @param {string} [args.csiPath]
+   *
    * @param {filehandle} [args.csiFilehandle]
-   * @param {number} [args.yieldTime] yield to main thread after N milliseconds if reading features is taking a long time to avoid hanging main thread
-   * @param {function} [args.renameRefSeqs] optional function with sig `string => string` to transform
-   * reference sequence names for the purpose of indexing and querying. note that the data that is returned is
-   * not altered, just the names of the reference sequences that are used for querying.
+   *
+   * @param {number} [args.yieldTime] yield to main thread after N milliseconds
+   * if reading features is taking a long time to avoid hanging main thread
+   *
+   * @param {function} [args.renameRefSeqs] optional function with sig `string
+   * => string` to transform reference sequence names for the purpose of
+   * indexing and querying. note that the data that is returned is not altered,
+   * just the names of the reference sequences that are used for querying.
    */
   constructor({
     path,
@@ -62,7 +71,6 @@ export default class TabixIndexedFile {
     csiUrl,
     csiFilehandle,
     yieldTime = 500,
-    chunkSizeLimit = 50000000,
     renameRefSeqs = n => n,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
@@ -76,7 +84,6 @@ export default class TabixIndexedFile {
     csiUrl?: string
     csiFilehandle?: GenericFilehandle
     yieldTime?: number
-    chunkSizeLimit?: number
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
@@ -133,7 +140,6 @@ export default class TabixIndexedFile {
       )
     }
 
-    this.chunkSizeLimit = chunkSizeLimit
     this.renameRefSeq = renameRefSeqs
     this.yieldTime = yieldTime
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
@@ -145,10 +151,16 @@ export default class TabixIndexedFile {
 
   /**
    * @param refName name of the reference sequence
+   *
    * @param start start of the region (in 0-based half-open coordinates)
+   *
    * @param end end of the region (in 0-based half-open coordinates)
-   * @param opts callback called for each line in the region. can also pass a object param containing obj.lineCallback, obj.signal, etc
-   * @returns promise that is resolved when the whole read is finished, rejected on error
+   *
+   * @param opts callback called for each line in the region. can also pass a
+   * object param containing obj.lineCallback, obj.signal, etc
+   *
+   * @returns promise that is resolved when the whole read is finished,
+   * rejected on error
    */
   async getLines(
     refName: string,
@@ -159,21 +171,13 @@ export default class TabixIndexedFile {
     let signal: AbortSignal | undefined
     let options: Options = {}
     let callback: (line: string, lineOffset: number) => void
-    if (opts === undefined) {
-      throw new TypeError('line callback must be provided')
-    }
+
     if (typeof opts === 'function') {
       callback = opts
     } else {
       options = opts
       callback = opts.lineCallback
       signal = opts.signal
-    }
-    if (refName === undefined) {
-      throw new TypeError('must provide a reference sequence name')
-    }
-    if (!callback) {
-      throw new TypeError('line callback must be provided')
     }
 
     const metadata = await this.index.getMetadata(options)
@@ -191,17 +195,6 @@ export default class TabixIndexedFile {
 
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
-
-    // check the chunks for any that are over the size limit.  if
-    // any are, don't fetch any of them
-    for (const chunk of chunks) {
-      const size = chunk.fetchedSize()
-      if (size > this.chunkSizeLimit) {
-        throw new Error(
-          `Too much data. Chunk size ${size.toLocaleString()} bytes exceeds chunkSizeLimit of ${this.chunkSizeLimit.toLocaleString()}.`,
-        )
-      }
-    }
 
     // now go through each chunk and parse and filter the lines out of it
     let last = Date.now()
@@ -224,8 +217,9 @@ export default class TabixIndexedFile {
         const b = buffer.slice(blockStart, n)
         const line = decoder?.decode(b) ?? b.toString()
 
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (dpositions) {
-          while (blockStart + c.minv.dataPosition >= dpositions[pos++]) {}
+          while (blockStart + c.minv.dataPosition >= dpositions[pos++]!) {}
           pos--
         }
 
@@ -262,8 +256,8 @@ export default class TabixIndexedFile {
             // then the blockStart-dpositions is an uncompressed file offset from
             // that bgzip block boundary, and since the cpositions are multiplied by
             // (1 << 8) these uncompressed offsets get a unique space
-            cpositions[pos] * (1 << 8) +
-              (blockStart - dpositions[pos]) +
+            cpositions[pos]! * (1 << 8) +
+              (blockStart - dpositions[pos]!) +
               c.minv.dataPosition +
               1,
           )
@@ -290,14 +284,15 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * get a buffer containing the "header" region of
-   * the file, which are the bytes up to the first
-   * non-meta line
+   * get a buffer containing the "header" region of the file, which are the
+   * bytes up to the first non-meta line
    */
   async getHeaderBuffer(opts: Options = {}) {
     const { firstDataLine, metaChar, maxBlockSize } =
       await this.getMetadata(opts)
     checkAbortSignal(opts.signal)
+
+    // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const maxFetch = (firstDataLine?.blockPosition || 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header
     // actually takes up more than one block? this case is not covered here
@@ -325,8 +320,8 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * get a string containing the "header" region of the
-   * file, is the portion up to the first non-meta line
+   * get a string containing the "header" region of the file, is the portion up
+   * to the first non-meta line
    *
    * @returns {Promise} for a string
    */
@@ -336,9 +331,8 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * get an array of reference sequence names, in the order in which
-   * they occur in the file. reference sequence renaming is not applied
-   * to these names.
+   * get an array of reference sequence names, in the order in which they occur
+   * in the file. reference sequence renaming is not applied to these names.
    */
   async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
@@ -346,12 +340,17 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * @param {object} metadata metadata object from the parsed index,
-   * containing columnNumbers, metaChar, and format
+   * @param {object} metadata metadata object from the parsed index, containing
+   * columnNumbers, metaChar, and format
+   *
    * @param {string} regionRefName
+   *
    * @param {number} regionStart region start coordinate (0-based-half-open)
+   *
    * @param {number} regionEnd region end coordinate (0-based-half-open)
+   *
    * @param {array[string]} line
+   *
    * @returns {object} like `{startCoordinate, overlaps}`. overlaps is boolean,
    * true if line is a data line that overlaps the given region
    */
@@ -384,9 +383,9 @@ export default class TabixIndexedFile {
     }
     const maxColumn = Math.max(ref, start, end)
 
-    // this code is kind of complex, but it is fairly fast.
-    // basically, we want to avoid doing a split, because if the lines are really long
-    // that could lead to us allocating a bunch of extra memory, which is slow
+    // this code is kind of complex, but it is fairly fast. basically, we want
+    // to avoid doing a split, because if the lines are really long that could
+    // lead to us allocating a bunch of extra memory, which is slow
 
     let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
     let currentColumnStart = 0
@@ -470,8 +469,11 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * return the approximate number of data lines in the given reference sequence
+   * return the approximate number of data lines in the given reference
+   * sequence
+   *
    * @param refSeq reference sequence name
+   *
    * @returns number of data lines present on that reference sequence
    */
   async lineCount(refName: string, opts: Options = {}) {
@@ -496,8 +498,8 @@ export default class TabixIndexedFile {
    * contiguous bgzip blocks) of the file
    */
   async readChunk(c: Chunk, opts: Options = {}) {
-    // fetch the uncompressed data, uncompress carefully a block at a time,
-    // and stop when done
+    // fetch the uncompressed data, uncompress carefully a block at a time, and
+    // stop when done
 
     const data = await this._readRegion(
       c.minv.blockPosition,

@@ -65,7 +65,7 @@ export default abstract class IndexFile {
 
   async parse(opts: Options = {}) {
     if (!this.parseP) {
-      this.parseP = this._parse(opts).catch(e => {
+      this.parseP = this._parse(opts).catch((e: unknown) => {
         this.parseP = undefined
         throw e
       })
