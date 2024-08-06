@@ -1,0 +1,25 @@
+<html>
+  <head>
+    <script src="https://unpkg.com/@gmod/tabix/dist/tabix-bundle.js"></script>
+    <script type="text/javascript">
+      ;(async () => {
+        const { TabixIndexedFile } = window.gmodTABIX
+
+        const tbiIndexed = new TabixIndexedFile({
+          url: 'volvox.filtered.vcf.gz',
+          tbiUrl: 'volvox.filtered.vcf.gz.tbi',
+        })
+        const lines = []
+        const res = await tbiIndexed.getLines('ctgA', 0, 10000, line =>
+          lines.push(line),
+        )
+        console.log({ lines })
+        document.getElementById('output').innerHTML = lines.join('\n')
+      })()
+    </script>
+  </head>
+  <body>
+    <h1>Hello world</h1>
+    <pre id="output" />
+  </body>
+</html>
