@@ -1,7 +1,7 @@
 import AbortablePromiseCache from '@gmod/abortable-promise-cache'
 import LRU from 'quick-lru'
 import { Buffer } from 'buffer'
-import { GenericFilehandle, LocalFile } from 'generic-filehandle'
+import { GenericFilehandle, RemoteFile, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile, { Options, IndexData } from './indexFile'
@@ -54,9 +54,12 @@ export default class TabixIndexedFile {
   constructor({
     path,
     filehandle,
+    url,
     tbiPath,
+    tbiUrl,
     tbiFilehandle,
     csiPath,
+    csiUrl,
     csiFilehandle,
     yieldTime = 500,
     chunkSizeLimit = 50000000,
@@ -65,9 +68,12 @@ export default class TabixIndexedFile {
   }: {
     path?: string
     filehandle?: GenericFilehandle
+    url?: string
     tbiPath?: string
+    tbiUrl?: string
     tbiFilehandle?: GenericFilehandle
     csiPath?: string
+    csiUrl?: string
     csiFilehandle?: GenericFilehandle
     yieldTime?: number
     chunkSizeLimit?: number
@@ -78,6 +84,8 @@ export default class TabixIndexedFile {
       this.filehandle = filehandle
     } else if (path) {
       this.filehandle = new LocalFile(path)
+    } else if (url) {
+      this.filehandle = new RemoteFile(url)
     } else {
       throw new TypeError('must provide either filehandle or path')
     }
@@ -107,9 +115,21 @@ export default class TabixIndexedFile {
         filehandle: new LocalFile(`${path}.tbi`),
         renameRefSeqs,
       })
+    } else if (csiUrl) {
+      this.index = new CSI({
+        filehandle: new RemoteFile(csiUrl),
+      })
+    } else if (tbiUrl) {
+      this.index = new TBI({
+        filehandle: new RemoteFile(tbiUrl),
+      })
+    } else if (url) {
+      this.index = new TBI({
+        filehandle: new RemoteFile(`${url}.tbi`),
+      })
     } else {
       throw new TypeError(
-        'must provide one of tbiFilehandle, tbiPath, csiFilehandle, or csiPath',
+        'must provide one of tbiFilehandle, tbiPath, csiFilehandle, csiPath, tbiUrl, csiUrl',
       )
     }
 
