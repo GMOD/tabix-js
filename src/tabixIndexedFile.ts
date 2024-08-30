@@ -52,6 +52,12 @@ export default class TabixIndexedFile {
    *
    * @param {filehandle} [args.csiFilehandle]
    *
+   * @param {url} [args.url]
+   *
+   * @param {csiUrl} [args.csiUrl]
+   *
+   * @param {tbiUrl} [args.tbiUrl]
+   *
    * @param {number} [args.yieldTime] yield to main thread after N milliseconds
    * if reading features is taking a long time to avoid hanging main thread
    *

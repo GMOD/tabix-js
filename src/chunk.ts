@@ -20,7 +20,6 @@ export default class Chunk {
   }
 
   toUniqueString() {
-     
     return `${this.minv}..${this.maxv} (bin ${
       this.bin
     }, fetchedSize ${this.fetchedSize()})`
