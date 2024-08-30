@@ -22,6 +22,15 @@ const { TabixIndexedFile } = require('@gmod/tabix')
 import { TabixIndexedFile } from '@gmod/tabix'
 ```
 
+### Single file bundle
+
+You can use tabix-js without NPM also with the tabix-bundle.js. See the example
+directory for usage with script tag [example/index.html](example/index.html)
+
+```
+    <script src="https://unpkg.com/@gmod/tabix/dist/tabix-bundle.js"></script>
+```
+
 ### TabixIndexedFile constructor
 
 Basic usage of TabixIndexedFile under node.js supplies a path and optionally a

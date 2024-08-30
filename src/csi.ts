@@ -30,10 +30,10 @@ export default class CSI extends IndexFile {
   }
   async lineCount(refName: string, opts: Options = {}): Promise<number> {
     const indexData = await this.parse(opts)
-    if (!indexData) {
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
       return -1
     }
-    const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
     if (!idx) {
       return -1
@@ -44,6 +44,7 @@ export default class CSI extends IndexFile {
     }
     return -1
   }
+
   indexCov() {
     throw new Error('CSI indexes do not support indexcov')
   }
@@ -206,10 +207,10 @@ export default class CSI extends IndexFile {
     }
 
     const indexData = await this.parse(opts)
-    if (!indexData) {
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
       return []
     }
-    const refId = indexData.refNameToId[refName]
     const ba = indexData.indices[refId]
     if (!ba) {
       return []
@@ -258,7 +259,7 @@ export default class CSI extends IndexFile {
           `query ${beg}-${end} is too large for current binning scheme (shift ${this.minShift}, depth ${this.depth}), try a smaller query or a coarser index binning scheme`,
         )
       }
-      bins.push([b, e])
+      bins.push([b, e] as const)
     }
     return bins
   }

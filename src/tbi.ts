@@ -10,7 +10,8 @@ const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
 /**
- * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
+ * calculate the list of bins that may overlap with region [beg,end)
+ * (zero-based half-open)
  */
 function reg2bins(beg: number, end: number) {
   beg += 1 // < convert to 1-based closed
@@ -22,16 +23,16 @@ function reg2bins(beg: number, end: number) {
     [73 + (beg >> 20), 73 + (end >> 20)],
     [585 + (beg >> 17), 585 + (end >> 17)],
     [4681 + (beg >> 14), 4681 + (end >> 14)],
-  ]
+  ] as const
 }
 
 export default class TabixIndex extends IndexFile {
   async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
-    if (!indexData) {
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
       return -1
     }
-    const refId = indexData.refNameToId[refName]
     const idx = indexData.indices[refId]
     if (!idx) {
       return -1
@@ -194,10 +195,10 @@ export default class TabixIndex extends IndexFile {
     }
 
     const indexData = await this.parse(opts)
-    if (!indexData) {
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
       return []
     }
-    const refId = indexData.refNameToId[refName]
     const ba = indexData.indices[refId]
     if (!ba) {
       return []

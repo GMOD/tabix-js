@@ -1,3 +1,4 @@
+import { expect, test } from 'vitest'
 import TabixIndexedFile from '../src/tabixIndexedFile'
 import VirtualOffset from '../src/virtualOffset'
 
@@ -284,7 +285,7 @@ test('can fetch the entire header for a very large vcf header', async () => {
 
   const h = await f.getHeader()
   const lastBit = 'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
-  expect(h.slice(h.length - lastBit.length, h.length)).toEqual(lastBit)
+  expect(h.slice(h.length - lastBit.length)).toEqual(lastBit)
   expect(h.at(-1)).toEqual('\n')
   expect(h.length).toEqual(5315655)
 })

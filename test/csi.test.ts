@@ -1,3 +1,4 @@
+import { expect, test } from 'vitest'
 import { LocalFile } from 'generic-filehandle'
 import VirtualOffset from '../src/virtualOffset'
 import CSI from '../src/csi'
