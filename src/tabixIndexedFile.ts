@@ -1,5 +1,4 @@
 import AbortablePromiseCache from '@gmod/abortable-promise-cache'
-import LRU from 'quick-lru'
 import { Buffer } from 'buffer'
 import { GenericFilehandle, RemoteFile, LocalFile } from 'generic-filehandle'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
@@ -35,7 +34,7 @@ export default class TabixIndexedFile {
   private index: IndexFile
   private yieldTime: number
   private renameRefSeq: (n: string) => string
-  private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
+  private chunkCache: AbortablePromiseCache<string, ReadChunk, { chunk: Chunk }>
 
   /**
    * @param {object} args
@@ -78,7 +77,7 @@ export default class TabixIndexedFile {
     csiFilehandle,
     yieldTime = 500,
     renameRefSeqs = n => n,
-    chunkCacheSize = 5 * 2 ** 20,
+    chunkCacheSize = 20,
   }: {
     path?: string
     filehandle?: GenericFilehandle
@@ -148,10 +147,27 @@ export default class TabixIndexedFile {
 
     this.renameRefSeq = renameRefSeqs
     this.yieldTime = yieldTime
-    this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
-      cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
-      fill: (args: Chunk, signal?: AbortSignal) =>
-        this.readChunk(args, { signal }),
+    this.chunkCache = new AbortablePromiseCache<
+      string,
+      ReadChunk,
+      { chunk: Chunk }
+    >({
+      max: chunkCacheSize,
+      fetchMethod: async (
+        _key,
+        _old,
+        {
+          context,
+          signal,
+        }: {
+          context: {
+            chunk: Chunk
+          }
+          signal?: AbortSignal
+        },
+      ) => {
+        return this.readChunk(context.chunk, { signal })
+      },
     })
   }
 
@@ -206,11 +222,14 @@ export default class TabixIndexedFile {
     let last = Date.now()
     for (const c of chunks) {
       let previousStartCoordinate: number | undefined
-      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
-        c.toString(),
-        c,
+      const res = await this.chunkCache.fetch(c.toString(), {
         signal,
-      )
+        context: { chunk: c },
+      })
+      if (res === undefined) {
+        throw new Error('Failed to fetch')
+      }
+      const { buffer, cpositions, dpositions } = res
 
       checkAbortSignal(signal)
       let blockStart = 0

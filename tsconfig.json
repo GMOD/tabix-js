@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "moduleResolution": "node",
-    "lib": ["es2017", "es7", "es6", "dom"],
+    "target": "esnext",
     "declaration": true,
     "noUncheckedIndexedAccess": true,
     "outDir": "dist",
