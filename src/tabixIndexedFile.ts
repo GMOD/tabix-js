@@ -10,6 +10,10 @@ import Chunk from './chunk'
 import TBI from './tbi'
 import CSI from './csi'
 
+function isASCII(str: string) {
+  return /^[\u0000-\u007F]*$/.test(str)
+}
+
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
 const decoder =
@@ -215,72 +219,68 @@ export default class TabixIndexedFile {
       checkAbortSignal(signal)
       let blockStart = 0
       let pos = 0
-      while (blockStart < buffer.length) {
-        const n = buffer.indexOf('\n', blockStart)
-        if (n === -1) {
-          break
-        }
-        const b = buffer.slice(blockStart, n)
-        const line = decoder?.decode(b) ?? b.toString()
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (dpositions) {
-          while (blockStart + c.minv.dataPosition >= dpositions[pos++]!) {}
-          pos--
-        }
+      const str = decoder?.decode(buffer) ?? buffer.toString()
+      if (isASCII(str)) {
+        while (blockStart < str.length) {
+          const n = str.indexOf('\n', blockStart)
+          if (n === -1) {
+            break
+          }
+          const line = str.slice(blockStart, n)
 
-        // filter the line for whether it is within the requested range
-        const { startCoordinate, overlaps } = this.checkLine(
-          metadata,
-          refName,
-          start,
-          end,
-          line,
-        )
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (dpositions) {
+            while (blockStart + c.minv.dataPosition >= dpositions[pos++]!) {}
+            pos--
+          }
 
-        // do a small check just to make sure that the lines are really sorted
-        // by start coordinate
-        if (
-          previousStartCoordinate !== undefined &&
-          startCoordinate !== undefined &&
-          previousStartCoordinate > startCoordinate
-        ) {
-          throw new Error(
-            `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
+          // filter the line for whether it is within the requested range
+          const { startCoordinate, overlaps } = this.checkLine(
+            metadata,
+            refName,
+            start,
+            end,
+            line,
           )
-        }
-        previousStartCoordinate = startCoordinate
 
-        if (overlaps) {
-          callback(
-            line.trim(),
-            // cpositions[pos] refers to actual file offset of a bgzip block boundaries
-            //
-            // we multiply by (1 <<8) in order to make sure each block has a "unique"
-            // address space so that data in that block could never overlap
-            //
-            // then the blockStart-dpositions is an uncompressed file offset from
-            // that bgzip block boundary, and since the cpositions are multiplied by
-            // (1 << 8) these uncompressed offsets get a unique space
-            cpositions[pos]! * (1 << 8) +
-              (blockStart - dpositions[pos]!) +
-              c.minv.dataPosition +
-              1,
-          )
-        } else if (startCoordinate !== undefined && startCoordinate >= end) {
-          // the lines were overlapping the region, but now have stopped, so
-          // we must be at the end of the relevant data and we can stop
-          // processing data now
-          return
-        }
+          // do a small check just to make sure that the lines are really sorted
+          // by start coordinate
+          if (
+            previousStartCoordinate !== undefined &&
+            startCoordinate !== undefined &&
+            previousStartCoordinate > startCoordinate
+          ) {
+            throw new Error(
+              `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
+            )
+          }
+          previousStartCoordinate = startCoordinate
 
-        // yield if we have emitted beyond the yield limit
-        if (this.yieldTime && last - Date.now() > this.yieldTime) {
-          last = Date.now()
-          checkAbortSignal(signal)
-          await timeout(1)
+          if (overlaps) {
+            callback(
+              line,
+              // cpositions[pos] refers to actual file offset of a bgzip block boundaries
+              //
+              // we multiply by (1 <<8) in order to make sure each block has a "unique"
+              // address space so that data in that block could never overlap
+              //
+              // then the blockStart-dpositions is an uncompressed file offset from
+              // that bgzip block boundary, and since the cpositions are multiplied by
+              // (1 << 8) these uncompressed offsets get a unique space
+              cpositions[pos]! * (1 << 8) +
+                (blockStart - dpositions[pos]!) +
+                c.minv.dataPosition +
+                1,
+            )
+          } else if (startCoordinate !== undefined && startCoordinate >= end) {
+            // the lines were overlapping the region, but now have stopped, so
+            // we must be at the end of the relevant data and we can stop
+            // processing data now
+            return
+          }
+          blockStart = n + 1
         }
-        blockStart = n + 1
       }
     }
   }
@@ -294,8 +294,12 @@ export default class TabixIndexedFile {
    * bytes up to the first non-meta line
    */
   async getHeaderBuffer(opts: Options = {}) {
-    const { firstDataLine, metaChar, maxBlockSize } =
-      await this.getMetadata(opts)
+    const {
+      firstDataLine,
+      metaChar: m,
+      maxBlockSize,
+    } = await this.getMetadata(opts)
+    const metaChar = m || '@'
     checkAbortSignal(opts.signal)
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
@@ -320,7 +324,7 @@ export default class TabixIndexedFile {
           lastNewline = i
         }
       }
-      return bytes.slice(0, lastNewline + 1)
+      return bytes.subarray(0, lastNewline + 1)
     }
     return bytes
   }
@@ -362,7 +366,7 @@ export default class TabixIndexedFile {
    */
   checkLine(
     metadata: IndexData,
-    regionRefName: string,
+    regionRefName: string | undefined,
     regionStart: number,
     regionEnd: number,
     line: string,
@@ -401,8 +405,9 @@ export default class TabixIndexedFile {
       if (line[i] === '\t' || i === line.length) {
         if (currentColumnNumber === ref) {
           if (
+            regionRefName !== undefined &&
             this.renameRefSeq(line.slice(currentColumnStart, i)) !==
-            regionRefName
+              regionRefName
           ) {
             return { overlaps: false }
           }
@@ -432,7 +437,7 @@ export default class TabixIndexedFile {
                   refSeq,
                   line.slice(currentColumnStart, i),
                 )
-              : parseInt(line.slice(currentColumnStart, i), 10)
+              : Number.parseInt(line.slice(currentColumnStart, i), 10)
           if (endCoordinate <= regionStart) {
             return { overlaps: false }
           }
@@ -496,7 +501,7 @@ export default class TabixIndexedFile {
       opts,
     )
 
-    return buffer.slice(0, bytesRead)
+    return buffer.subarray(0, bytesRead)
   }
 
   /**

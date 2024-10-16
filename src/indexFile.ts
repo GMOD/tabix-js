@@ -43,6 +43,13 @@ export default abstract class IndexFile {
     return rest
   }
 
+  public abstract blocksForRangeForRefId(
+    refId: number,
+    start: number,
+    end: number,
+    opts: Options,
+  ): Promise<Chunk[]>
+
   public abstract blocksForRange(
     refName: string,
     start: number,
