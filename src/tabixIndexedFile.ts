@@ -11,6 +11,7 @@ import TBI from './tbi'
 import CSI from './csi'
 
 function isASCII(str: string) {
+  // eslint-disable-next-line no-control-regex
   return /^[\u0000-\u007F]*$/.test(str)
 }
 
