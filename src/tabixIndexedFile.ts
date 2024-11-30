@@ -198,7 +198,6 @@ export default class TabixIndexedFile {
 
     // now go through each chunk and parse and filter the lines out of it
     for (const c of chunks) {
-      let previousStartCoordinate: number | undefined
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
@@ -209,9 +208,11 @@ export default class TabixIndexedFile {
       let blockStart = 0
       let pos = 0
 
-      // fast path, Buffer is just ASCII chars, process directly
       const str = decoder?.decode(buffer) ?? buffer.toString()
-      const strIsASCII = isASCII(str)
+      // fast path, Buffer is just ASCII chars and not gigantor, can be
+      // converted to string and processed directly. if it is not ASCII or
+      // gigantic (chrome max str len is 512Mb), we have to decode line by line
+      const strIsASCII = buffer.length < 500_000_000 && isASCII(str)
       while (blockStart < str.length) {
         let line: string
         let n: number
@@ -226,7 +227,7 @@ export default class TabixIndexedFile {
           if (n === -1) {
             break
           }
-          const b = buffer.subarray(blockStart, n)
+          const b = buffer.slice(blockStart, n)
           line = decoder?.decode(b) ?? b.toString()
         }
 
@@ -245,39 +246,29 @@ export default class TabixIndexedFile {
           line,
         )
 
-        // do a small check just to make sure that the lines are really sorted
-        // by start coordinate
-        if (
-          previousStartCoordinate !== undefined &&
-          startCoordinate !== undefined &&
-          previousStartCoordinate > startCoordinate
-        ) {
-          throw new Error(
-            `Lines not sorted by start coordinate (${previousStartCoordinate} > ${startCoordinate}), this file is not usable with Tabix.`,
-          )
-        }
-        previousStartCoordinate = startCoordinate
-
         if (overlaps) {
           callback(
             line,
-            // cpositions[pos] refers to actual file offset of a bgzip block boundaries
+            // cpositions[pos] refers to actual file offset of a bgzip block
+            // boundaries
             //
-            // we multiply by (1 <<8) in order to make sure each block has a "unique"
-            // address space so that data in that block could never overlap
+            // we multiply by (1 <<8) in order to make sure each block has a
+            // "unique" address space so that data in that block could never
+            // overlap
             //
-            // then the blockStart-dpositions is an uncompressed file offset from
-            // that bgzip block boundary, and since the cpositions are multiplied by
-            // (1 << 8) these uncompressed offsets get a unique space
+            // then the blockStart-dpositions is an uncompressed file offset
+            // from that bgzip block boundary, and since the cpositions are
+            // multiplied by (1 << 8) these uncompressed offsets get a unique
+            // space
             cpositions[pos]! * (1 << 8) +
               (blockStart - dpositions[pos]!) +
               c.minv.dataPosition +
               1,
           )
         } else if (startCoordinate !== undefined && startCoordinate >= end) {
-          // the lines were overlapping the region, but now have stopped, so
-          // we must be at the end of the relevant data and we can stop
-          // processing data now
+          // the lines were overlapping the region, but now have stopped, so we
+          // must be at the end of the relevant data and we can stop processing
+          // data now
           return
         }
         blockStart = n + 1
@@ -294,12 +285,9 @@ export default class TabixIndexedFile {
    * bytes up to the first non-meta line
    */
   async getHeaderBuffer(opts: Options = {}) {
-    const {
-      firstDataLine,
-      metaChar: m,
-      maxBlockSize,
-    } = await this.getMetadata(opts)
-    const metaChar = m || '@'
+    const { firstDataLine, metaChar, maxBlockSize } =
+      await this.getMetadata(opts)
+
     checkAbortSignal(opts.signal)
 
     // eslint-disable-next-line @typescript-eslint/restrict-plus-operands

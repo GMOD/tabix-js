@@ -196,8 +196,8 @@ export default class CSI extends IndexFile {
     return { lineCount }
   }
 
-  async blocksForRangeForRefId(
-    refId: number,
+  async blocksForRange(
+    refName: string,
     min: number,
     max: number,
     opts: Options = {},
@@ -207,6 +207,10 @@ export default class CSI extends IndexFile {
     }
 
     const indexData = await this.parse(opts)
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
+      return []
+    }
     const ba = indexData.indices[refId]
     if (!ba) {
       return []
@@ -229,24 +233,6 @@ export default class CSI extends IndexFile {
     }
 
     return optimizeChunks(chunks, new VirtualOffset(0, 0))
-  }
-
-  async blocksForRange(
-    refName: string,
-    min: number,
-    max: number,
-    opts: Options = {},
-  ) {
-    if (min < 0) {
-      min = 0
-    }
-
-    const indexData = await this.parse(opts)
-    const refId = indexData.refNameToId[refName]
-    if (refId === undefined) {
-      return []
-    }
-    return this.blocksForRangeForRefId(refId, min, max, opts)
   }
 
   /**

@@ -199,15 +199,6 @@ export default class TabixIndex extends IndexFile {
     if (refId === undefined) {
       return []
     }
-    return this.blocksForRangeForRefId(refId, min, max, opts)
-  }
-  async blocksForRangeForRefId(
-    refId: number,
-    min: number,
-    max: number,
-    opts: Options = {},
-  ) {
-    const indexData = await this.parse(opts)
     const ba = indexData.indices[refId]
     if (!ba) {
       return []
