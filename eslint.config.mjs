@@ -36,11 +36,17 @@ export default tseslint.config(
         },
       ],
 
-      'no-underscore-dangle': 0,
+      'no-console': [
+        'warn',
+        {
+          allow: ['error', 'warn'],
+        },
+      ],
+      'no-underscore-dangle': 'off',
       curly: 'error',
-      '@typescript-eslint/no-explicit-any': 0,
-      '@typescript-eslint/explicit-module-boundary-types': 0,
-      '@typescript-eslint/ban-ts-comment': 0,
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
       semi: ['error', 'never'],
       'unicorn/no-new-array': 'off',
       'unicorn/no-empty-file': 'off',
