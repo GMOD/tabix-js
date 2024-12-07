@@ -291,7 +291,6 @@ export default class TabixIndexedFile {
 
     checkAbortSignal(opts.signal)
 
-    // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
     const maxFetch = (firstDataLine?.blockPosition || 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header
     // actually takes up more than one block? this case is not covered here
