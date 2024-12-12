@@ -1,10 +1,6 @@
 ## [1.6.1](https://github.com/GMOD/tabix-js/compare/v1.6.0...v1.6.1) (2024-12-07)
 
-
-
 # [1.6.0](https://github.com/GMOD/tabix-js/compare/v1.5.15...v1.6.0) (2024-11-30)
-
-
 
 ## [1.5.15](https://github.com/GMOD/tabix-js/compare/v1.5.14...v1.5.15) (2024-08-30)
 

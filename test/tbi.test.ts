@@ -1,5 +1,5 @@
 import { vi, expect, test } from 'vitest'
-import { LocalFile } from 'generic-filehandle'
+import { LocalFile } from 'generic-filehandle2'
 import VirtualOffset from '../src/virtualOffset'
 import TBI from '../src/tbi'
 

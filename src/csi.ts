@@ -1,5 +1,4 @@
 import Long from 'long'
-import { Buffer } from 'buffer'
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import VirtualOffset, { fromBytes } from './virtualOffset'
@@ -10,6 +9,12 @@ import IndexFile, { Options } from './indexFile'
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
+
+const formats = {
+  0: 'generic',
+  1: 'SAM',
+  2: 'VCF',
+}
 
 function lshift(num: number, bits: number) {
   return num * 2 ** bits
@@ -49,26 +54,27 @@ export default class CSI extends IndexFile {
     throw new Error('CSI indexes do not support indexcov')
   }
 
-  parseAuxData(bytes: Buffer, offset: number) {
-    const formatFlags = bytes.readInt32LE(offset)
+  parseAuxData(bytes: Uint8Array, offset: number) {
+    const dataView = new DataView(bytes.buffer)
+    const formatFlags = dataView.getInt32(offset, true)
     const coordinateType =
       formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const format = { 0: 'generic', 1: 'SAM', 2: 'VCF' }[formatFlags & 0xf]
+    const format = formats[(formatFlags & 0xf) as 0 | 1 | 2]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
     const columnNumbers = {
-      ref: bytes.readInt32LE(offset + 4),
-      start: bytes.readInt32LE(offset + 8),
-      end: bytes.readInt32LE(offset + 12),
+      ref: dataView.getInt32(offset + 4, true),
+      start: dataView.getInt32(offset + 8, true),
+      end: dataView.getInt32(offset + 12, true),
     }
-    const metaValue = bytes.readInt32LE(offset + 16)
+    const metaValue = dataView.getInt32(offset + 16, true)
     const metaChar = metaValue ? String.fromCharCode(metaValue) : null
-    const skipLines = bytes.readInt32LE(offset + 20)
-    const nameSectionLength = bytes.readInt32LE(offset + 24)
+    const skipLines = dataView.getInt32(offset + 20, true)
+    const nameSectionLength = dataView.getInt32(offset + 24, true)
 
     const { refIdToName, refNameToId } = this._parseNameBytes(
-      bytes.slice(offset + 28, offset + 28 + nameSectionLength),
+      bytes.subarray(offset + 28, offset + 28 + nameSectionLength),
     )
 
     return {
@@ -82,16 +88,18 @@ export default class CSI extends IndexFile {
     }
   }
 
-  _parseNameBytes(namesBytes: Buffer) {
+  _parseNameBytes(namesBytes: Uint8Array) {
     let currRefId = 0
     let currNameStart = 0
     const refIdToName = []
     const refNameToId: Record<string, number> = {}
+    const decoder = new TextDecoder('utf8')
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
-          let refName = namesBytes.toString('utf8', currNameStart, i)
-          refName = this.renameRefSeq(refName)
+          const refName = this.renameRefSeq(
+            decoder.decode(namesBytes.subarray(currNameStart, i)),
+          )
           refIdToName[currRefId] = refName
           refNameToId[refName] = currRefId
         }
@@ -99,30 +107,33 @@ export default class CSI extends IndexFile {
         currRefId += 1
       }
     }
-    return { refNameToId, refIdToName }
+    return {
+      refNameToId,
+      refIdToName,
+    }
   }
 
   // fetch and parse the index
 
   async _parse(opts: Options = {}) {
     const bytes = await unzip(await this.filehandle.readFile(opts))
+    const dataView = new DataView(bytes.buffer)
 
     // check TBI magic numbers
     let csiVersion
-    if (bytes.readUInt32LE(0) === CSI1_MAGIC) {
+    if (dataView.getUint32(0, true) === CSI1_MAGIC) {
       csiVersion = 1
-    } else if (bytes.readUInt32LE(0) === CSI2_MAGIC) {
+    } else if (dataView.getUint32(0, true) === CSI2_MAGIC) {
       csiVersion = 2
     } else {
       throw new Error('Not a CSI file')
-      // TODO: do we need to support big-endian CSI files?
     }
 
-    this.minShift = bytes.readInt32LE(4)
-    this.depth = bytes.readInt32LE(8)
+    this.minShift = dataView.getInt32(4, true)
+    this.depth = dataView.getInt32(8, true)
     this.maxBinNumber = ((1 << ((this.depth + 1) * 3)) - 1) / 7
     const maxRefLength = 2 ** (this.minShift + this.depth * 3)
-    const auxLength = bytes.readInt32LE(12)
+    const auxLength = dataView.getInt32(12, true)
     const aux =
       auxLength && auxLength >= 30
         ? this.parseAuxData(bytes, 16)
@@ -134,35 +145,33 @@ export default class CSI extends IndexFile {
             coordinateType: 'zero-based-half-open',
             format: 'generic',
           }
-    const refCount = bytes.readInt32LE(16 + auxLength)
+    const refCount = dataView.getInt32(16 + auxLength, true)
 
     // read the indexes for each reference sequence
     let firstDataLine: VirtualOffset | undefined
     let currOffset = 16 + auxLength + 4
     const indices = new Array(refCount).fill(0).map(() => {
-      // the binning index
-      const binCount = bytes.readInt32LE(currOffset)
+      const binCount = dataView.getInt32(currOffset, true)
       currOffset += 4
       const binIndex: Record<string, Chunk[]> = {}
-      let stats // < provided by parsing a pseudo-bin, if present
+      let stats
       for (let j = 0; j < binCount; j += 1) {
-        const bin = bytes.readUInt32LE(currOffset)
+        const bin = dataView.getUint32(currOffset, true)
         if (bin > this.maxBinNumber) {
-          // this is a fake bin that actually has stats information
-          // about the reference sequence in it
+          // this is a fake bin that actually has stats information about the
+          // reference sequence in it
           stats = this.parsePseudoBin(bytes, currOffset + 4)
           currOffset += 4 + 8 + 4 + 16 + 16
         } else {
           const loffset = fromBytes(bytes, currOffset + 4)
           firstDataLine = this._findFirstData(firstDataLine, loffset)
-          const chunkCount = bytes.readInt32LE(currOffset + 12)
+          const chunkCount = dataView.getInt32(currOffset + 12, true)
           currOffset += 16
           const chunks = new Array(chunkCount)
           for (let k = 0; k < chunkCount; k += 1) {
             const u = fromBytes(bytes, currOffset)
             const v = fromBytes(bytes, currOffset + 8)
             currOffset += 16
-            // this._findFirstData(data, u)
             chunks[k] = new Chunk(u, v, bin)
           }
           binIndex[bin] = chunks
@@ -186,14 +195,15 @@ export default class CSI extends IndexFile {
     }
   }
 
-  parsePseudoBin(bytes: Buffer, offset: number) {
-    const lineCount = longToNumber(
-      Long.fromBytesLE(
-        bytes.slice(offset + 28, offset + 36) as unknown as number[],
-        true,
+  parsePseudoBin(bytes: Uint8Array, offset: number) {
+    return {
+      lineCount: longToNumber(
+        Long.fromBytesLE(
+          bytes.subarray(offset + 28, offset + 36) as unknown as number[],
+          true,
+        ),
       ),
-    )
-    return { lineCount }
+    }
   }
 
   async blocksForRange(
@@ -216,9 +226,8 @@ export default class CSI extends IndexFile {
       return []
     }
 
-    // const { linearIndex, binIndex } = indexes
-
-    const overlappingBins = this.reg2bins(min, max) // List of bin #s that overlap min, max
+    // List of bin #s that overlap min, max
+    const overlappingBins = this.reg2bins(min, max)
     const chunks: Chunk[] = []
 
     // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
