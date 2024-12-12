@@ -1,5 +1,4 @@
 import Long from 'long'
-import { Buffer } from 'buffer'
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
 import { unzip } from '@gmod/bgzf-filehandle'
@@ -37,11 +36,7 @@ export default class TabixIndex extends IndexFile {
     if (!idx) {
       return -1
     }
-    const { stats } = indexData.indices[refId]
-    if (stats) {
-      return stats.lineCount
-    }
-    return -1
+    return indexData.indices[refId].stats?.lineCount ?? -1
   }
 
   // fetch and parse the index
@@ -49,16 +44,16 @@ export default class TabixIndex extends IndexFile {
     const buf = await this.filehandle.readFile(opts)
     const bytes = await unzip(buf)
     checkAbortSignal(opts.signal)
+    const dataView = new DataView(bytes.buffer)
 
-    // check TBI magic numbers
-    if (bytes.readUInt32LE(0) !== TBI_MAGIC /* "TBI\1" */) {
+    const magic = dataView.getUint32(0, true)
+    if (magic !== TBI_MAGIC /* "TBI\1" */) {
       throw new Error('Not a TBI file')
-      // TODO: do we need to support big-endian TBI files?
     }
 
     // number of reference sequences in the index
-    const refCount = bytes.readInt32LE(4)
-    const formatFlags = bytes.readInt32LE(8)
+    const refCount = dataView.getUint32(4, true)
+    const formatFlags = dataView.getUint32(8, true)
     const coordinateType =
       formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
     const formatOpts: Record<number, string> = {
@@ -71,19 +66,19 @@ export default class TabixIndex extends IndexFile {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
     const columnNumbers = {
-      ref: bytes.readInt32LE(12),
-      start: bytes.readInt32LE(16),
-      end: bytes.readInt32LE(20),
+      ref: dataView.getInt32(12, true),
+      start: dataView.getInt32(16, true),
+      end: dataView.getInt32(20, true),
     }
-    const metaValue = bytes.readInt32LE(24)
+    const metaValue = dataView.getInt32(24, true)
     const depth = 5
     const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
     const maxRefLength = 2 ** (14 + depth * 3)
     const metaChar = metaValue ? String.fromCharCode(metaValue) : null
-    const skipLines = bytes.readInt32LE(28)
+    const skipLines = dataView.getInt32(28, true)
 
     // read sequence dictionary
-    const nameSectionLength = bytes.readInt32LE(32)
+    const nameSectionLength = dataView.getInt32(32, true)
     const { refNameToId, refIdToName } = this._parseNameBytes(
       bytes.slice(36, 36 + nameSectionLength),
     )
@@ -93,26 +88,26 @@ export default class TabixIndex extends IndexFile {
     let firstDataLine: VirtualOffset | undefined
     const indices = new Array(refCount).fill(0).map(() => {
       // the binning index
-      const binCount = bytes.readInt32LE(currOffset)
+      const binCount = dataView.getInt32(currOffset, true)
       currOffset += 4
       const binIndex: Record<number, Chunk[]> = {}
       let stats
       for (let j = 0; j < binCount; j += 1) {
-        const bin = bytes.readUInt32LE(currOffset)
+        const bin = dataView.getUint32(currOffset, true)
         currOffset += 4
         if (bin > maxBinNumber + 1) {
           throw new Error(
             'tabix index contains too many bins, please use a CSI index',
           )
         } else if (bin === maxBinNumber + 1) {
-          const chunkCount = bytes.readInt32LE(currOffset)
+          const chunkCount = dataView.getInt32(currOffset, true)
           currOffset += 4
           if (chunkCount === 2) {
             stats = this.parsePseudoBin(bytes, currOffset)
           }
           currOffset += 16 * chunkCount
         } else {
-          const chunkCount = bytes.readInt32LE(currOffset)
+          const chunkCount = dataView.getInt32(currOffset, true)
           currOffset += 4
           const chunks = new Array(chunkCount)
           for (let k = 0; k < chunkCount; k += 1) {
@@ -127,7 +122,7 @@ export default class TabixIndex extends IndexFile {
       }
 
       // the linear index
-      const linearCount = bytes.readInt32LE(currOffset)
+      const linearCount = dataView.getInt32(currOffset, true)
       currOffset += 4
       const linearIndex = new Array(linearCount)
       for (let k = 0; k < linearCount; k += 1) {
@@ -135,7 +130,11 @@ export default class TabixIndex extends IndexFile {
         currOffset += 8
         firstDataLine = this._findFirstData(firstDataLine, linearIndex[k])
       }
-      return { binIndex, linearIndex, stats }
+      return {
+        binIndex,
+        linearIndex,
+        stats,
+      }
     })
 
     return {
@@ -154,26 +153,28 @@ export default class TabixIndex extends IndexFile {
     }
   }
 
-  parsePseudoBin(bytes: Buffer, offset: number) {
+  parsePseudoBin(bytes: Uint8Array, offset: number) {
     const lineCount = longToNumber(
       Long.fromBytesLE(
-        bytes.slice(offset + 16, offset + 24) as unknown as number[],
+        bytes.subarray(offset + 16, offset + 24) as unknown as number[],
         true,
       ),
     )
     return { lineCount }
   }
 
-  _parseNameBytes(namesBytes: Buffer) {
+  _parseNameBytes(namesBytes: Uint8Array) {
     let currRefId = 0
     let currNameStart = 0
     const refIdToName: string[] = []
     const refNameToId: Record<string, number> = {}
+    const decoder = new TextDecoder('utf8')
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
-          let refName = namesBytes.toString('utf8', currNameStart, i)
-          refName = this.renameRefSeq(refName)
+          const refName = this.renameRefSeq(
+            decoder.decode(namesBytes.subarray(currNameStart, i)),
+          )
           refIdToName[currRefId] = refName
           refNameToId[refName] = currRefId
         }
@@ -181,7 +182,10 @@ export default class TabixIndex extends IndexFile {
         currRefId += 1
       }
     }
-    return { refNameToId, refIdToName }
+    return {
+      refNameToId,
+      refIdToName,
+    }
   }
 
   async blocksForRange(

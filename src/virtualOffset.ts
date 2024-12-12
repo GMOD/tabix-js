@@ -1,4 +1,3 @@
-import { Buffer } from 'buffer'
 export default class VirtualOffset {
   public blockPosition: number
   public dataPosition: number
@@ -17,11 +16,7 @@ export default class VirtualOffset {
     )
   }
 }
-export function fromBytes(bytes: Buffer, offset = 0, bigendian = false) {
-  if (bigendian) {
-    throw new Error('big-endian virtual file offsets not implemented')
-  }
-
+export function fromBytes(bytes: Uint8Array, offset = 0) {
   return new VirtualOffset(
     bytes[offset + 7]! * 0x10000000000 +
       bytes[offset + 6]! * 0x100000000 +

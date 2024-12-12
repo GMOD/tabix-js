@@ -1,4 +1,4 @@
-import { GenericFilehandle } from 'generic-filehandle'
+import { GenericFilehandle } from 'generic-filehandle2'
 import VirtualOffset from './virtualOffset'
 import Chunk from './chunk'
 

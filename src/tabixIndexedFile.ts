@@ -1,7 +1,6 @@
 import AbortablePromiseCache from '@gmod/abortable-promise-cache'
 import LRU from 'quick-lru'
-import { Buffer } from 'buffer'
-import { GenericFilehandle, RemoteFile, LocalFile } from 'generic-filehandle'
+import { GenericFilehandle, RemoteFile, LocalFile } from 'generic-filehandle2'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import { checkAbortSignal } from './util'
 import IndexFile, { Options, IndexData } from './indexFile'
@@ -17,9 +16,6 @@ function isASCII(str: string) {
 
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
-const decoder =
-  typeof TextDecoder !== 'undefined' ? new TextDecoder('utf8') : undefined
-
 interface GetLinesOpts {
   [key: string]: unknown
   signal?: AbortSignal
@@ -27,7 +23,7 @@ interface GetLinesOpts {
 }
 
 interface ReadChunk {
-  buffer: Buffer
+  buffer: Uint8Array
   cpositions: number[]
   dpositions: number[]
 }
@@ -196,6 +192,7 @@ export default class TabixIndexedFile {
 
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     checkAbortSignal(signal)
+    const decoder = new TextDecoder('utf8')
 
     // now go through each chunk and parse and filter the lines out of it
     for (const c of chunks) {
@@ -209,11 +206,11 @@ export default class TabixIndexedFile {
       let blockStart = 0
       let pos = 0
 
-      const str = decoder?.decode(buffer) ?? buffer.toString()
       // fast path, Buffer is just ASCII chars and not gigantor, can be
       // converted to string and processed directly. if it is not ASCII or
       // gigantic (chrome max str len is 512Mb), we have to decode line by line
-      const strIsASCII = buffer.length < 500_000_000 && isASCII(str)
+      const str = decoder.decode(buffer)
+      const strIsASCII = isASCII(str)
       while (blockStart < str.length) {
         let line: string
         let n: number
@@ -224,12 +221,12 @@ export default class TabixIndexedFile {
           }
           line = str.slice(blockStart, n)
         } else {
-          n = buffer.indexOf('\n', blockStart)
+          n = buffer.indexOf('\n'.charCodeAt(0), blockStart)
           if (n === -1) {
             break
           }
           const b = buffer.slice(blockStart, n)
-          line = decoder?.decode(b) ?? b.toString()
+          line = decoder.decode(b)
         }
 
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -292,10 +289,10 @@ export default class TabixIndexedFile {
     checkAbortSignal(opts.signal)
 
     const maxFetch = (firstDataLine?.blockPosition || 0) + maxBlockSize
-    // TODO: what if we don't have a firstDataLine, and the header
-    // actually takes up more than one block? this case is not covered here
+    // TODO: what if we don't have a firstDataLine, and the header actually
+    // takes up more than one block? this case is not covered here
 
-    const buf = await this._readRegion(0, maxFetch, opts)
+    const buf = await this.filehandle.read(maxFetch, 0, opts)
     const bytes = await unzip(buf)
 
     // trim off lines after the last non-meta line
@@ -324,8 +321,9 @@ export default class TabixIndexedFile {
    * @returns {Promise} for a string
    */
   async getHeader(opts: Options = {}) {
+    const decoder = new TextDecoder('utf8')
     const bytes = await this.getHeaderBuffer(opts)
-    return bytes.toString('utf8')
+    return decoder.decode(bytes)
   }
 
   /**
@@ -492,32 +490,16 @@ export default class TabixIndexedFile {
     return this.index.lineCount(refName, opts)
   }
 
-  async _readRegion(pos: number, size: number, opts: Options = {}) {
-    const b = Buffer.alloc(size)
-    const { bytesRead, buffer } = await this.filehandle.read(
-      b,
-      0,
-      size,
-      pos,
-      opts,
-    )
-
-    return buffer.subarray(0, bytesRead)
-  }
-
   /**
    * read and uncompress the data in a chunk (composed of one or more
    * contiguous bgzip blocks) of the file
    */
   async readChunk(c: Chunk, opts: Options = {}) {
-    // fetch the uncompressed data, uncompress carefully a block at a time, and
-    // stop when done
-
-    const data = await this._readRegion(
-      c.minv.blockPosition,
+    const ret = await this.filehandle.read(
       c.fetchedSize(),
+      c.minv.blockPosition,
       opts,
     )
-    return unzipChunkSlice(data, c)
+    return unzipChunkSlice(ret, c)
   }
 }
