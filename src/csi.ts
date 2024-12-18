@@ -5,7 +5,7 @@ import Chunk from './chunk'
 import { optimizeChunks } from './util'
 
 import IndexFile, { Options } from './indexFile'
-import { fromBytesLE, toNumber } from 'longfn'
+import { longFromBytesToUnsigned } from './long'
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -197,9 +197,7 @@ export default class CSI extends IndexFile {
 
   parsePseudoBin(bytes: Uint8Array, offset: number) {
     return {
-      lineCount: toNumber(
-        fromBytesLE(bytes.subarray(offset + 28, offset + 36), true),
-      ),
+      lineCount: longFromBytesToUnsigned(bytes, offset + 28),
     }
   }
 
