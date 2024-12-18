@@ -1,11 +1,11 @@
-import Long from 'long'
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import VirtualOffset, { fromBytes } from './virtualOffset'
 import Chunk from './chunk'
-import { longToNumber, optimizeChunks } from './util'
+import { optimizeChunks } from './util'
 
 import IndexFile, { Options } from './indexFile'
+import { fromBytesLE, toNumber } from 'longfn'
 
 const CSI1_MAGIC = 21582659 // CSI\1
 const CSI2_MAGIC = 38359875 // CSI\2
@@ -197,11 +197,8 @@ export default class CSI extends IndexFile {
 
   parsePseudoBin(bytes: Uint8Array, offset: number) {
     return {
-      lineCount: longToNumber(
-        Long.fromBytesLE(
-          bytes.subarray(offset + 28, offset + 36) as unknown as number[],
-          true,
-        ),
+      lineCount: toNumber(
+        fromBytesLE(bytes.subarray(offset + 28, offset + 36), true),
       ),
     }
   }
