@@ -72,11 +72,11 @@ const remoteTbiIndexed = new TabixIndexedFile({
 ```
 
 You can also alternatively supply a filehandle-like object with the
-[generic-filehandle](https://github.com/GMOD/generic-filehandle): example
+[generic-filehandle2](https://github.com/GMOD/generic-filehandle2): example
 
 ```typescript
-// use a remote file or other filehandle, note RemoteFile comes from https://github.com/GMOD/generic-filehandle
-const { RemoteFile } = require('generic-filehandle')
+// use a remote file or other filehandle, note RemoteFile comes from https://github.com/GMOD/generic-filehandle2
+const { RemoteFile } = require('generic-filehandle2')
 const remoteTbiIndexed = new TabixIndexedFile({
   filehandle: new RemoteFile('http://yourhost/file.vcf.gz'),
   tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi'), // can also be csiFilehandle
