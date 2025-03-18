@@ -3,8 +3,6 @@ import VirtualOffset from './virtualOffset'
 import Chunk from './chunk'
 
 export interface Options {
-  // support having some unknown parts of the options
-  [key: string]: unknown
   signal?: AbortSignal
 }
 
