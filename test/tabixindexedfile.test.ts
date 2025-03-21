@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+
 import TabixIndexedFile from '../src/tabixIndexedFile'
 import VirtualOffset from '../src/virtualOffset'
 
