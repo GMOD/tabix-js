@@ -1,22 +1,12 @@
 ## [2.0.5](https://github.com/GMOD/tabix-js/compare/v2.0.4...v2.0.5) (2025-03-18)
 
-
-
 ## [2.0.4](https://github.com/GMOD/tabix-js/compare/v2.0.3...v2.0.4) (2024-12-18)
-
-
 
 ## [2.0.3](https://github.com/GMOD/tabix-js/compare/v2.0.2...v2.0.3) (2024-12-18)
 
-
-
 ## [2.0.2](https://github.com/GMOD/tabix-js/compare/v2.0.0...v2.0.2) (2024-12-12)
 
-
-
 # [2.0.0](https://github.com/GMOD/tabix-js/compare/v1.6.1...v2.0.0) (2024-12-12)
-
-
 
 ## [1.6.1](https://github.com/GMOD/tabix-js/compare/v1.6.0...v1.6.1) (2024-12-07)
 

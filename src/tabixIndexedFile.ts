@@ -1,13 +1,15 @@
 import AbortablePromiseCache from '@gmod/abortable-promise-cache'
-import LRU from 'quick-lru'
-import { GenericFilehandle, RemoteFile, LocalFile } from 'generic-filehandle2'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
-import { checkAbortSignal } from './util'
-import IndexFile, { Options, IndexData } from './indexFile'
+import { LocalFile, RemoteFile } from 'generic-filehandle2'
+import LRU from 'quick-lru'
 
-import Chunk from './chunk'
-import TBI from './tbi'
-import CSI from './csi'
+import Chunk from './chunk.ts'
+import CSI from './csi.ts'
+import IndexFile, { IndexData, Options } from './indexFile.ts'
+import TBI from './tbi.ts'
+import { checkAbortSignal } from './util.ts'
+
+import type { GenericFilehandle } from 'generic-filehandle2'
 
 function isASCII(str: string) {
   // eslint-disable-next-line no-control-regex

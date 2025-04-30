@@ -1,5 +1,5 @@
-import Chunk from './chunk'
-import VirtualOffset from './virtualOffset'
+import Chunk from './chunk.ts'
+import VirtualOffset from './virtualOffset.ts'
 
 class AbortError extends Error {
   public code: string | undefined

@@ -1,9 +1,10 @@
-import VirtualOffset, { fromBytes } from './virtualOffset'
-import Chunk from './chunk'
 import { unzip } from '@gmod/bgzf-filehandle'
-import { optimizeChunks, checkAbortSignal } from './util'
-import IndexFile, { Options } from './indexFile'
-import { longFromBytesToUnsigned } from './long'
+
+import Chunk from './chunk.ts'
+import IndexFile, { Options } from './indexFile.ts'
+import { longFromBytesToUnsigned } from './long.ts'
+import { checkAbortSignal, optimizeChunks } from './util.ts'
+import VirtualOffset, { fromBytes } from './virtualOffset.ts'
 
 const TBI_MAGIC = 21578324 // TBI\1
 const TAD_LIDX_SHIFT = 14

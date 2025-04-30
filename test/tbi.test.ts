@@ -1,7 +1,8 @@
-import { vi, expect, test } from 'vitest'
 import { LocalFile } from 'generic-filehandle2'
-import VirtualOffset from '../src/virtualOffset'
+import { expect, test, vi } from 'vitest'
+
 import TBI from '../src/tbi'
+import VirtualOffset from '../src/virtualOffset'
 
 test('loads', async () => {
   const ti = new TBI({
