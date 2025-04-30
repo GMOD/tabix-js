@@ -1,6 +1,6 @@
 {
   "name": "@gmod/tabix",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Read Tabix-indexed files, supports both .tbi and .csi indexes",
   "type": "module",
   "types": "./dist/index.d.ts",
@@ -51,8 +51,8 @@
     "genomics"
   ],
   "dependencies": {
-    "@gmod/abortable-promise-cache": "^2.0.0",
-    "@gmod/bgzf-filehandle": "^2.0.1",
+    "@gmod/abortable-promise-cache": "^3.0.1",
+    "@gmod/bgzf-filehandle": "^3.0.2",
     "generic-filehandle2": "^2.0.1",
     "quick-lru": "^4.0.0"
   },
