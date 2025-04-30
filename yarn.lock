@@ -2237,6 +2237,11 @@ generic-filehandle2@^1.0.0:
   resolved "https://registry.yarnpkg.com/generic-filehandle2/-/generic-filehandle2-1.0.0.tgz#d7a216072467793e1e48c925f97162eab1b82efc"
   integrity sha512-jXfyNk1zhsR0Xf2sLm4vgeYSP1q1XbeSVG0TRSnOCKLb2CojPNJyy57nKi6QWmt83yGSHZGay8qIn7YWyl2V5w==
 
+generic-filehandle2@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/generic-filehandle2/-/generic-filehandle2-2.0.1.tgz#5255de8aee2e7214fd91ee332433d1c7d5895761"
+  integrity sha512-/y+IrWYv0y+DueFkRNDeIQf/1B/MPDgNNTjZY/1kRZlN1YNRCvWaTm8LcUvgirs8S+t7QUZZU1Sg61NaJy0GqA==
+
 gensync@^1.0.0-beta.2:
   version "1.0.0-beta.2"
   resolved "https://registry.yarnpkg.com/gensync/-/gensync-1.0.0-beta.2.tgz#32a6ee76c3d7f52d46b2b1ae5d93fea8580a25e0"
