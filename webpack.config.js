@@ -14,4 +14,9 @@ export default {
     library: 'gmodTABIX',
     libraryTarget: 'window',
   },
+  resolve: {
+    fallback: {
+      fs: false,
+    },
+  },
 }
