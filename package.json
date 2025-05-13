@@ -38,6 +38,7 @@
     "prebuild": "npm run clean && npm run lint",
     "build:esm": "tsc --target es2020 --outDir esm",
     "build:es5": "tsc --target es2020 --module commonjs --outDir dist",
+    "postbuild:es5": "echo '{\"type\": \"commonjs\"}' > dist/package.json",
     "build": "npm run build:esm && npm run build:es5",
     "postbuild": "webpack",
     "preversion": "npm run lint && npm test run && npm run build",
