@@ -1,6 +1,6 @@
 {
   "name": "@gmod/tabix",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "Read Tabix-indexed files, supports both .tbi and .csi indexes",
   "type": "module",
   "types": "./dist/index.d.ts",
