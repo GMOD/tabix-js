@@ -22,12 +22,12 @@ export function checkAbortSignal(signal?: AbortSignal) {
   }
 
   if (signal.aborted) {
-    if (typeof DOMException !== 'undefined') {
-      throw new DOMException('aborted', 'AbortError')
-    } else {
+    if (typeof DOMException === 'undefined') {
       const e = new AbortError('aborted')
       e.code = 'ERR_ABORTED'
       throw e
+    } else {
+      throw new DOMException('aborted', 'AbortError')
     }
   }
 }
@@ -52,7 +52,7 @@ export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
 
 export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
   const mergedChunks: Chunk[] = []
-  let lastChunk: Chunk | null = null
+  let lastChunk: Chunk | undefined
 
   if (chunks.length === 0) {
     return chunks
@@ -60,12 +60,12 @@ export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
 
   chunks.sort(function (c0, c1) {
     const dif = c0.minv.blockPosition - c1.minv.blockPosition
-    return dif !== 0 ? dif : c0.minv.dataPosition - c1.minv.dataPosition
+    return dif === 0 ? c0.minv.dataPosition - c1.minv.dataPosition : dif
   })
 
-  chunks.forEach(chunk => {
+  for (const chunk of chunks) {
     if (!lowest || chunk.maxv.compareTo(lowest) > 0) {
-      if (lastChunk === null) {
+      if (lastChunk === undefined) {
         mergedChunks.push(chunk)
         lastChunk = chunk
       } else {
@@ -79,7 +79,7 @@ export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
         }
       }
     }
-  })
+  }
 
   return mergedChunks
 }

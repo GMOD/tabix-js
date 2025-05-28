@@ -303,11 +303,13 @@ export default class TabixIndexedFile {
       let lastNewline = -1
       const newlineByte = '\n'.charCodeAt(0)
       const metaByte = metaChar.charCodeAt(0)
-      for (let i = 0; i < bytes.length; i += 1) {
-        if (i === lastNewline + 1 && bytes[i] !== metaByte) {
+
+      for (let i = 0, l = bytes.length; i < l; i++) {
+        const byte = bytes[i]
+        if (i === lastNewline + 1 && byte !== metaByte) {
           break
         }
-        if (bytes[i] === newlineByte) {
+        if (byte === newlineByte) {
           lastNewline = i
         }
       }
@@ -402,7 +404,10 @@ export default class TabixIndexedFile {
             }
           }
         } else if (currentColumnNumber === start) {
-          startCoordinate = parseInt(line.slice(currentColumnStart, i), 10)
+          startCoordinate = Number.parseInt(
+            line.slice(currentColumnStart, i),
+            10,
+          )
           // we convert to 0-based-half-open
           if (coordinateType === '1-based-closed') {
             startCoordinate -= 1
@@ -413,13 +418,13 @@ export default class TabixIndexedFile {
               overlaps: false,
             }
           }
-          if (end === 0 || end === start) {
-            // if we have no end, we assume the feature is 1 bp long
-            if (startCoordinate + 1 <= regionStart) {
-              return {
-                startCoordinate,
-                overlaps: false,
-              }
+          if (
+            (end === 0 || end === start) && // if we have no end, we assume the feature is 1 bp long
+            startCoordinate + 1 <= regionStart
+          ) {
+            return {
+              startCoordinate,
+              overlaps: false,
             }
           }
         } else if (format === 'VCF' && currentColumnNumber === 4) {
@@ -469,7 +474,7 @@ export default class TabixIndexedFile {
           if (valueEnd === -1) {
             valueEnd = info.length
           }
-          endCoordinate = parseInt(info.slice(j + 4, valueEnd), 10)
+          endCoordinate = Number.parseInt(info.slice(j + 4, valueEnd), 10)
           break
         }
         prevChar = info[j]

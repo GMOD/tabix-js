@@ -62,7 +62,7 @@ export default class TabixIndex extends IndexFile {
       1: 'SAM',
       2: 'VCF',
     }
-    const format = formatOpts[formatFlags & 0xf]
+    const format = formatOpts[formatFlags & 0xF]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
@@ -75,7 +75,7 @@ export default class TabixIndex extends IndexFile {
     const depth = 5
     const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
     const maxRefLength = 2 ** (14 + depth * 3)
-    const metaChar = metaValue ? String.fromCharCode(metaValue) : null
+    const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
     const skipLines = dataView.getInt32(28, true)
 
     // read sequence dictionary
@@ -205,13 +205,14 @@ export default class TabixIndex extends IndexFile {
       return []
     }
 
-    const minOffset = ba.linearIndex.length
-      ? ba.linearIndex[
-          min >> TAD_LIDX_SHIFT >= ba.linearIndex.length
-            ? ba.linearIndex.length - 1
-            : min >> TAD_LIDX_SHIFT
-        ]
-      : new VirtualOffset(0, 0)
+    const minOffset =
+      ba.linearIndex.length > 0
+        ? ba.linearIndex[
+            min >> TAD_LIDX_SHIFT >= ba.linearIndex.length
+              ? ba.linearIndex.length - 1
+              : min >> TAD_LIDX_SHIFT
+          ]
+        : new VirtualOffset(0, 0)
     if (!minOffset) {
       console.warn('querying outside of possible tabix range')
     }
@@ -235,15 +236,13 @@ export default class TabixIndex extends IndexFile {
     // Use the linear index to find minimum file position of chunks that could
     // contain alignments in the region
     const nintv = ba.linearIndex.length
-    let lowest = null
+    let lowest: VirtualOffset | undefined
     const minLin = Math.min(min >> 14, nintv - 1)
     const maxLin = Math.min(max >> 14, nintv - 1)
     for (let i = minLin; i <= maxLin; ++i) {
       const vp = ba.linearIndex[i]
-      if (vp) {
-        if (!lowest || vp.compareTo(lowest) < 0) {
-          lowest = vp
-        }
+      if (vp && (!lowest || vp.compareTo(lowest) < 0)) {
+        lowest = vp
       }
     }
 

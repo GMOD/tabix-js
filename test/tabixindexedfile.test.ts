@@ -13,7 +13,9 @@ class RecordCollector {
   }
 
   forEach(cb: (arg: { line: string; fileOffset: number }) => void) {
-    this.records.forEach(cb)
+    for (const arg of this.records) {
+      cb(arg)
+    }
   }
 
   clear() {
@@ -26,10 +28,10 @@ class RecordCollector {
 
   expectNoDuplicates() {
     const seen = {} as Record<string, number>
-    this.forEach(({ line, fileOffset }) => {
+    for (const { line, fileOffset } of this.records) {
       expect(seen[line]).toBe(undefined)
       seen[line] = fileOffset
-    })
+    }
   }
 }
 test('can read ctgA:1000..4000', async () => {
@@ -42,13 +44,13 @@ test('can read ctgA:1000..4000', async () => {
   await f.getLines('ctgA', 1000, 4000, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(8)
-  items.forEach(({ line, fileOffset }) => {
+  for (const { line, fileOffset } of items.records) {
     const l = line.split('\t')
     expect(l[0]).toEqual('contigA')
-    expect(parseInt(l[1], 10)).toBeGreaterThan(999)
-    expect(parseInt(l[1], 10)).toBeLessThan(4001)
+    expect(Number.parseInt(l[1], 10)).toBeGreaterThan(999)
+    expect(Number.parseInt(l[1], 10)).toBeLessThan(4001)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
-  })
+  }
 
   items.clear()
   await f.getLines('ctgA', 3000, 3000, items.callback)
@@ -88,12 +90,12 @@ test('can read ctgA:10000', async () => {
   await f.getLines('ctgA', 10000, undefined, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(30)
-  items.forEach(({ line, fileOffset }) => {
+  for (const { line, fileOffset } of items.records) {
     const l = line.split('\t')
     expect(l[0]).toEqual('contigA')
-    expect(parseInt(l[1], 10)).toBeGreaterThan(9999)
+    expect(Number.parseInt(l[1], 10)).toBeGreaterThan(9999)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
-  })
+  }
 })
 test('can read ctgA', async () => {
   const f = new TabixIndexedFile({
@@ -105,11 +107,11 @@ test('can read ctgA', async () => {
   await f.getLines('ctgA', undefined, undefined, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(109)
-  items.forEach(({ line, fileOffset }) => {
+  for (const { line, fileOffset } of items.records) {
     const l = line.split('\t')
     expect(l[0]).toEqual('contigA')
     expect(fileOffset).toBeGreaterThanOrEqual(0)
-  })
+  }
 })
 test('can count lines with TBI', async () => {
   const f = new TabixIndexedFile({
@@ -215,14 +217,14 @@ test('can query out.gff.gz with a TBI index', async () => {
   const lines = new RecordCollector()
   await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
   lines.expectNoDuplicates()
-  lines.forEach(({ line, fileOffset }) => {
+  for (const { line, fileOffset } of lines.records) {
     const fields = line.split('\t')
     lineCount += 1
     expect(fields[0]).toEqual('NC_000001.11')
-    expect(parseInt(fields[3], 10)).toBeLessThan(55000)
-    expect(parseInt(fields[4], 10)).toBeGreaterThan(3000)
+    expect(Number.parseInt(fields[3], 10)).toBeLessThan(55000)
+    expect(Number.parseInt(fields[4], 10)).toBeGreaterThan(3000)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
-  })
+  }
   expect(lineCount).toEqual(23)
   expect(lines.records[0].line).toEqual(
     'NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA',

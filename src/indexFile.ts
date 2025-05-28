@@ -10,7 +10,7 @@ export interface Options {
 export interface IndexData {
   refNameToId: Record<string, number>
   refIdToName: string[]
-  metaChar: string | null
+  metaChar: string | undefined
   columnNumbers: { ref: number; start: number; end: number }
   coordinateType: string
   format: string
@@ -64,9 +64,9 @@ export default abstract class IndexFile {
 
   async parse(opts: Options = {}) {
     if (!this.parseP) {
-      this.parseP = this._parse(opts).catch((e: unknown) => {
+      this.parseP = this._parse(opts).catch((error: unknown) => {
         this.parseP = undefined
-        throw e
+        throw error
       })
     }
     return this.parseP

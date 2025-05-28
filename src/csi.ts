@@ -58,7 +58,7 @@ export default class CSI extends IndexFile {
     const formatFlags = dataView.getInt32(offset, true)
     const coordinateType =
       formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const format = formats[(formatFlags & 0xf) as 0 | 1 | 2]
+    const format = formats[(formatFlags & 0xF) as 0 | 1 | 2]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
@@ -68,7 +68,7 @@ export default class CSI extends IndexFile {
       end: dataView.getInt32(offset + 12, true),
     }
     const metaValue = dataView.getInt32(offset + 16, true)
-    const metaChar = metaValue ? String.fromCharCode(metaValue) : null
+    const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
     const skipLines = dataView.getInt32(offset + 20, true)
     const nameSectionLength = dataView.getInt32(offset + 24, true)
 
@@ -112,8 +112,6 @@ export default class CSI extends IndexFile {
     }
   }
 
-  // fetch and parse the index
-
   async _parse(opts: Options = {}) {
     const bytes = await unzip(await this.filehandle.readFile(opts))
     const dataView = new DataView(bytes.buffer)
@@ -139,7 +137,7 @@ export default class CSI extends IndexFile {
         : {
             refIdToName: [],
             refNameToId: {},
-            metaChar: null,
+            metaChar: undefined,
             columnNumbers: { ref: 0, start: 1, end: 2 },
             coordinateType: 'zero-based-half-open',
             format: 'generic',

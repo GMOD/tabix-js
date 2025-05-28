@@ -11,7 +11,7 @@ export default class Chunk {
     minv: VirtualOffset,
     maxv: VirtualOffset,
     bin: number,
-    fetchedSize = undefined,
+    fetchedSize?: number,
   ) {
     this.minv = minv
     this.maxv = maxv
