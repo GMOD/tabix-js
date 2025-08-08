@@ -35,6 +35,9 @@ export default class TabixIndexedFile {
   private index: IndexFile
   private renameRefSeq: (n: string) => string
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
+  public cache = new LRU<string, { buffer: Uint8Array; nextIn: number }>({
+    maxSize: 1000,
+  })
 
   /**
    * @param {object} args
@@ -507,6 +510,6 @@ export default class TabixIndexedFile {
       c.minv.blockPosition,
       opts,
     )
-    return unzipChunkSlice(ret, c)
+    return unzipChunkSlice(ret, c, this.cache)
   }
 }

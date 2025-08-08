@@ -179,7 +179,6 @@ console.log(lines)
 
 - `args`
   **[object](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object)**&#x20;
-
   - `args.path`
     **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)?**&#x20;
   - `args.filehandle` **filehandle?**&#x20;
