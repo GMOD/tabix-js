@@ -40,6 +40,7 @@ export default defineConfig(
       curly: 'error',
 
       semi: ['error', 'never'],
+      'unicorn/text-encoding-identifier-case': 'off',
       'unicorn/no-new-array': 'off',
       'unicorn/prefer-module': 'off',
       'unicorn/filename-case': 'off',
