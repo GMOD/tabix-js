@@ -498,11 +498,11 @@ export default class TabixIndexedFile {
             }
           }
         }
-        currentColumnStart = i + 1
-        currentColumnNumber += 1
-        if (currentColumnNumber > maxColumn) {
+        if (currentColumnNumber === maxColumn) {
           break
         }
+        currentColumnStart = i + 1
+        currentColumnNumber += 1
       }
     }
     return {
