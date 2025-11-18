@@ -76,4 +76,29 @@ export default abstract class IndexFile {
     const idx = await this.parse(opts)
     return !!idx.indices[seqId]?.binIndex
   }
+
+  _parseNameBytes(namesBytes: Uint8Array) {
+    let currRefId = 0
+    let currNameStart = 0
+    const refIdToName: string[] = []
+    const refNameToId: Record<string, number> = {}
+    const decoder = new TextDecoder('utf8')
+    for (let i = 0; i < namesBytes.length; i += 1) {
+      if (!namesBytes[i]) {
+        if (currNameStart < i) {
+          const refName = this.renameRefSeq(
+            decoder.decode(namesBytes.subarray(currNameStart, i)),
+          )
+          refIdToName[currRefId] = refName
+          refNameToId[refName] = currRefId
+        }
+        currNameStart = i + 1
+        currRefId += 1
+      }
+    }
+    return {
+      refNameToId,
+      refIdToName,
+    }
+  }
 }

@@ -168,6 +168,21 @@ export default class TabixIndexedFile {
    * @returns promise that is resolved when the whole read is finished,
    * rejected on error
    */
+  private calculateFileOffset(
+    cpositions: number[],
+    dpositions: number[],
+    pos: number,
+    blockStart: number,
+    minvDataPosition: number,
+  ) {
+    return (
+      cpositions[pos]! * (1 << 8) +
+      (blockStart - dpositions[pos]!) +
+      minvDataPosition +
+      1
+    )
+  }
+
   async getLines(
     refName: string,
     s: number | undefined,
@@ -216,11 +231,13 @@ export default class TabixIndexedFile {
       let pos = 0
 
       // fast path, Buffer is just ASCII chars and not gigantor, can be
-      // converted to string and processed directly. if it is not ASCII or
-      // gigantic (chrome max str len is 512Mb), we have to decode line by line
+      // converted to string and processed directly.
+      //
+      // if it is not ASCII or, we have to decode line by line, as it is
+      // otherwise hard to get the right 'fileOffset' based feature IDs
       const strIsASCII = isASCII(buffer)
-      const str = decoder.decode(buffer)
       if (strIsASCII) {
+        const str = decoder.decode(buffer)
         while (blockStart < str.length) {
           const n = str.indexOf('\n', blockStart)
           if (n === -1) {
@@ -248,21 +265,13 @@ export default class TabixIndexedFile {
           if (overlaps) {
             callback(
               line,
-              // cpositions[pos] refers to actual file offset of a bgzip block
-              // boundaries
-              //
-              // we multiply by (1 <<8) in order to make sure each block has a
-              // "unique" address space so that data in that block could never
-              // overlap
-              //
-              // then the blockStart-dpositions is an uncompressed file offset
-              // from that bgzip block boundary, and since the cpositions are
-              // multiplied by (1 << 8) these uncompressed offsets get a unique
-              // space
-              cpositions[pos]! * (1 << 8) +
-                (blockStart - dpositions[pos]!) +
-                c.minv.dataPosition +
-                1,
+              this.calculateFileOffset(
+                cpositions,
+                dpositions,
+                pos,
+                blockStart,
+                c.minv.dataPosition,
+              ),
             )
           } else if (startCoordinate !== undefined && startCoordinate >= end) {
             // the lines were overlapping the region, but now have stopped, so we
@@ -273,7 +282,7 @@ export default class TabixIndexedFile {
           blockStart = n + 1
         }
       } else {
-        while (blockStart < str.length) {
+        while (blockStart < buffer.length) {
           const n = buffer.indexOf('\n'.charCodeAt(0), blockStart)
           if (n === -1) {
             break
@@ -301,21 +310,13 @@ export default class TabixIndexedFile {
           if (overlaps) {
             callback(
               line,
-              // cpositions[pos] refers to actual file offset of a bgzip block
-              // boundaries
-              //
-              // we multiply by (1 <<8) in order to make sure each block has a
-              // "unique" address space so that data in that block could never
-              // overlap
-              //
-              // then the blockStart-dpositions is an uncompressed file offset
-              // from that bgzip block boundary, and since the cpositions are
-              // multiplied by (1 << 8) these uncompressed offsets get a unique
-              // space
-              cpositions[pos]! * (1 << 8) +
-                (blockStart - dpositions[pos]!) +
-                c.minv.dataPosition +
-                1,
+              this.calculateFileOffset(
+                cpositions,
+                dpositions,
+                pos,
+                blockStart,
+                c.minv.dataPosition,
+              ),
             )
           } else if (startCoordinate !== undefined && startCoordinate >= end) {
             // the lines were overlapping the region, but now have stopped, so we
@@ -520,20 +521,10 @@ export default class TabixIndexedFile {
     // be another pairwise feature at the end of this one
     const isTRA = info.includes('SVTYPE=TRA')
     if (info[0] !== '.' && !isTRA) {
-      let pos = info.indexOf(';END=')
-      if (pos === -1 && info.startsWith('END=')) {
-        const valueEnd = info.indexOf(';')
-        endCoordinate = Number.parseInt(
-          info.slice(4, valueEnd === -1 ? info.length : valueEnd),
-          10,
-        )
-      } else if (pos !== -1) {
-        pos += 1
-        let valueEnd = info.indexOf(';', pos + 4)
-        if (valueEnd === -1) {
-          valueEnd = info.length
-        }
-        endCoordinate = Number.parseInt(info.slice(pos + 4, valueEnd), 10)
+      const endRegex = /(?:^|;)END=([^;]+)/
+      const match = endRegex.exec(info)
+      if (match) {
+        endCoordinate = Number.parseInt(match[1]!, 10)
       }
     } else if (isTRA) {
       return startCoordinate + 1
