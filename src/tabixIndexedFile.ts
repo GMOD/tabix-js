@@ -12,7 +12,7 @@ import { checkAbortSignal } from './util.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 function isASCII(buffer: Uint8Array) {
-  for (let i = 0; i < buffer.length; i++) {
+  for (let i = 0, l = buffer.length; i < l; i++) {
     if (buffer[i]! > 127) {
       return false
     }
@@ -518,46 +518,25 @@ export default class TabixIndexedFile {
     //
     // if CHR2 is on the same chromosome, still ignore it because there should
     // be another pairwise feature at the end of this one
-    if (info[0] !== '.') {
-      let prevChar = ';'
-      let isTRA = false
-      for (let j = 0; j < info.length; j += 1) {
-        if (prevChar === ';') {
-          if (
-            info[j] === 'S' &&
-            info[j + 1] === 'V' &&
-            info[j + 2] === 'T' &&
-            info[j + 3] === 'Y' &&
-            info[j + 4] === 'P' &&
-            info[j + 5] === 'E' &&
-            info[j + 6] === '=' &&
-            info[j + 7] === 'T' &&
-            info[j + 8] === 'R' &&
-            info[j + 9] === 'A'
-          ) {
-            isTRA = true
-            break
-          }
-          if (
-            !isTRA &&
-            info[j] === 'E' &&
-            info[j + 1] === 'N' &&
-            info[j + 2] === 'D' &&
-            info[j + 3] === '='
-          ) {
-            let valueEnd = info.indexOf(';', j)
-            if (valueEnd === -1) {
-              valueEnd = info.length
-            }
-            endCoordinate = Number.parseInt(info.slice(j + 4, valueEnd), 10)
-            break
-          }
+    const isTRA = info.includes('SVTYPE=TRA')
+    if (info[0] !== '.' && !isTRA) {
+      let pos = info.indexOf(';END=')
+      if (pos === -1 && info.startsWith('END=')) {
+        const valueEnd = info.indexOf(';')
+        endCoordinate = Number.parseInt(
+          info.slice(4, valueEnd === -1 ? info.length : valueEnd),
+          10,
+        )
+      } else if (pos !== -1) {
+        pos += 1
+        let valueEnd = info.indexOf(';', pos + 4)
+        if (valueEnd === -1) {
+          valueEnd = info.length
         }
-        prevChar = info[j]
+        endCoordinate = Number.parseInt(info.slice(pos + 4, valueEnd), 10)
       }
-      if (isTRA) {
-        return startCoordinate + 1
-      }
+    } else if (isTRA) {
+      return startCoordinate + 1
     }
     return endCoordinate
   }
