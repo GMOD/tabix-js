@@ -11,9 +11,13 @@ import { checkAbortSignal } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
-function isASCII(str: string) {
-  // eslint-disable-next-line no-control-regex
-  return /^[\u0000-\u007F]*$/.test(str)
+function isASCII(buffer: Uint8Array) {
+  for (let i = 0; i < buffer.length; i++) {
+    if (buffer[i]! > 127) {
+      return false
+    }
+  }
+  return true
 }
 
 type GetLinesCallback = (line: string, fileOffset: number) => void
@@ -214,67 +218,113 @@ export default class TabixIndexedFile {
       // fast path, Buffer is just ASCII chars and not gigantor, can be
       // converted to string and processed directly. if it is not ASCII or
       // gigantic (chrome max str len is 512Mb), we have to decode line by line
+      const strIsASCII = isASCII(buffer)
       const str = decoder.decode(buffer)
-      const strIsASCII = isASCII(str)
-      while (blockStart < str.length) {
-        let line: string
-        let n: number
-        if (strIsASCII) {
-          n = str.indexOf('\n', blockStart)
+      if (strIsASCII) {
+        while (blockStart < str.length) {
+          const n = str.indexOf('\n', blockStart)
           if (n === -1) {
             break
           }
-          line = str.slice(blockStart, n)
-        } else {
-          n = buffer.indexOf('\n'.charCodeAt(0), blockStart)
+          const line = str.slice(blockStart, n)
+
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (dpositions) {
+            const target = blockStart + c.minv.dataPosition
+            while (pos < dpositions.length && target >= dpositions[pos]!) {
+              pos++
+            }
+          }
+
+          // filter the line for whether it is within the requested range
+          const { startCoordinate, overlaps } = this.checkLine(
+            metadata,
+            refName,
+            start,
+            end,
+            line,
+          )
+
+          if (overlaps) {
+            callback(
+              line,
+              // cpositions[pos] refers to actual file offset of a bgzip block
+              // boundaries
+              //
+              // we multiply by (1 <<8) in order to make sure each block has a
+              // "unique" address space so that data in that block could never
+              // overlap
+              //
+              // then the blockStart-dpositions is an uncompressed file offset
+              // from that bgzip block boundary, and since the cpositions are
+              // multiplied by (1 << 8) these uncompressed offsets get a unique
+              // space
+              cpositions[pos]! * (1 << 8) +
+                (blockStart - dpositions[pos]!) +
+                c.minv.dataPosition +
+                1,
+            )
+          } else if (startCoordinate !== undefined && startCoordinate >= end) {
+            // the lines were overlapping the region, but now have stopped, so we
+            // must be at the end of the relevant data and we can stop processing
+            // data now
+            return
+          }
+          blockStart = n + 1
+        }
+      } else {
+        while (blockStart < str.length) {
+          const n = buffer.indexOf('\n'.charCodeAt(0), blockStart)
           if (n === -1) {
             break
           }
           const b = buffer.slice(blockStart, n)
-          line = decoder.decode(b)
-        }
+          const line = decoder.decode(b)
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (dpositions) {
-          while (blockStart + c.minv.dataPosition >= dpositions[pos++]!) {}
-          pos--
-        }
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (dpositions) {
+            const target = blockStart + c.minv.dataPosition
+            while (pos < dpositions.length && target >= dpositions[pos]!) {
+              pos++
+            }
+          }
 
-        // filter the line for whether it is within the requested range
-        const { startCoordinate, overlaps } = this.checkLine(
-          metadata,
-          refName,
-          start,
-          end,
-          line,
-        )
-
-        if (overlaps) {
-          callback(
+          // filter the line for whether it is within the requested range
+          const { startCoordinate, overlaps } = this.checkLine(
+            metadata,
+            refName,
+            start,
+            end,
             line,
-            // cpositions[pos] refers to actual file offset of a bgzip block
-            // boundaries
-            //
-            // we multiply by (1 <<8) in order to make sure each block has a
-            // "unique" address space so that data in that block could never
-            // overlap
-            //
-            // then the blockStart-dpositions is an uncompressed file offset
-            // from that bgzip block boundary, and since the cpositions are
-            // multiplied by (1 << 8) these uncompressed offsets get a unique
-            // space
-            cpositions[pos]! * (1 << 8) +
-              (blockStart - dpositions[pos]!) +
-              c.minv.dataPosition +
-              1,
           )
-        } else if (startCoordinate !== undefined && startCoordinate >= end) {
-          // the lines were overlapping the region, but now have stopped, so we
-          // must be at the end of the relevant data and we can stop processing
-          // data now
-          return
+
+          if (overlaps) {
+            callback(
+              line,
+              // cpositions[pos] refers to actual file offset of a bgzip block
+              // boundaries
+              //
+              // we multiply by (1 <<8) in order to make sure each block has a
+              // "unique" address space so that data in that block could never
+              // overlap
+              //
+              // then the blockStart-dpositions is an uncompressed file offset
+              // from that bgzip block boundary, and since the cpositions are
+              // multiplied by (1 << 8) these uncompressed offsets get a unique
+              // space
+              cpositions[pos]! * (1 << 8) +
+                (blockStart - dpositions[pos]!) +
+                c.minv.dataPosition +
+                1,
+            )
+          } else if (startCoordinate !== undefined && startCoordinate >= end) {
+            // the lines were overlapping the region, but now have stopped, so we
+            // must be at the end of the relevant data and we can stop processing
+            // data now
+            return
+          }
+          blockStart = n + 1
         }
-        blockStart = n + 1
       }
     }
   }
@@ -468,22 +518,46 @@ export default class TabixIndexedFile {
     //
     // if CHR2 is on the same chromosome, still ignore it because there should
     // be another pairwise feature at the end of this one
-    const isTRA = info.includes('SVTYPE=TRA')
-    if (info[0] !== '.' && !isTRA) {
+    if (info[0] !== '.') {
       let prevChar = ';'
+      let isTRA = false
       for (let j = 0; j < info.length; j += 1) {
-        if (prevChar === ';' && info.slice(j, j + 4) === 'END=') {
-          let valueEnd = info.indexOf(';', j)
-          if (valueEnd === -1) {
-            valueEnd = info.length
+        if (prevChar === ';') {
+          if (
+            info[j] === 'S' &&
+            info[j + 1] === 'V' &&
+            info[j + 2] === 'T' &&
+            info[j + 3] === 'Y' &&
+            info[j + 4] === 'P' &&
+            info[j + 5] === 'E' &&
+            info[j + 6] === '=' &&
+            info[j + 7] === 'T' &&
+            info[j + 8] === 'R' &&
+            info[j + 9] === 'A'
+          ) {
+            isTRA = true
+            break
           }
-          endCoordinate = Number.parseInt(info.slice(j + 4, valueEnd), 10)
-          break
+          if (
+            !isTRA &&
+            info[j] === 'E' &&
+            info[j + 1] === 'N' &&
+            info[j + 2] === 'D' &&
+            info[j + 3] === '='
+          ) {
+            let valueEnd = info.indexOf(';', j)
+            if (valueEnd === -1) {
+              valueEnd = info.length
+            }
+            endCoordinate = Number.parseInt(info.slice(j + 4, valueEnd), 10)
+            break
+          }
         }
         prevChar = info[j]
       }
-    } else if (isTRA) {
-      return startCoordinate + 1
+      if (isTRA) {
+        return startCoordinate + 1
+      }
     }
     return endCoordinate
   }
