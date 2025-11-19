@@ -58,7 +58,7 @@ export default class CSI extends IndexFile {
     const formatFlags = dataView.getInt32(offset, true)
     const coordinateType =
       formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
-    const format = formats[(formatFlags & 0xF) as 0 | 1 | 2]
+    const format = formats[(formatFlags & 0xf) as 0 | 1 | 2]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
@@ -84,31 +84,6 @@ export default class CSI extends IndexFile {
       columnNumbers,
       format,
       coordinateType,
-    }
-  }
-
-  _parseNameBytes(namesBytes: Uint8Array) {
-    let currRefId = 0
-    let currNameStart = 0
-    const refIdToName = []
-    const refNameToId: Record<string, number> = {}
-    const decoder = new TextDecoder('utf8')
-    for (let i = 0; i < namesBytes.length; i += 1) {
-      if (!namesBytes[i]) {
-        if (currNameStart < i) {
-          const refName = this.renameRefSeq(
-            decoder.decode(namesBytes.subarray(currNameStart, i)),
-          )
-          refIdToName[currRefId] = refName
-          refNameToId[refName] = currRefId
-        }
-        currNameStart = i + 1
-        currRefId += 1
-      }
-    }
-    return {
-      refNameToId,
-      refIdToName,
     }
   }
 

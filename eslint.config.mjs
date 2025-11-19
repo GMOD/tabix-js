@@ -9,7 +9,9 @@ export default defineConfig(
     ignores: [
       'webpack.config.js',
       'dist/*',
+      'benchmark/*',
       'esm/*',
+      'profile*',
       'example/*',
       'eslint.config.mjs',
     ],
@@ -40,6 +42,7 @@ export default defineConfig(
       curly: 'error',
 
       semi: ['error', 'never'],
+      'unicorn/number-literal-case': 'off',
       'unicorn/text-encoding-identifier-case': 'off',
       'unicorn/no-new-array': 'off',
       'unicorn/prefer-module': 'off',

@@ -62,7 +62,7 @@ export default class TabixIndex extends IndexFile {
       1: 'SAM',
       2: 'VCF',
     }
-    const format = formatOpts[formatFlags & 0xF]
+    const format = formatOpts[formatFlags & 0xf]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
     }
@@ -157,31 +157,6 @@ export default class TabixIndex extends IndexFile {
   parsePseudoBin(bytes: Uint8Array, offset: number) {
     return {
       lineCount: longFromBytesToUnsigned(bytes, offset + 16),
-    }
-  }
-
-  _parseNameBytes(namesBytes: Uint8Array) {
-    let currRefId = 0
-    let currNameStart = 0
-    const refIdToName: string[] = []
-    const refNameToId: Record<string, number> = {}
-    const decoder = new TextDecoder('utf8')
-    for (let i = 0; i < namesBytes.length; i += 1) {
-      if (!namesBytes[i]) {
-        if (currNameStart < i) {
-          const refName = this.renameRefSeq(
-            decoder.decode(namesBytes.subarray(currNameStart, i)),
-          )
-          refIdToName[currRefId] = refName
-          refNameToId[refName] = currRefId
-        }
-        currNameStart = i + 1
-        currRefId += 1
-      }
-    }
-    return {
-      refNameToId,
-      refIdToName,
     }
   }
 
