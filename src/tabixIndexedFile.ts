@@ -11,15 +11,6 @@ import { checkAbortSignal } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
-function isASCII(buffer: Uint8Array) {
-  for (let i = 0, l = buffer.length; i < l; i++) {
-    if (buffer[i]! > 127) {
-      return false
-    }
-  }
-  return true
-}
-
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
 interface GetLinesOpts {
@@ -235,9 +226,12 @@ export default class TabixIndexedFile {
       //
       // if it is not ASCII or, we have to decode line by line, as it is
       // otherwise hard to get the right 'fileOffset' based feature IDs
-      const strIsASCII = isASCII(buffer)
+      //
+      // we use a basic check for isASCII: string length equals buffer length
+      // if it is ASCII...no multi-byte decodings
+      const str = decoder.decode(buffer)
+      const strIsASCII = buffer.length == str.length
       if (strIsASCII) {
-        const str = decoder.decode(buffer)
         while (blockStart < str.length) {
           const n = str.indexOf('\n', blockStart)
           if (n === -1) {

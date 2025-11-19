@@ -4,16 +4,18 @@ import TabixIndexedFile from '../src/tabixIndexedFile'
 
 describe('Overall benchmark', () => {
   bench(
-    'parse large_vcf_header.vcf.gz and get LcChr1:1-11443',
+    'parse 1kg.chr1.subset.vcf.gz and get chr1:10109-622047',
     async () => {
       const f = new TabixIndexedFile({
-        path: require.resolve('../test/data/large_vcf_header.vcf.gz'),
+        path: require.resolve('../test/data/1kg.chr1.subset.vcf.gz'),
       })
 
       const lines: string[] = []
-      await f.getLines('LcChr1', 1, 11443, line => {
-        lines.push(line)
+      let i = 0
+      await f.getLines('chr1', 10109, 11000, line => {
+        i++
       })
+      console.log(i)
     },
     { iterations: 1000 },
   )
