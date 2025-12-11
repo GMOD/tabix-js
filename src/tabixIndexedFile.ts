@@ -524,7 +524,7 @@ export default class TabixIndexedFile {
   _getVcfEnd(startCoordinate: number, refSeqLength: number, info: string) {
     let endCoordinate = startCoordinate + refSeqLength
     const isTRA = info.includes('SVTYPE=TRA')
-    if (info[0] !== '.' && !isTRA) {
+    if (!info.startsWith('.') && !isTRA) {
       const match = END_REGEX.exec(info)
       if (match) {
         endCoordinate = Number.parseInt(match[1]!, 10)

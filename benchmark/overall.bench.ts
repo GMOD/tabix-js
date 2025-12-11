@@ -1,22 +1,67 @@
+import { readFileSync } from 'node:fs'
 import { bench, describe } from 'vitest'
 
-import TabixIndexedFile from '../src/tabixIndexedFile'
+import { default as TabixBranch1 } from '../esm_branch1/tabixIndexedFile.js'
+import { default as TabixBranch2 } from '../esm_branch2/tabixIndexedFile.js'
 
-describe('Overall benchmark', () => {
-  bench(
-    'parse 1kg.chr1.subset.vcf.gz and get chr1:10109-622047',
-    async () => {
-      const f = new TabixIndexedFile({
-        path: require.resolve('../test/data/1kg.chr1.subset.vcf.gz'),
-      })
+const branch1Name = readFileSync('esm_branch1/branchname.txt', 'utf8').trim()
+const branch2Name = readFileSync('esm_branch2/branchname.txt', 'utf8').trim()
 
-      const lines: string[] = []
-      let i = 0
-      await f.getLines('chr1', 10109, 11000, line => {
-        i++
-      })
-      //console.log(i)
-    },
-    { iterations: 1000 },
-  )
-})
+function benchTabix(
+  name: string,
+  path: string,
+  refSeq: string,
+  start: number,
+  end: number,
+  opts?: { iterations?: number; warmupIterations?: number },
+) {
+  describe(name, () => {
+    bench(
+      branch1Name,
+      async () => {
+        const f = new TabixBranch1({ path })
+        let i = 0
+        await f.getLines(refSeq, start, end, () => {
+          i++
+        })
+      },
+      opts,
+    )
+
+    bench(
+      branch2Name,
+      async () => {
+        const f = new TabixBranch2({ path })
+        let i = 0
+        await f.getLines(refSeq, start, end, () => {
+          i++
+        })
+      },
+      opts,
+    )
+  })
+}
+
+benchTabix(
+  'gff (0.5mbp)',
+  'test/data/out.sorted.gff.gz',
+  'NC_000001.11',
+  1,
+  500_000,
+  {
+    iterations: 50,
+    warmupIterations: 5,
+  },
+)
+
+benchTabix(
+  'gff (1mbp)',
+  'test/data/out.sorted.gff.gz',
+  'NC_000001.11',
+  1,
+  1_000_000,
+  {
+    iterations: 50,
+    warmupIterations: 5,
+  },
+)

@@ -11,6 +11,7 @@ export default defineConfig(
       'dist/*',
       'benchmark/*',
       'esm/*',
+      'esm_*/*',
       'profile*',
       'example/*',
       'eslint.config.mjs',
