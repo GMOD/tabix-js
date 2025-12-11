@@ -12,6 +12,7 @@ import { checkAbortSignal } from './util.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 const NO_OVERLAP = { overlaps: false, startCoordinate: undefined } as const
+const OVERLAP_RESULT = { overlaps: true, startCoordinate: 0 }
 const END_REGEX = /(?:^|;)END=([^;]+)/
 const ZERO = '0'.charCodeAt(0)
 
@@ -58,8 +59,6 @@ interface ReadChunk {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
-  private renameRefSeq: (n: string) => string
-  private renameRefSeqIsIdentity: boolean
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
   public cache = new LRU<string, { buffer: Uint8Array; nextIn: number }>({
     maxSize: 1000,
@@ -85,11 +84,6 @@ export default class TabixIndexedFile {
    * @param {csiUrl} [args.csiUrl]
    *
    * @param {tbiUrl} [args.tbiUrl]
-   *
-   * @param {function} [args.renameRefSeqs] optional function with sig `string
-   * => string` to transform reference sequence names for the purpose of
-   * indexing and querying. note that the data that is returned is not altered,
-   * just the names of the reference sequences that are used for querying.
    */
   constructor({
     path,
@@ -101,7 +95,6 @@ export default class TabixIndexedFile {
     csiPath,
     csiUrl,
     csiFilehandle,
-    renameRefSeqs,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
     path?: string
@@ -113,7 +106,6 @@ export default class TabixIndexedFile {
     csiPath?: string
     csiUrl?: string
     csiFilehandle?: GenericFilehandle
-    renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
     if (filehandle) {
@@ -129,27 +121,22 @@ export default class TabixIndexedFile {
     if (tbiFilehandle) {
       this.index = new TBI({
         filehandle: tbiFilehandle,
-        renameRefSeqs,
       })
     } else if (csiFilehandle) {
       this.index = new CSI({
         filehandle: csiFilehandle,
-        renameRefSeqs,
       })
     } else if (tbiPath) {
       this.index = new TBI({
         filehandle: new LocalFile(tbiPath),
-        renameRefSeqs,
       })
     } else if (csiPath) {
       this.index = new CSI({
         filehandle: new LocalFile(csiPath),
-        renameRefSeqs,
       })
     } else if (path) {
       this.index = new TBI({
         filehandle: new LocalFile(`${path}.tbi`),
-        renameRefSeqs,
       })
     } else if (csiUrl) {
       this.index = new CSI({
@@ -169,8 +156,6 @@ export default class TabixIndexedFile {
       )
     }
 
-    this.renameRefSeqIsIdentity = !renameRefSeqs
-    this.renameRefSeq = renameRefSeqs ?? (n => n)
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
       cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
       fill: (args: Chunk, signal?: AbortSignal) =>
@@ -412,7 +397,7 @@ export default class TabixIndexedFile {
 
   /**
    * get an array of reference sequence names, in the order in which they occur
-   * in the file. reference sequence renaming is not applied to these names.
+   * in the file.
    */
   async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
@@ -441,8 +426,8 @@ export default class TabixIndexedFile {
     regionEnd: number,
     line: string,
   ) {
-    const { columnNumbers, metaChar, coordinateType, format } = metadata
-    if (metaChar && line.charCodeAt(0) === metaChar.charCodeAt(0)) {
+    const { columnNumbers, metaCharCode, coordinateType, format } = metadata
+    if (metaCharCode && line.charCodeAt(0) === metaCharCode) {
       return NO_OVERLAP
     }
 
@@ -468,11 +453,7 @@ export default class TabixIndexedFile {
       const columnEnd = nextTab === -1 ? l : nextTab
 
       if (currentColumnNumber === ref) {
-        const refMatches = this.renameRefSeqIsIdentity
-          ? substringEquals(line, currentColumnStart, columnEnd, regionRefName)
-          : this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) ===
-            regionRefName
-        if (!refMatches) {
+        if (!substringEquals(line, currentColumnStart, columnEnd, regionRefName)) {
           return NO_OVERLAP
         }
       } else if (currentColumnNumber === start) {
@@ -518,7 +499,8 @@ export default class TabixIndexedFile {
       currentColumnNumber += 1
     }
 
-    return { startCoordinate, overlaps: true }
+    OVERLAP_RESULT.startCoordinate = startCoordinate
+    return OVERLAP_RESULT
   }
 
   _getVcfEnd(startCoordinate: number, refSeqLength: number, info: string) {

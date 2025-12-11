@@ -11,6 +11,7 @@ export interface IndexData {
   refNameToId: Record<string, number>
   refIdToName: string[]
   metaChar: string | undefined
+  metaCharCode: number
   columnNumbers: { ref: number; start: number; end: number }
   coordinateType: string
   format: string
@@ -19,18 +20,10 @@ export interface IndexData {
 
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
-  public renameRefSeq: (arg0: string) => string
   private parseP?: Promise<IndexData>
 
-  constructor({
-    filehandle,
-    renameRefSeqs = (n: string) => n,
-  }: {
-    filehandle: GenericFilehandle
-    renameRefSeqs?: (a: string) => string
-  }) {
+  constructor({ filehandle }: { filehandle: GenericFilehandle }) {
     this.filehandle = filehandle
-    this.renameRefSeq = renameRefSeqs
   }
 
   public abstract lineCount(refName: string, args: Options): Promise<number>
@@ -86,9 +79,7 @@ export default abstract class IndexFile {
     for (let i = 0; i < namesBytes.length; i += 1) {
       if (!namesBytes[i]) {
         if (currNameStart < i) {
-          const refName = this.renameRefSeq(
-            decoder.decode(namesBytes.subarray(currNameStart, i)),
-          )
+          const refName = decoder.decode(namesBytes.subarray(currNameStart, i))
           refIdToName[currRefId] = refName
           refNameToId[refName] = currRefId
         }

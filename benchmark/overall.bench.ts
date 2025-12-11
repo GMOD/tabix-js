@@ -43,13 +43,25 @@ function benchTabix(
 }
 
 benchTabix(
+  '1kg VCF (50k-80k)',
+  'test/data/1kg.chr1.subset.vcf.gz',
+  'chr1',
+  50_000,
+  80_000,
+  {
+    iterations: 5,
+    warmupIterations: 1,
+  },
+)
+
+benchTabix(
   'gff (0.5mbp)',
   'test/data/out.sorted.gff.gz',
   'NC_000001.11',
   1,
   500_000,
   {
-    iterations: 50,
+    iterations: 100,
     warmupIterations: 5,
   },
 )
@@ -61,7 +73,7 @@ benchTabix(
   1,
   1_000_000,
   {
-    iterations: 50,
+    iterations: 100,
     warmupIterations: 5,
   },
 )

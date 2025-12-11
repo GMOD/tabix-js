@@ -25,6 +25,7 @@ test('loads', async () => {
     coordinateType: '1-based-closed',
     format: 'VCF',
     metaChar: '#',
+    metaCharCode: 35,
     maxBinNumber: 37449,
     firstDataLine: new VirtualOffset(0, 10431),
     refIdToName: ['contigA'],

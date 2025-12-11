@@ -141,6 +141,7 @@ export default class TabixIndex extends IndexFile {
     return {
       indices,
       metaChar,
+      metaCharCode: metaValue || 0,
       maxBinNumber,
       maxRefLength,
       skipLines,

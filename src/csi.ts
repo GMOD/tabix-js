@@ -69,6 +69,7 @@ export default class CSI extends IndexFile {
     }
     const metaValue = dataView.getInt32(offset + 16, true)
     const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
+    const metaCharCode = metaValue || 0
     const skipLines = dataView.getInt32(offset + 20, true)
     const nameSectionLength = dataView.getInt32(offset + 24, true)
 
@@ -81,6 +82,7 @@ export default class CSI extends IndexFile {
       refNameToId,
       skipLines,
       metaChar,
+      metaCharCode,
       columnNumbers,
       format,
       coordinateType,
@@ -113,6 +115,7 @@ export default class CSI extends IndexFile {
             refIdToName: [],
             refNameToId: {},
             metaChar: undefined,
+            metaCharCode: 0,
             columnNumbers: { ref: 0, start: 1, end: 2 },
             coordinateType: 'zero-based-half-open',
             format: 'generic',

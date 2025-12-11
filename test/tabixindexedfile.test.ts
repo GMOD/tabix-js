@@ -34,14 +34,13 @@ class RecordCollector {
     }
   }
 }
-test('can read ctgA:1000..4000', async () => {
+test('can read contigA:1000..4000', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    renameRefSeqs: n => n.replace('contig', 'ctg'),
   })
   const items = new RecordCollector()
-  await f.getLines('ctgA', 1000, 4000, items.callback)
+  await f.getLines('contigA', 1000, 4000, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(8)
   for (const { line, fileOffset } of items.records) {
@@ -53,13 +52,13 @@ test('can read ctgA:1000..4000', async () => {
   }
 
   items.clear()
-  await f.getLines('ctgA', 3000, 3000, items.callback)
+  await f.getLines('contigA', 3000, 3000, items.callback)
   expect(items.records.length).toEqual(0)
   items.clear()
-  await f.getLines('ctgA', 2999, 3000, items.callback)
+  await f.getLines('contigA', 2999, 3000, items.callback)
   expect(items.records.length).toEqual(1)
   items.clear()
-  await f.getLines('ctgA', 3000, 3001, items.callback)
+  await f.getLines('contigA', 3000, 3001, items.callback)
   expect(items.records.length).toEqual(0)
 
   const headerString = await f.getHeader()
@@ -72,22 +71,22 @@ test('can read ctgA:1000..4000', async () => {
     maxBlockSize: 1 << 16,
     format: 'VCF',
     metaChar: '#',
+    metaCharCode: 35,
     firstDataLine: new VirtualOffset(0, 10431),
-    refIdToName: ['ctgA'],
-    refNameToId: { ctgA: 0 },
+    refIdToName: ['contigA'],
+    refNameToId: { contigA: 0 },
     skipLines: 0,
     maxBinNumber: 37449,
     maxRefLength: 536870912,
   })
 })
-test('can read ctgA:10000', async () => {
+test('can read contigA:10000', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    renameRefSeqs: n => n.replace('contig', 'ctg'),
   })
   const items = new RecordCollector()
-  await f.getLines('ctgA', 10000, undefined, items.callback)
+  await f.getLines('contigA', 10000, undefined, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(30)
   for (const { line, fileOffset } of items.records) {
@@ -97,14 +96,13 @@ test('can read ctgA:10000', async () => {
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
 })
-test('can read ctgA', async () => {
+test('can read contigA', async () => {
   const f = new TabixIndexedFile({
     path: require.resolve('./data/volvox.test.vcf.gz'),
     tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    renameRefSeqs: n => n.replace('contig', 'ctg'),
   })
   const items = new RecordCollector()
-  await f.getLines('ctgA', undefined, undefined, items.callback)
+  await f.getLines('contigA', undefined, undefined, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(109)
   for (const { line, fileOffset } of items.records) {
