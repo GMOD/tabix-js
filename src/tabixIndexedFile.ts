@@ -11,6 +11,9 @@ import { checkAbortSignal } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
+const NO_OVERLAP = { overlaps: false } as const
+const END_REGEX = /(?:^|;)END=([^;]+)/
+
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
 interface GetLinesOpts {
@@ -410,113 +413,86 @@ export default class TabixIndexedFile {
     line: string,
   ) {
     const { columnNumbers, metaChar, coordinateType, format } = metadata
-    // skip meta lines
-    if (metaChar && line.startsWith(metaChar)) {
-      return { overlaps: false }
+    if (metaChar && line.charCodeAt(0) === metaChar.charCodeAt(0)) {
+      return NO_OVERLAP
     }
 
-    // check ref/start/end using column metadata from index
     let { ref, start, end } = columnNumbers
-    if (!ref) {
-      ref = 0
-    }
-    if (!start) {
-      start = 0
-    }
-    if (!end) {
-      end = 0
-    }
+    ref ||= 0
+    start ||= 0
+    end ||= 0
     if (format === 'VCF') {
       end = 8
     }
     const maxColumn = Math.max(ref, start, end)
 
-    // this code is kind of complex, but it is fairly fast. basically, we want
-    // to avoid doing a split, because if the lines are really long that could
-    // lead to us allocating a bunch of extra memory, which is slow
-
-    let currentColumnNumber = 1 // cols are numbered starting at 1 in the index metadata
+    let currentColumnNumber = 1
     let currentColumnStart = 0
     let refSeq = ''
     let startCoordinate = -Infinity
+    let i = 0
     const l = line.length
-    for (let i = 0; i < l + 1; i++) {
-      if (line[i] === '\t' || i === l) {
-        if (currentColumnNumber === ref) {
-          if (
-            this.renameRefSeq(line.slice(currentColumnStart, i)) !==
-            regionRefName
-          ) {
-            return {
-              overlaps: false,
-            }
-          }
-        } else if (currentColumnNumber === start) {
-          startCoordinate = Number.parseInt(
-            line.slice(currentColumnStart, i),
-            10,
-          )
-          // we convert to 0-based-half-open
-          if (coordinateType === '1-based-closed') {
-            startCoordinate -= 1
-          }
-          if (startCoordinate >= regionEnd) {
-            return {
-              startCoordinate,
-              overlaps: false,
-            }
-          }
-          if (
-            (end === 0 || end === start) && // if we have no end, we assume the feature is 1 bp long
-            startCoordinate + 1 <= regionStart
-          ) {
-            return {
-              startCoordinate,
-              overlaps: false,
-            }
-          }
-        } else if (format === 'VCF' && currentColumnNumber === 4) {
-          refSeq = line.slice(currentColumnStart, i)
-        } else if (currentColumnNumber === end) {
-          // this will never match if there is no end column
-          const endCoordinate =
-            format === 'VCF'
-              ? this._getVcfEnd(
-                  startCoordinate,
-                  refSeq,
-                  line.slice(currentColumnStart, i),
-                )
-              : Number.parseInt(line.slice(currentColumnStart, i), 10)
-          if (endCoordinate <= regionStart) {
-            return {
-              overlaps: false,
-            }
-          }
+
+    while (currentColumnNumber <= maxColumn) {
+      const nextTab = line.indexOf('\t', i)
+      const columnEnd = nextTab === -1 ? l : nextTab
+
+      if (currentColumnNumber === ref) {
+        if (
+          this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) !==
+          regionRefName
+        ) {
+          return NO_OVERLAP
         }
-        if (currentColumnNumber === maxColumn) {
-          break
+      } else if (currentColumnNumber === start) {
+        startCoordinate = Number.parseInt(
+          line.slice(currentColumnStart, columnEnd),
+          10,
+        )
+        if (coordinateType === '1-based-closed') {
+          startCoordinate -= 1
         }
-        currentColumnStart = i + 1
-        currentColumnNumber += 1
+        if (startCoordinate >= regionEnd) {
+          return { startCoordinate, overlaps: false }
+        }
+        if (
+          (end === 0 || end === start) &&
+          startCoordinate + 1 <= regionStart
+        ) {
+          return { startCoordinate, overlaps: false }
+        }
+      } else if (format === 'VCF' && currentColumnNumber === 4) {
+        refSeq = line.slice(currentColumnStart, columnEnd)
+      } else if (currentColumnNumber === end) {
+        const endCoordinate =
+          format === 'VCF'
+            ? this._getVcfEnd(
+                startCoordinate,
+                refSeq,
+                line.slice(currentColumnStart, columnEnd),
+              )
+            : Number.parseInt(line.slice(currentColumnStart, columnEnd), 10)
+        if (endCoordinate <= regionStart) {
+          return NO_OVERLAP
+        }
       }
+
+      if (nextTab === -1) {
+        break
+      }
+      currentColumnStart = nextTab + 1
+      i = currentColumnStart
+      currentColumnNumber += 1
     }
-    return {
-      startCoordinate,
-      overlaps: true,
-    }
+
+    return { startCoordinate, overlaps: true }
   }
 
-  _getVcfEnd(startCoordinate: number, refSeq: string, info: any) {
+  _getVcfEnd(startCoordinate: number, refSeq: string, info: string) {
     let endCoordinate = startCoordinate + refSeq.length
-    // ignore TRA features as they specify CHR2 and END as being on a different
-    // chromosome
-    //
-    // if CHR2 is on the same chromosome, still ignore it because there should
-    // be another pairwise feature at the end of this one
     const isTRA = info.includes('SVTYPE=TRA')
     if (info[0] !== '.' && !isTRA) {
-      const endRegex = /(?:^|;)END=([^;]+)/
-      const match = endRegex.exec(info)
+      const match = END_REGEX.exec(info)
       if (match) {
         endCoordinate = Number.parseInt(match[1]!, 10)
       }
