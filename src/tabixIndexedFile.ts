@@ -30,7 +30,10 @@ export default class TabixIndexedFile {
   private index: IndexFile
   private renameRefSeq: (n: string) => string
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
-  public cache = new LRU<string, { buffer: Uint8Array; nextIn: number }>({
+  public cache = new LRU<
+    string,
+    { bytesRead: number; buffer: Uint8Array; nextIn: number }
+  >({
     maxSize: 1000,
   })
 
