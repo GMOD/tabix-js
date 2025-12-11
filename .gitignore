@@ -8,3 +8,5 @@ coverage/
 *.swp
 esm
 test/data/1kg.chr1.subset.vcf.gz*
+esm_*/
+*.cpuprofile
