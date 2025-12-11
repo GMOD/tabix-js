@@ -11,8 +11,35 @@ import { checkAbortSignal } from './util.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
-const NO_OVERLAP = { overlaps: false } as const
+const NO_OVERLAP = { overlaps: false, startCoordinate: undefined } as const
 const END_REGEX = /(?:^|;)END=([^;]+)/
+const ZERO = '0'.charCodeAt(0)
+
+function parseIntFromSubstring(str: string, start: number, end: number) {
+  let result = 0
+  for (let i = start; i < end; i++) {
+    result = result * 10 + (str.charCodeAt(i) - ZERO)
+  }
+  return result
+}
+
+function substringEquals(
+  str: string,
+  start: number,
+  end: number,
+  target: string,
+) {
+  const len = end - start
+  if (len !== target.length) {
+    return false
+  }
+  for (let i = 0; i < len; i++) {
+    if (str.charCodeAt(start + i) !== target.charCodeAt(i)) {
+      return false
+    }
+  }
+  return true
+}
 
 type GetLinesCallback = (line: string, fileOffset: number) => void
 
@@ -32,6 +59,7 @@ export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   private renameRefSeq: (n: string) => string
+  private renameRefSeqIsIdentity: boolean
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
   public cache = new LRU<string, { buffer: Uint8Array; nextIn: number }>({
     maxSize: 1000,
@@ -73,7 +101,7 @@ export default class TabixIndexedFile {
     csiPath,
     csiUrl,
     csiFilehandle,
-    renameRefSeqs = n => n,
+    renameRefSeqs,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
     path?: string
@@ -141,7 +169,8 @@ export default class TabixIndexedFile {
       )
     }
 
-    this.renameRefSeq = renameRefSeqs
+    this.renameRefSeqIsIdentity = !renameRefSeqs
+    this.renameRefSeq = renameRefSeqs ?? (n => n)
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
       cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
       fill: (args: Chunk, signal?: AbortSignal) =>
@@ -428,7 +457,8 @@ export default class TabixIndexedFile {
 
     let currentColumnNumber = 1
     let currentColumnStart = 0
-    let refSeq = ''
+    let refSeqStart = 0
+    let refSeqEnd = 0
     let startCoordinate = -Infinity
     let i = 0
     const l = line.length
@@ -438,16 +468,18 @@ export default class TabixIndexedFile {
       const columnEnd = nextTab === -1 ? l : nextTab
 
       if (currentColumnNumber === ref) {
-        if (
-          this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) !==
-          regionRefName
-        ) {
+        const refMatches = this.renameRefSeqIsIdentity
+          ? substringEquals(line, currentColumnStart, columnEnd, regionRefName)
+          : this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) ===
+            regionRefName
+        if (!refMatches) {
           return NO_OVERLAP
         }
       } else if (currentColumnNumber === start) {
-        startCoordinate = Number.parseInt(
-          line.slice(currentColumnStart, columnEnd),
-          10,
+        startCoordinate = parseIntFromSubstring(
+          line,
+          currentColumnStart,
+          columnEnd,
         )
         if (coordinateType === '1-based-closed') {
           startCoordinate -= 1
@@ -462,16 +494,17 @@ export default class TabixIndexedFile {
           return { startCoordinate, overlaps: false }
         }
       } else if (format === 'VCF' && currentColumnNumber === 4) {
-        refSeq = line.slice(currentColumnStart, columnEnd)
+        refSeqStart = currentColumnStart
+        refSeqEnd = columnEnd
       } else if (currentColumnNumber === end) {
         const endCoordinate =
           format === 'VCF'
             ? this._getVcfEnd(
                 startCoordinate,
-                refSeq,
+                refSeqEnd - refSeqStart,
                 line.slice(currentColumnStart, columnEnd),
               )
-            : Number.parseInt(line.slice(currentColumnStart, columnEnd), 10)
+            : parseIntFromSubstring(line, currentColumnStart, columnEnd)
         if (endCoordinate <= regionStart) {
           return NO_OVERLAP
         }
@@ -488,8 +521,8 @@ export default class TabixIndexedFile {
     return { startCoordinate, overlaps: true }
   }
 
-  _getVcfEnd(startCoordinate: number, refSeq: string, info: string) {
-    let endCoordinate = startCoordinate + refSeq.length
+  _getVcfEnd(startCoordinate: number, refSeqLength: number, info: string) {
+    let endCoordinate = startCoordinate + refSeqLength
     const isTRA = info.includes('SVTYPE=TRA')
     if (info[0] !== '.' && !isTRA) {
       const match = END_REGEX.exec(info)

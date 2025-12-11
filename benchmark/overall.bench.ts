@@ -15,7 +15,7 @@ describe('Overall benchmark', () => {
       await f.getLines('chr1', 10109, 11000, line => {
         i++
       })
-      console.log(i)
+      //console.log(i)
     },
     { iterations: 1000 },
   )
