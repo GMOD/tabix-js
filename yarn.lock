@@ -363,13 +363,12 @@
   resolved "https://registry.yarnpkg.com/@gmod/abortable-promise-cache/-/abortable-promise-cache-3.0.4.tgz#5ecb44e40cf128e9f44f7c25e1406facdcaede9b"
   integrity sha512-kxRJj5fyRKFuZDp/YvnHeadYCV2EEUKyH2T4a2Iz9O7T/thOWWHUDiiD/Mg6WZP/RNNDIcfSHl/xVHHy/+j8qg==
 
-"@gmod/bgzf-filehandle@^6.0.0":
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/@gmod/bgzf-filehandle/-/bgzf-filehandle-6.0.0.tgz#886159f3252778416b50c7698af6cfbad34f0cf7"
-  integrity sha512-svwZR3BcvNfsduZPB+fLS+4zgYKvtSniX/J9ZWbTn4VxrBWF8uNG24jREZbo9Jz+sGLEt2u5QoOmqcNzxKsP+Q==
+"@gmod/bgzf-filehandle@^6.0.3":
+  version "6.0.3"
+  resolved "https://registry.yarnpkg.com/@gmod/bgzf-filehandle/-/bgzf-filehandle-6.0.3.tgz#7c5ef5a61fb6b9f05560a3109217db4a5e15720c"
+  integrity sha512-O9qh93gOt18fU4Fac4SJTo9xC3wH7VSQl2NNcglCAu3UKaKwmkGb+wxESEKHPlR7OirrO8gI2V2M9mH3m7LfmQ==
   dependencies:
     generic-filehandle2 "^2.0.5"
-    pako-esm2 "^2.0.1"
 
 "@humanfs/core@^0.19.1":
   version "0.19.1"
@@ -3839,11 +3838,6 @@ package-json-from-dist@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/package-json-from-dist/-/package-json-from-dist-1.0.1.tgz#4f1471a010827a86f94cfd9b0727e36d267de505"
   integrity sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==
-
-pako-esm2@^2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/pako-esm2/-/pako-esm2-2.0.1.tgz#ce2ccc6cd243148602cea867e465c4e9e76eaaa2"
-  integrity sha512-emGjBjADMceMZ2YtStgI58nNfBm4i9bvmbAiKZYaQIXIt0TO+tDodxs6wLPaNYGdJ6jb/ZLPAZOX/9rdFyExwg==
 
 parent-module@^1.0.0:
   version "1.0.1"
