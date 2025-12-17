@@ -1,7 +1,7 @@
 import AbortablePromiseCache from '@gmod/abortable-promise-cache'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
+import LRU from '@jbrowse/quick-lru'
 import { LocalFile, RemoteFile } from 'generic-filehandle2'
-import LRU from 'quick-lru'
 
 import Chunk from './chunk.ts'
 import CSI from './csi.ts'
