@@ -28,6 +28,9 @@ interface ReadChunk {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
+  private fallbackIndex?: IndexFile
+  private indexResolved = false
+  private indexResolvePromise?: Promise<void>
   private renameRefSeq: (n: string) => string
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
   public cache = new LRU<
@@ -98,7 +101,16 @@ export default class TabixIndexedFile {
       throw new TypeError('must provide either filehandle or path')
     }
 
-    if (tbiFilehandle) {
+    if (tbiFilehandle && csiFilehandle) {
+      this.index = new TBI({
+        filehandle: tbiFilehandle,
+        renameRefSeqs,
+      })
+      this.fallbackIndex = new CSI({
+        filehandle: csiFilehandle,
+        renameRefSeqs,
+      })
+    } else if (tbiFilehandle) {
       this.index = new TBI({
         filehandle: tbiFilehandle,
         renameRefSeqs,
@@ -106,6 +118,15 @@ export default class TabixIndexedFile {
     } else if (csiFilehandle) {
       this.index = new CSI({
         filehandle: csiFilehandle,
+        renameRefSeqs,
+      })
+    } else if (tbiPath && csiPath) {
+      this.index = new TBI({
+        filehandle: new LocalFile(tbiPath),
+        renameRefSeqs,
+      })
+      this.fallbackIndex = new CSI({
+        filehandle: new LocalFile(csiPath),
         renameRefSeqs,
       })
     } else if (tbiPath) {
@@ -123,17 +144,37 @@ export default class TabixIndexedFile {
         filehandle: new LocalFile(`${path}.tbi`),
         renameRefSeqs,
       })
+      this.fallbackIndex = new CSI({
+        filehandle: new LocalFile(`${path}.csi`),
+        renameRefSeqs,
+      })
+    } else if (tbiUrl && csiUrl) {
+      this.index = new TBI({
+        filehandle: new RemoteFile(tbiUrl),
+        renameRefSeqs,
+      })
+      this.fallbackIndex = new CSI({
+        filehandle: new RemoteFile(csiUrl),
+        renameRefSeqs,
+      })
     } else if (csiUrl) {
       this.index = new CSI({
         filehandle: new RemoteFile(csiUrl),
+        renameRefSeqs,
       })
     } else if (tbiUrl) {
       this.index = new TBI({
         filehandle: new RemoteFile(tbiUrl),
+        renameRefSeqs,
       })
     } else if (url) {
       this.index = new TBI({
         filehandle: new RemoteFile(`${url}.tbi`),
+        renameRefSeqs,
+      })
+      this.fallbackIndex = new CSI({
+        filehandle: new RemoteFile(`${url}.csi`),
+        renameRefSeqs,
       })
     } else {
       throw new TypeError(
@@ -147,6 +188,38 @@ export default class TabixIndexedFile {
       fill: (args: Chunk, signal?: AbortSignal) =>
         this.readChunk(args, { signal }),
     })
+  }
+
+  private async ensureIndex(opts: Options = {}) {
+    if (this.indexResolved) {
+      return
+    }
+    if (!this.indexResolvePromise) {
+      this.indexResolvePromise = this.resolveIndex(opts)
+    }
+    return this.indexResolvePromise
+  }
+
+  private async resolveIndex(opts: Options = {}) {
+    if (!this.fallbackIndex) {
+      this.indexResolved = true
+      return
+    }
+    try {
+      await this.index.parse(opts)
+      this.indexResolved = true
+    } catch (e) {
+      const isNotFound =
+        e instanceof Error &&
+        (/HTTP 404/.test(e.message) || /ENOENT/.test(e.message))
+      if (isNotFound) {
+        this.index = this.fallbackIndex
+        this.fallbackIndex = undefined
+        this.indexResolved = true
+      } else {
+        throw e
+      }
+    }
   }
 
   /**
@@ -195,6 +268,7 @@ export default class TabixIndexedFile {
       signal = opts.signal
     }
 
+    await this.ensureIndex(options)
     const metadata = await this.index.getMetadata(options)
     checkAbortSignal(signal)
     const start = s ?? 0
@@ -328,6 +402,7 @@ export default class TabixIndexedFile {
   }
 
   async getMetadata(opts: Options = {}) {
+    await this.ensureIndex(opts)
     return this.index.getMetadata(opts)
   }
 
@@ -538,6 +613,7 @@ export default class TabixIndexedFile {
    * @returns number of data lines present on that reference sequence
    */
   async lineCount(refName: string, opts: Options = {}) {
+    await this.ensureIndex(opts)
     return this.index.lineCount(refName, opts)
   }
 
