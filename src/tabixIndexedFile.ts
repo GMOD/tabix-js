@@ -271,7 +271,9 @@ export default class TabixIndexedFile {
             start,
             end,
             line,
-            columnNumbersEffective,
+            columnNumbersEffective.ref,
+            columnNumbersEffective.start,
+            columnNumbersEffective.end,
             maxColumn,
             metaCharCode,
             coordinateOffset,
@@ -321,7 +323,9 @@ export default class TabixIndexedFile {
             start,
             end,
             line,
-            columnNumbersEffective,
+            columnNumbersEffective.ref,
+            columnNumbersEffective.start,
+            columnNumbersEffective.end,
             maxColumn,
             metaCharCode,
             coordinateOffset,
@@ -420,7 +424,11 @@ export default class TabixIndexedFile {
    *
    * @param {string} line
    *
-   * @param {object} columnNumbersEffective pre-calculated column numbers
+   * @param {number} refColumn column number for ref
+   *
+   * @param {number} startColumn column number for start
+   *
+   * @param {number} endColumn column number for end
    *
    * @param {number} maxColumn pre-calculated max column
    *
@@ -439,7 +447,9 @@ export default class TabixIndexedFile {
     regionStart: number,
     regionEnd: number,
     line: string,
-    columnNumbersEffective: { ref: number; start: number; end: number },
+    refColumn: number,
+    startColumn: number,
+    endColumn: number,
     maxColumn: number,
     metaCharCode: number | undefined,
     coordinateOffset: number,
@@ -460,7 +470,7 @@ export default class TabixIndexedFile {
     while (currentColumnNumber <= maxColumn) {
       const columnEnd = tabPos === -1 ? l : tabPos
 
-      if (currentColumnNumber === columnNumbersEffective.ref) {
+      if (currentColumnNumber === refColumn) {
         const refMatch = isIdentityRename
           ? line.slice(currentColumnStart, columnEnd) === regionRefName
           : this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) ===
@@ -468,7 +478,7 @@ export default class TabixIndexedFile {
         if (!refMatch) {
           return
         }
-      } else if (currentColumnNumber === columnNumbersEffective.start) {
+      } else if (currentColumnNumber === startColumn) {
         startCoordinate =
           Number.parseInt(line.slice(currentColumnStart, columnEnd), 10) +
           coordinateOffset
@@ -476,15 +486,14 @@ export default class TabixIndexedFile {
           return null
         }
         if (
-          (columnNumbersEffective.end === 0 ||
-            columnNumbersEffective.end === columnNumbersEffective.start) &&
+          (endColumn === 0 || endColumn === startColumn) &&
           startCoordinate + 1 <= regionStart
         ) {
           return
         }
       } else if (isVCF && currentColumnNumber === 4) {
         refSeq = line.slice(currentColumnStart, columnEnd)
-      } else if (currentColumnNumber === columnNumbersEffective.end) {
+      } else if (currentColumnNumber === endColumn) {
         const endCoordinate = isVCF
           ? this._getVcfEnd(
               startCoordinate,

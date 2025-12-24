@@ -59,7 +59,7 @@ benchTabix(
 benchTabix(
   'volvox.test.vcf.gz (45KB)',
   'test/data/volvox.test.vcf.gz',
-  'ctgA',
+  'contigA',
   0,
   100000,
   { iterations: 2000, warmupIterations: 500 },
