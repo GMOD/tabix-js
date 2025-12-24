@@ -3,7 +3,7 @@ import { unzip } from '@gmod/bgzf-filehandle'
 import Chunk from './chunk.ts'
 import IndexFile, { Options } from './indexFile.ts'
 import { longFromBytesToUnsigned } from './long.ts'
-import { checkAbortSignal, optimizeChunks } from './util.ts'
+import { optimizeChunks } from './util.ts'
 import VirtualOffset, { fromBytes } from './virtualOffset.ts'
 
 const TBI_MAGIC = 21578324 // TBI\1
@@ -44,7 +44,6 @@ export default class TabixIndex extends IndexFile {
   async _parse(opts: Options = {}) {
     const buf = await this.filehandle.readFile(opts)
     const bytes = await unzip(buf)
-    checkAbortSignal(opts.signal)
     const dataView = new DataView(bytes.buffer)
 
     const magic = dataView.getUint32(0, true)
