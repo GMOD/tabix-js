@@ -33,6 +33,10 @@ Or specify branches directly:
 
 - `tabix.bench.ts` - Benchmarks tabix file reading performance across various
   file sizes
+- `overall.bench.ts` - Quick benchmark for parsing a large VCF file
+- `string-comparison.bench.ts` - Compares different string parsing algorithms
+  (not branch comparison, compares algorithms)
+- `profile-cpu.mjs` - CPU profiling script for detailed performance analysis
 
 The benchmarks test a range of file sizes from small (2KB) to large (213MB)
 files, including:

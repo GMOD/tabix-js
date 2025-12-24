@@ -10,7 +10,12 @@ import TBI from './tbi.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
 
-type GetLinesCallback = (line: string, fileOffset: number) => void
+type GetLinesCallback = (
+  line: string,
+  fileOffset: number,
+  start: number,
+  end: number,
+) => void
 
 interface GetLinesOpts {
   [key: string]: unknown
@@ -187,7 +192,7 @@ export default class TabixIndexedFile {
   ) {
     let signal: AbortSignal | undefined
     let options: Options = {}
-    let callback: (line: string, lineOffset: number) => void
+    let callback: GetLinesCallback
 
     if (typeof opts === 'function') {
       callback = opts
@@ -228,13 +233,24 @@ export default class TabixIndexedFile {
       metadata.coordinateType === '1-based-closed' ? -1 : 0
     const isIdentityRename = !this.hasCustomRenameRefSeq
 
+    let timeDecompress = 0
+    let timeDecode = 0
+    let timeCheckLine = 0
+    let timeCallback = 0
+    let lineCount = 0
+    let matchCount = 0
+    let totalBytes = 0
+
     // now go through each chunk and parse and filter the lines out of it
     for (const c of chunks) {
+      const t0 = performance.now()
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
         signal,
       )
+      timeDecompress += performance.now() - t0
+      totalBytes += buffer.length
 
       let blockStart = 0
       let pos = 0
@@ -247,7 +263,9 @@ export default class TabixIndexedFile {
       //
       // we use a basic check for isASCII: string length equals buffer length
       // if it is ASCII...no multi-byte decodings
+      const t1 = performance.now()
       const str = decoder.decode(buffer)
+      timeDecode += performance.now() - t1
       const strIsASCII = buffer.length == str.length
       if (strIsASCII) {
         while (blockStart < str.length) {
@@ -256,6 +274,7 @@ export default class TabixIndexedFile {
             break
           }
           const line = str.slice(blockStart, n)
+          lineCount++
 
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           if (dpositions) {
@@ -266,6 +285,7 @@ export default class TabixIndexedFile {
           }
 
           // filter the line for whether it is within the requested range
+          const t2 = performance.now()
           const result = this.checkLine(
             refName,
             start,
@@ -280,13 +300,19 @@ export default class TabixIndexedFile {
             isVCF,
             isIdentityRename,
           )
+          timeCheckLine += performance.now() - t2
 
           if (result === null) {
             // the lines were overlapping the region, but now have stopped, so we
             // must be at the end of the relevant data and we can stop processing
             // data now
+            console.log(
+              `[tabix-js] chunks=${chunks.length} bytes=${totalBytes} decompress=${timeDecompress.toFixed(1)}ms decode=${timeDecode.toFixed(1)}ms checkLine=${timeCheckLine.toFixed(1)}ms callback=${timeCallback.toFixed(1)}ms lines=${lineCount} matches=${matchCount}`,
+            )
             return
           } else if (result !== undefined) {
+            matchCount++
+            const t3 = performance.now()
             callback(
               line,
               this.calculateFileOffset(
@@ -296,7 +322,10 @@ export default class TabixIndexedFile {
                 blockStart,
                 c.minv.dataPosition,
               ),
+              result.start,
+              result.end,
             )
+            timeCallback += performance.now() - t3
           }
           blockStart = n + 1
         }
@@ -307,7 +336,10 @@ export default class TabixIndexedFile {
             break
           }
           const b = buffer.slice(blockStart, n)
+          const t1b = performance.now()
           const line = decoder.decode(b)
+          timeDecode += performance.now() - t1b
+          lineCount++
 
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           if (dpositions) {
@@ -318,6 +350,7 @@ export default class TabixIndexedFile {
           }
 
           // filter the line for whether it is within the requested range
+          const t2b = performance.now()
           const result = this.checkLine(
             refName,
             start,
@@ -332,13 +365,19 @@ export default class TabixIndexedFile {
             isVCF,
             isIdentityRename,
           )
+          timeCheckLine += performance.now() - t2b
 
           if (result === null) {
             // the lines were overlapping the region, but now have stopped, so we
             // must be at the end of the relevant data and we can stop processing
             // data now
+            console.log(
+              `[tabix-js] chunks=${chunks.length} bytes=${totalBytes} decompress=${timeDecompress.toFixed(1)}ms decode=${timeDecode.toFixed(1)}ms checkLine=${timeCheckLine.toFixed(1)}ms callback=${timeCallback.toFixed(1)}ms lines=${lineCount} matches=${matchCount}`,
+            )
             return
           } else if (result !== undefined) {
+            matchCount++
+            const t3b = performance.now()
             callback(
               line,
               this.calculateFileOffset(
@@ -348,12 +387,18 @@ export default class TabixIndexedFile {
                 blockStart,
                 c.minv.dataPosition,
               ),
+              result.start,
+              result.end,
             )
+            timeCallback += performance.now() - t3b
           }
           blockStart = n + 1
         }
       }
     }
+    console.log(
+      `[tabix-js] chunks=${chunks.length} bytes=${totalBytes} decompress=${timeDecompress.toFixed(1)}ms decode=${timeDecode.toFixed(1)}ms checkLine=${timeCheckLine.toFixed(1)}ms callback=${timeCallback.toFixed(1)}ms lines=${lineCount} matches=${matchCount}`,
+    )
   }
 
   async getMetadata(opts: Options = {}) {
@@ -440,7 +485,7 @@ export default class TabixIndexedFile {
    *
    * @param {boolean} isIdentityRename whether renameRefSeq is the identity function
    *
-   * @returns {number | null | undefined} startCoordinate if overlapping, null if should stop processing, undefined otherwise
+   * @returns {{ start: number, end: number } | null | undefined} coordinates if overlapping, null if should stop processing, undefined otherwise
    */
   checkLine(
     regionRefName: string,
@@ -455,7 +500,7 @@ export default class TabixIndexedFile {
     coordinateOffset: number,
     isVCF: boolean,
     isIdentityRename: boolean,
-  ) {
+  ): { start: number; end: number } | null | undefined {
     if (metaCharCode !== undefined && line.charCodeAt(0) === metaCharCode) {
       return
     }
@@ -464,6 +509,7 @@ export default class TabixIndexedFile {
     let currentColumnStart = 0
     let refSeq = ''
     let startCoordinate = -Infinity
+    let endCoordinate = -Infinity
     const l = line.length
     let tabPos = line.indexOf('\t', currentColumnStart)
 
@@ -471,36 +517,67 @@ export default class TabixIndexedFile {
       const columnEnd = tabPos === -1 ? l : tabPos
 
       if (currentColumnNumber === refColumn) {
-        const refMatch = isIdentityRename
-          ? line.slice(currentColumnStart, columnEnd) === regionRefName
-          : this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) ===
+        if (isIdentityRename) {
+          const colLen = columnEnd - currentColumnStart
+          if (colLen !== regionRefName.length) {
+            return
+          }
+          let match = true
+          for (let i = 0; i < colLen; i++) {
+            if (
+              line.charCodeAt(currentColumnStart + i) !==
+              regionRefName.charCodeAt(i)
+            ) {
+              match = false
+              break
+            }
+          }
+          if (!match) {
+            return
+          }
+        } else {
+          if (
+            this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) !==
             regionRefName
-        if (!refMatch) {
-          return
+          ) {
+            return
+          }
         }
       } else if (currentColumnNumber === startColumn) {
-        startCoordinate =
-          Number.parseInt(line.slice(currentColumnStart, columnEnd), 10) +
-          coordinateOffset
+        startCoordinate = coordinateOffset
+        for (let i = currentColumnStart; i < columnEnd; i++) {
+          const c = line.charCodeAt(i)
+          if (c >= 48 && c <= 57) {
+            startCoordinate = startCoordinate * 10 + (c - 48)
+          }
+        }
         if (startCoordinate >= regionEnd) {
           return null
         }
-        if (
-          (endColumn === 0 || endColumn === startColumn) &&
-          startCoordinate + 1 <= regionStart
-        ) {
-          return
+        if (endColumn === 0 || endColumn === startColumn) {
+          endCoordinate = startCoordinate + 1
+          if (endCoordinate <= regionStart) {
+            return
+          }
         }
       } else if (isVCF && currentColumnNumber === 4) {
         refSeq = line.slice(currentColumnStart, columnEnd)
       } else if (currentColumnNumber === endColumn) {
-        const endCoordinate = isVCF
-          ? this._getVcfEnd(
-              startCoordinate,
-              refSeq,
-              line.slice(currentColumnStart, columnEnd),
-            )
-          : Number.parseInt(line.slice(currentColumnStart, columnEnd), 10)
+        if (isVCF) {
+          endCoordinate = this._getVcfEnd(
+            startCoordinate,
+            refSeq,
+            line.slice(currentColumnStart, columnEnd),
+          )
+        } else {
+          endCoordinate = 0
+          for (let i = currentColumnStart; i < columnEnd; i++) {
+            const c = line.charCodeAt(i)
+            if (c >= 48 && c <= 57) {
+              endCoordinate = endCoordinate * 10 + (c - 48)
+            }
+          }
+        }
         if (endCoordinate <= regionStart) {
           return
         }
@@ -514,7 +591,7 @@ export default class TabixIndexedFile {
       currentColumnNumber += 1
       tabPos = line.indexOf('\t', currentColumnStart)
     }
-    return startCoordinate
+    return { start: startCoordinate, end: endCoordinate }
   }
 
   _getVcfEnd(startCoordinate: number, refSeq: string, info: any) {

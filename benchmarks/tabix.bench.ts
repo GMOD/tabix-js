@@ -65,14 +65,10 @@ benchTabix(
   { iterations: 2000, warmupIterations: 500 },
 )
 
-benchTabix(
-  'out.bed.gz (285KB)',
-  'test/data/out.bed.gz',
-  'ctgA',
-  0,
-  100000000,
-  { iterations: 1000, warmupIterations: 300 },
-)
+benchTabix('out.bed.gz (285KB)', 'test/data/out.bed.gz', 'ctgA', 0, 100000000, {
+  iterations: 1000,
+  warmupIterations: 300,
+})
 
 benchTabix(
   'raw.g.vcf.gz (283KB)',
