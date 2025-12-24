@@ -5,7 +5,7 @@ import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import Chunk from './chunk.ts'
 import CSI from './csi.ts'
-import IndexFile, { IndexData, Options } from './indexFile.ts'
+import IndexFile, { Options } from './indexFile.ts'
 import TBI from './tbi.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
@@ -73,7 +73,7 @@ export default class TabixIndexedFile {
     csiPath,
     csiUrl,
     csiFilehandle,
-    renameRefSeqs = n => n,
+    renameRefSeqs: renameRefSeqsPre,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
     path?: string
@@ -88,6 +88,7 @@ export default class TabixIndexedFile {
     renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
+    const renameRefSeqs = renameRefSeqsPre ?? (arg => arg)
     if (filehandle) {
       this.filehandle = filehandle
     } else if (path) {
@@ -142,7 +143,7 @@ export default class TabixIndexedFile {
     }
 
     this.renameRefSeq = renameRefSeqs
-    this.hasCustomRenameRefSeq = arguments[0]?.renameRefSeqs !== undefined
+    this.hasCustomRenameRefSeq = renameRefSeqsPre !== undefined
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
       cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
       fill: (args: Chunk, signal?: AbortSignal) =>
@@ -223,7 +224,8 @@ export default class TabixIndexedFile {
       columnNumbersEffective.end,
     )
     const metaCharCode = metadata.metaChar?.charCodeAt(0)
-    const coordinateOffset = metadata.coordinateType === '1-based-closed' ? -1 : 0
+    const coordinateOffset =
+      metadata.coordinateType === '1-based-closed' ? -1 : 0
     const isIdentityRename = !this.hasCustomRenameRefSeq
 
     // now go through each chunk and parse and filter the lines out of it
@@ -393,8 +395,6 @@ export default class TabixIndexedFile {
   /**
    * get a string containing the "header" region of the file, is the portion up
    * to the first non-meta line
-   *
-   * @returns {Promise} for a string
    */
   async getHeader(opts: Options = {}) {
     const decoder = new TextDecoder('utf8')
@@ -447,7 +447,7 @@ export default class TabixIndexedFile {
     isIdentityRename: boolean,
   ) {
     if (metaCharCode !== undefined && line.charCodeAt(0) === metaCharCode) {
-      return undefined
+      return
     }
 
     let currentColumnNumber = 1
@@ -466,7 +466,7 @@ export default class TabixIndexedFile {
           : this.renameRefSeq(line.slice(currentColumnStart, columnEnd)) ===
             regionRefName
         if (!refMatch) {
-          return undefined
+          return
         }
       } else if (currentColumnNumber === columnNumbersEffective.start) {
         startCoordinate =
@@ -480,7 +480,7 @@ export default class TabixIndexedFile {
             columnNumbersEffective.end === columnNumbersEffective.start) &&
           startCoordinate + 1 <= regionStart
         ) {
-          return undefined
+          return
         }
       } else if (isVCF && currentColumnNumber === 4) {
         refSeq = line.slice(currentColumnStart, columnEnd)
@@ -493,7 +493,7 @@ export default class TabixIndexedFile {
             )
           : Number.parseInt(line.slice(currentColumnStart, columnEnd), 10)
         if (endCoordinate <= regionStart) {
-          return undefined
+          return
         }
       }
 

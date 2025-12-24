@@ -9,7 +9,7 @@ export default defineConfig(
     ignores: [
       'webpack.config.js',
       'dist/*',
-      'benchmark/*',
+      'benchmarks/*',
       'esm/*',
       'esm_*/*',
       'profile*',
@@ -46,6 +46,7 @@ export default defineConfig(
       'unicorn/number-literal-case': 'off',
       'unicorn/text-encoding-identifier-case': 'off',
       'unicorn/no-new-array': 'off',
+      'unicorn/no-null': 'off',
       'unicorn/prefer-module': 'off',
       'unicorn/filename-case': 'off',
       'unicorn/prevent-abbreviations': 'off',

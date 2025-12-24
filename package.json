@@ -31,6 +31,8 @@
   ],
   "scripts": {
     "test": "vitest",
+    "benchonly": "vitest bench",
+    "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "lint": "eslint --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write .",
     "docs": "documentation readme --shallow src/tabixIndexedFile.ts --section TabixIndexedFile",
