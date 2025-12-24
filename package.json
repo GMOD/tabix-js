@@ -31,6 +31,8 @@
   ],
   "scripts": {
     "test": "vitest",
+    "benchonly": "vitest bench",
+    "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "lint": "eslint --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write .",
     "docs": "documentation readme --shallow src/tabixIndexedFile.ts --section TabixIndexedFile",
@@ -68,9 +70,9 @@
     "rimraf": "^6.0.1",
     "standard-changelog": "^7.0.1",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.50.0",
+    "typescript-eslint": "^8.50.1",
     "vitest": "^4.0.16",
-    "webpack": "^5.104.0",
+    "webpack": "^5.104.1",
     "webpack-cli": "^6.0.1"
   },
   "publishConfig": {

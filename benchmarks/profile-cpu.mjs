@@ -1,4 +1,4 @@
-import { TabixIndexedFile } from './esm/index.js'
+import { TabixIndexedFile } from '../esm/index.js'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import inspector from 'inspector'
@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 async function runBenchmark() {
   const f = new TabixIndexedFile({
-    path: join(__dirname, 'test/data/1kg.chr1.subset.vcf.gz'),
+    path: join(__dirname, '../test/data/1kg.chr1.subset.vcf.gz'),
   })
 
   let totalLines = 0
