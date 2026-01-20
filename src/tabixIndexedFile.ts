@@ -29,11 +29,12 @@ interface ReadChunk {
   dpositions: number[]
 }
 
+const TAB = 9
+const NEWLINE = 10
+
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
-  private renameRefSeq: (n: string) => string
-  private hasCustomRenameRefSeq: boolean
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
   public cache = new LRU<
     string,
@@ -44,29 +45,15 @@ export default class TabixIndexedFile {
 
   /**
    * @param {object} args
-   *
    * @param {string} [args.path]
-   *
    * @param {filehandle} [args.filehandle]
-   *
    * @param {string} [args.tbiPath]
-   *
    * @param {filehandle} [args.tbiFilehandle]
-   *
    * @param {string} [args.csiPath]
-   *
    * @param {filehandle} [args.csiFilehandle]
-   *
    * @param {url} [args.url]
-   *
    * @param {csiUrl} [args.csiUrl]
-   *
    * @param {tbiUrl} [args.tbiUrl]
-   *
-   * @param {function} [args.renameRefSeqs] optional function with sig `string
-   * => string` to transform reference sequence names for the purpose of
-   * indexing and querying. note that the data that is returned is not altered,
-   * just the names of the reference sequences that are used for querying.
    */
   constructor({
     path,
@@ -78,7 +65,6 @@ export default class TabixIndexedFile {
     csiPath,
     csiUrl,
     csiFilehandle,
-    renameRefSeqs: renameRefSeqsPre,
     chunkCacheSize = 5 * 2 ** 20,
   }: {
     path?: string
@@ -90,10 +76,8 @@ export default class TabixIndexedFile {
     csiPath?: string
     csiUrl?: string
     csiFilehandle?: GenericFilehandle
-    renameRefSeqs?: (n: string) => string
     chunkCacheSize?: number
   }) {
-    const renameRefSeqs = renameRefSeqsPre ?? (arg => arg)
     if (filehandle) {
       this.filehandle = filehandle
     } else if (path) {
@@ -105,50 +89,27 @@ export default class TabixIndexedFile {
     }
 
     if (tbiFilehandle) {
-      this.index = new TBI({
-        filehandle: tbiFilehandle,
-        renameRefSeqs,
-      })
+      this.index = new TBI({ filehandle: tbiFilehandle })
     } else if (csiFilehandle) {
-      this.index = new CSI({
-        filehandle: csiFilehandle,
-        renameRefSeqs,
-      })
+      this.index = new CSI({ filehandle: csiFilehandle })
     } else if (tbiPath) {
-      this.index = new TBI({
-        filehandle: new LocalFile(tbiPath),
-        renameRefSeqs,
-      })
+      this.index = new TBI({ filehandle: new LocalFile(tbiPath) })
     } else if (csiPath) {
-      this.index = new CSI({
-        filehandle: new LocalFile(csiPath),
-        renameRefSeqs,
-      })
+      this.index = new CSI({ filehandle: new LocalFile(csiPath) })
     } else if (path) {
-      this.index = new TBI({
-        filehandle: new LocalFile(`${path}.tbi`),
-        renameRefSeqs,
-      })
+      this.index = new TBI({ filehandle: new LocalFile(`${path}.tbi`) })
     } else if (csiUrl) {
-      this.index = new CSI({
-        filehandle: new RemoteFile(csiUrl),
-      })
+      this.index = new CSI({ filehandle: new RemoteFile(csiUrl) })
     } else if (tbiUrl) {
-      this.index = new TBI({
-        filehandle: new RemoteFile(tbiUrl),
-      })
+      this.index = new TBI({ filehandle: new RemoteFile(tbiUrl) })
     } else if (url) {
-      this.index = new TBI({
-        filehandle: new RemoteFile(`${url}.tbi`),
-      })
+      this.index = new TBI({ filehandle: new RemoteFile(`${url}.tbi`) })
     } else {
       throw new TypeError(
         'must provide one of tbiFilehandle, tbiPath, csiFilehandle, csiPath, tbiUrl, csiUrl',
       )
     }
 
-    this.renameRefSeq = renameRefSeqs
-    this.hasCustomRenameRefSeq = renameRefSeqsPre !== undefined
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
       cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
       fill: (args: Chunk, signal?: AbortSignal) =>
@@ -216,6 +177,7 @@ export default class TabixIndexedFile {
 
     const chunks = await this.index.blocksForRange(refName, start, end, options)
     const decoder = new TextDecoder('utf8')
+    const encoder = new TextEncoder()
 
     const isVCF = metadata.format === 'VCF'
     const columnNumbersEffective = {
@@ -231,9 +193,9 @@ export default class TabixIndexedFile {
     const metaCharCode = metadata.metaChar?.charCodeAt(0)
     const coordinateOffset =
       metadata.coordinateType === '1-based-closed' ? -1 : 0
-    const isIdentityRename = !this.hasCustomRenameRefSeq
 
-    // now go through each chunk and parse and filter the lines out of it
+    const regionRefNameBytes = encoder.encode(refName)
+
     for (const c of chunks) {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
@@ -244,117 +206,55 @@ export default class TabixIndexedFile {
       let blockStart = 0
       let pos = 0
 
-      // fast path, Buffer is just ASCII chars and not gigantor, can be
-      // converted to string and processed directly.
-      //
-      // if it is not ASCII or, we have to decode line by line, as it is
-      // otherwise hard to get the right 'fileOffset' based feature IDs
-      //
-      // we use a basic check for isASCII: string length equals buffer length
-      // if it is ASCII...no multi-byte decodings
-      const str = decoder.decode(buffer)
-      const strIsASCII = buffer.length == str.length
-      if (strIsASCII) {
-        while (blockStart < str.length) {
-          const n = str.indexOf('\n', blockStart)
-          if (n === -1) {
-            break
-          }
-          const line = str.slice(blockStart, n)
-
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          if (dpositions) {
-            const target = blockStart + c.minv.dataPosition
-            while (pos < dpositions.length && target >= dpositions[pos]!) {
-              pos++
-            }
-          }
-
-          // filter the line for whether it is within the requested range
-          const result = this.checkLine(
-            refName,
-            start,
-            end,
-            line,
-            columnNumbersEffective.ref,
-            columnNumbersEffective.start,
-            columnNumbersEffective.end,
-            maxColumn,
-            metaCharCode,
-            coordinateOffset,
-            isVCF,
-            isIdentityRename,
-          )
-
-          if (result === null) {
-            return
-          } else if (result !== undefined) {
-            callback(
-              line,
-              this.calculateFileOffset(
-                cpositions,
-                dpositions,
-                pos,
-                blockStart,
-                c.minv.dataPosition,
-              ),
-              result.start,
-              result.end,
-            )
-          }
-          blockStart = n + 1
+      while (blockStart < buffer.length) {
+        const n = buffer.indexOf(NEWLINE, blockStart)
+        if (n === -1) {
+          break
         }
-      } else {
-        while (blockStart < buffer.length) {
-          const n = buffer.indexOf('\n'.charCodeAt(0), blockStart)
-          if (n === -1) {
-            break
-          }
-          const b = buffer.slice(blockStart, n)
-          const line = decoder.decode(b)
 
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          if (dpositions) {
-            const target = blockStart + c.minv.dataPosition
-            while (pos < dpositions.length && target >= dpositions[pos]!) {
-              pos++
-            }
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (dpositions) {
+          const target = blockStart + c.minv.dataPosition
+          while (pos < dpositions.length && target >= dpositions[pos]!) {
+            pos++
           }
-
-          // filter the line for whether it is within the requested range
-          const result = this.checkLine(
-            refName,
-            start,
-            end,
-            line,
-            columnNumbersEffective.ref,
-            columnNumbersEffective.start,
-            columnNumbersEffective.end,
-            maxColumn,
-            metaCharCode,
-            coordinateOffset,
-            isVCF,
-            isIdentityRename,
-          )
-
-          if (result === null) {
-            return
-          } else if (result !== undefined) {
-            callback(
-              line,
-              this.calculateFileOffset(
-                cpositions,
-                dpositions,
-                pos,
-                blockStart,
-                c.minv.dataPosition,
-              ),
-              result.start,
-              result.end,
-            )
-          }
-          blockStart = n + 1
         }
+
+        const result = this.checkLineBytes(
+          buffer,
+          blockStart,
+          n,
+          regionRefNameBytes,
+          start,
+          end,
+          columnNumbersEffective.ref,
+          columnNumbersEffective.start,
+          columnNumbersEffective.end,
+          maxColumn,
+          metaCharCode,
+          coordinateOffset,
+          isVCF,
+        )
+
+        if (result === null) {
+          return
+        }
+        if (result !== undefined) {
+          const line = decoder.decode(buffer.subarray(blockStart, n))
+          callback(
+            line,
+            this.calculateFileOffset(
+              cpositions,
+              dpositions,
+              pos,
+              blockStart,
+              c.minv.dataPosition,
+            ),
+            result.start,
+            result.end,
+          )
+        }
+        blockStart = n + 1
       }
     }
   }
@@ -411,45 +311,20 @@ export default class TabixIndexedFile {
 
   /**
    * get an array of reference sequence names, in the order in which they occur
-   * in the file. reference sequence renaming is not applied to these names.
+   * in the file.
    */
   async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
     return metadata.refIdToName
   }
 
-  /**
-   * @param {string} regionRefName
-   *
-   * @param {number} regionStart region start coordinate (0-based-half-open)
-   *
-   * @param {number} regionEnd region end coordinate (0-based-half-open)
-   *
-   * @param {string} line
-   *
-   * @param {number} refColumn column number for ref
-   *
-   * @param {number} startColumn column number for start
-   *
-   * @param {number} endColumn column number for end
-   *
-   * @param {number} maxColumn pre-calculated max column
-   *
-   * @param {number} metaCharCode pre-calculated metaChar code
-   *
-   * @param {number} coordinateOffset 0 or -1 for coordinate adjustment
-   *
-   * @param {boolean} isVCF whether this is VCF format
-   *
-   * @param {boolean} isIdentityRename whether renameRefSeq is the identity function
-   *
-   * @returns {{ start: number, end: number } | null | undefined} coordinates if overlapping, null if should stop processing, undefined otherwise
-   */
-  checkLine(
-    regionRefName: string,
+  checkLineBytes(
+    buffer: Uint8Array,
+    lineStart: number,
+    lineEnd: number,
+    regionRefNameBytes: Uint8Array,
     regionStart: number,
     regionEnd: number,
-    line: string,
     refColumn: number,
     startColumn: number,
     endColumn: number,
@@ -457,87 +332,71 @@ export default class TabixIndexedFile {
     metaCharCode: number | undefined,
     coordinateOffset: number,
     isVCF: boolean,
-    isIdentityRename: boolean,
   ): { start: number; end: number } | null | undefined {
-    if (metaCharCode !== undefined && line.charCodeAt(0) === metaCharCode) {
+    if (metaCharCode !== undefined && buffer[lineStart] === metaCharCode) {
       return
     }
 
-    // Length-based fast path: split for short lines, indexOf for long lines
-    // Split is faster for short lines, but slow for long lines with big attribute columns
-    if (line.length < 500) {
-      const fields = line.split('\t')
-      const ref = fields[refColumn - 1]!
-      const refMatch = isIdentityRename
-        ? ref === regionRefName
-        : this.renameRefSeq(ref) === regionRefName
-      if (!refMatch) {
-        return
-      }
-
-      const startCoordinate = +fields[startColumn - 1]! + coordinateOffset
-      if (startCoordinate >= regionEnd) {
-        return null
-      }
-
-      let endCoordinate: number
-      if (endColumn === 0 || endColumn === startColumn) {
-        endCoordinate = startCoordinate + 1
-      } else if (isVCF) {
-        endCoordinate = this._getVcfEnd(
-          startCoordinate,
-          fields[3]!,
-          fields[endColumn - 1]!,
-        )
-      } else {
-        endCoordinate = +fields[endColumn - 1]!
-      }
-
-      if (endCoordinate <= regionStart) {
-        return
-      }
-      return { start: startCoordinate, end: endCoordinate }
-    }
-
-    // Long lines - use indexOf chain (avoids parsing long attribute column)
-    let prev = -1
-    const tabs = [-1]
+    // Find tab positions
+    let prev = lineStart - 1
+    const tabs = [lineStart - 1]
     for (let i = 0; i < maxColumn; i++) {
-      const pos = line.indexOf('\t', prev + 1)
-      if (pos === -1) {
-        tabs.push(line.length)
-        break
+      let pos = prev + 1
+      while (pos < lineEnd && buffer[pos] !== TAB) {
+        pos++
       }
-      tabs.push(pos)
+      tabs.push(pos < lineEnd ? pos : lineEnd)
       prev = pos
     }
 
-    const ref = line.slice(tabs[refColumn - 1]! + 1, tabs[refColumn])
-    const refMatch = isIdentityRename
-      ? ref === regionRefName
-      : this.renameRefSeq(ref) === regionRefName
-    if (!refMatch) {
+    // Compare ref bytes directly
+    const refStart = tabs[refColumn - 1]! + 1
+    const refEnd = tabs[refColumn]!
+    const refLen = refEnd - refStart
+    if (refLen !== regionRefNameBytes.length) {
       return
     }
+    for (let i = 0; i < refLen; i++) {
+      if (buffer[refStart + i] !== regionRefNameBytes[i]) {
+        return
+      }
+    }
 
-    const startCoordinate =
-      +line.slice(tabs[startColumn - 1]! + 1, tabs[startColumn]) +
-      coordinateOffset
+    // Parse start coordinate from bytes
+    let startCoordinate = 0
+    for (let i = tabs[startColumn - 1]! + 1; i < tabs[startColumn]!; i++) {
+      const c = buffer[i]!
+      if (c >= 48 && c <= 57) {
+        startCoordinate = startCoordinate * 10 + (c - 48)
+      }
+    }
+    startCoordinate += coordinateOffset
+
     if (startCoordinate >= regionEnd) {
       return null
     }
 
+    // Parse end coordinate
     let endCoordinate: number
     if (endColumn === 0 || endColumn === startColumn) {
       endCoordinate = startCoordinate + 1
     } else if (isVCF) {
-      endCoordinate = this._getVcfEnd(
+      endCoordinate = this._getVcfEndBytes(
+        buffer,
         startCoordinate,
-        line.slice(tabs[3]! + 1, tabs[4]),
-        line.slice(tabs[endColumn - 1]! + 1, tabs[endColumn]),
+        tabs[3]! + 1,
+        tabs[4]!,
+        tabs[endColumn - 1]! + 1,
+        tabs[endColumn]!,
       )
     } else {
-      endCoordinate = +line.slice(tabs[endColumn - 1]! + 1, tabs[endColumn])
+      endCoordinate = 0
+      for (let i = tabs[endColumn - 1]! + 1; i < tabs[endColumn]!; i++) {
+        const c = buffer[i]!
+        if (c >= 48 && c <= 57) {
+          endCoordinate = endCoordinate * 10 + (c - 48)
+        }
+      }
     }
 
     if (endCoordinate <= regionStart) {
@@ -547,22 +406,59 @@ export default class TabixIndexedFile {
     return { start: startCoordinate, end: endCoordinate }
   }
 
-  _getVcfEnd(startCoordinate: number, refSeq: string, info: any) {
-    let endCoordinate = startCoordinate + refSeq.length
-    const isTRA = info.includes('SVTYPE=TRA')
-    if (isTRA) {
-      return startCoordinate + 1
+  _getVcfEndBytes(
+    buffer: Uint8Array,
+    startCoordinate: number,
+    refStart: number,
+    refEnd: number,
+    infoStart: number,
+    infoEnd: number,
+  ) {
+    const refLen = refEnd - refStart
+    let endCoordinate = startCoordinate + refLen
+
+    // Check for SVTYPE=TRA
+    const SVTYPE_TRA = [83, 86, 84, 89, 80, 69, 61, 84, 82, 65] // "SVTYPE=TRA"
+    for (let i = infoStart; i <= infoEnd - SVTYPE_TRA.length; i++) {
+      let match = true
+      for (let j = 0; j < SVTYPE_TRA.length; j++) {
+        if (buffer[i + j] !== SVTYPE_TRA[j]) {
+          match = false
+          break
+        }
+      }
+      if (match) {
+        return startCoordinate + 1
+      }
     }
 
-    if (info[0] !== '.') {
-      const endIdx = info.indexOf('END=')
-      if (endIdx !== -1 && (endIdx === 0 || info[endIdx - 1] === ';')) {
-        const start = endIdx + 4
-        let end = info.indexOf(';', start)
-        if (end === -1) {
-          end = info.length
+    // Check for END=
+    if (buffer[infoStart] !== 46) {
+      // not '.'
+      const END_EQ = [69, 78, 68, 61] // "END="
+      const SEMICOLON = 59
+      for (let i = infoStart; i <= infoEnd - END_EQ.length; i++) {
+        if (i === infoStart || buffer[i - 1] === SEMICOLON) {
+          let match = true
+          for (let j = 0; j < END_EQ.length; j++) {
+            if (buffer[i + j] !== END_EQ[j]) {
+              match = false
+              break
+            }
+          }
+          if (match) {
+            endCoordinate = 0
+            for (let k = i + END_EQ.length; k < infoEnd; k++) {
+              const c = buffer[k]!
+              if (c >= 48 && c <= 57) {
+                endCoordinate = endCoordinate * 10 + (c - 48)
+              } else if (c === SEMICOLON) {
+                break
+              }
+            }
+            break
+          }
         }
-        endCoordinate = Number.parseInt(info.slice(start, end), 10)
       }
     }
     return endCoordinate
