@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 
-import TabixIndexedFile from '../src/tabixIndexedFile'
-import VirtualOffset from '../src/virtualOffset'
+import TabixIndexedFile from '../src/tabixIndexedFile.ts'
+import VirtualOffset from '../src/virtualOffset.ts'
 
 class RecordCollector {
   records: { line: string; fileOffset: number }[] = []
@@ -34,14 +34,13 @@ class RecordCollector {
     }
   }
 }
-test('can read ctgA:1000..4000', async () => {
+test('can read contigA:1000..4000', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    renameRefSeqs: n => n.replace('contig', 'ctg'),
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
   })
   const items = new RecordCollector()
-  await f.getLines('ctgA', 1000, 4000, items.callback)
+  await f.getLines('contigA', 1000, 4000, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(8)
   for (const { line, fileOffset } of items.records) {
@@ -53,17 +52,17 @@ test('can read ctgA:1000..4000', async () => {
   }
 
   items.clear()
-  await f.getLines('ctgA', 3000, 3000, items.callback)
+  await f.getLines('contigA', 3000, 3000, items.callback)
   expect(items.records.length).toEqual(0)
   items.clear()
-  await f.getLines('ctgA', 2999, 3000, items.callback)
+  await f.getLines('contigA', 2999, 3000, items.callback)
   expect(items.records.length).toEqual(1)
   items.clear()
-  await f.getLines('ctgA', 3000, 3001, items.callback)
+  await f.getLines('contigA', 3000, 3001, items.callback)
   expect(items.records.length).toEqual(0)
 
   const headerString = await f.getHeader()
-  expect(headerString.length).toEqual(10431)
+  expect(headerString.length).toEqual(10_431)
   expect(headerString.at(-1)).toEqual('\n')
 
   expect(await f.getMetadata()).toEqual({
@@ -72,22 +71,21 @@ test('can read ctgA:1000..4000', async () => {
     maxBlockSize: 1 << 16,
     format: 'VCF',
     metaChar: '#',
-    firstDataLine: new VirtualOffset(0, 10431),
-    refIdToName: ['ctgA'],
-    refNameToId: { ctgA: 0 },
+    firstDataLine: new VirtualOffset(0, 10_431),
+    refIdToName: ['contigA'],
+    refNameToId: { contigA: 0 },
     skipLines: 0,
-    maxBinNumber: 37449,
-    maxRefLength: 536870912,
+    maxBinNumber: 37_449,
+    maxRefLength: 536_870_912,
   })
 })
-test('can read ctgA:10000', async () => {
+test('can read contigA:10000', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    renameRefSeqs: n => n.replace('contig', 'ctg'),
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
   })
   const items = new RecordCollector()
-  await f.getLines('ctgA', 10000, undefined, items.callback)
+  await f.getLines('contigA', 10_000, undefined, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(30)
   for (const { line, fileOffset } of items.records) {
@@ -97,14 +95,13 @@ test('can read ctgA:10000', async () => {
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
 })
-test('can read ctgA', async () => {
+test('can read contigA', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
-    renameRefSeqs: n => n.replace('contig', 'ctg'),
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
   })
   const items = new RecordCollector()
-  await f.getLines('ctgA', undefined, undefined, items.callback)
+  await f.getLines('contigA', undefined, undefined, items.callback)
   items.expectNoDuplicates()
   expect(items.records.length).toEqual(109)
   for (const { line, fileOffset } of items.records) {
@@ -115,32 +112,33 @@ test('can read ctgA', async () => {
 })
 test('can count lines with TBI', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi'),
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
   })
   expect(await f.lineCount('contigA')).toEqual(109)
   expect(await f.lineCount('nonexistent')).toEqual(-1)
 })
 test('can count lines with CSI', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    csiPath: require.resolve('./data/volvox.test.vcf.gz.csi'),
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    csiPath: new URL('data/volvox.test.vcf.gz.csi', import.meta.url).pathname,
   })
   expect(await f.lineCount('contigA')).toEqual(109)
   expect(await f.lineCount('nonexistent')).toEqual(-1)
 })
 test("can't count lines without pseudo-bin", async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.test.vcf.gz'),
-    tbiPath: require.resolve('./data/volvox.test.vcf.gz.tbi.no_pseudo'),
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi.no_pseudo', import.meta.url)
+      .pathname,
   })
   expect(await f.lineCount('contigA')).toEqual(-1)
 })
 
 test('can query volvox.sort.gff3.gz.1', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/volvox.sort.gff3.gz.1'),
-    tbiPath: require.resolve('./data/volvox.sort.gff3.gz.tbi'),
+    path: new URL('data/volvox.sort.gff3.gz.1', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.sort.gff3.gz.tbi', import.meta.url).pathname,
   })
 
   const headerString = await f.getHeader()
@@ -155,7 +153,7 @@ test('can query volvox.sort.gff3.gz.1', async () => {
     'ctgB	example	remark	4715	5968	.	-	.	Name=f05;Note=ああ、この機能は、世界中を旅しています！',
   )
   lines.clear()
-  await f.getLines('ctgA', 10000000, Infinity, lines.callback)
+  await f.getLines('ctgA', 10_000_000, Infinity, lines.callback)
   expect(lines.records.length).toEqual(0)
   lines.clear()
   await f.getLines('ctgA', 0, Infinity, lines.callback)
@@ -172,7 +170,7 @@ test('can query volvox.sort.gff3.gz.1', async () => {
 })
 test('can query gvcf.vcf.gz', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/gvcf.vcf.gz'),
+    path: new URL('data/gvcf.vcf.gz', import.meta.url).pathname,
   })
 
   const headerString = await f.getHeader()
@@ -205,7 +203,7 @@ test('can query gvcf.vcf.gz', async () => {
 
 test('can query out.gff.gz with a TBI index', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/out.gff.gz'),
+    path: new URL('data/out.gff.gz', import.meta.url).pathname,
   })
 
   const headerString = await f.getHeader()
@@ -215,13 +213,13 @@ test('can query out.gff.gz with a TBI index', async () => {
 
   let lineCount = 0
   const lines = new RecordCollector()
-  await f.getLines('NC_000001.11', 30000, 55000, lines.callback)
+  await f.getLines('NC_000001.11', 30_000, 55_000, lines.callback)
   lines.expectNoDuplicates()
   for (const { line, fileOffset } of lines.records) {
     const fields = line.split('\t')
     lineCount += 1
     expect(fields[0]).toEqual('NC_000001.11')
-    expect(Number.parseInt(fields[3], 10)).toBeLessThan(55000)
+    expect(Number.parseInt(fields[3], 10)).toBeLessThan(55_000)
     expect(Number.parseInt(fields[4], 10)).toBeGreaterThan(3000)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
@@ -236,8 +234,8 @@ test('can query out.gff.gz with a TBI index', async () => {
 
 test('can query test.vcf.gz with a CSI index', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/test.vcf.gz'),
-    csiPath: require.resolve('./data/test.vcf.gz.csi'),
+    path: new URL('data/test.vcf.gz', import.meta.url).pathname,
+    csiPath: new URL('data/test.vcf.gz.csi', import.meta.url).pathname,
   })
 
   const headerString = await f.getHeader()
@@ -255,67 +253,69 @@ test('can query test.vcf.gz with a CSI index', async () => {
   await f.getLines('1', 4000, 5000, lines.callback)
   expect(lines.records.length).toEqual(0)
   lines.clear()
-  await f.getLines('1', 1206810423, 1206810423, lines.callback)
+  await f.getLines('1', 1_206_810_423, 1_206_810_423, lines.callback)
   expect(lines.records.length).toEqual(0)
   lines.clear()
   await expect(
-    f.getLines('1', 1206808844, 12068500000, lines.callback),
+    f.getLines('1', 1_206_808_844, 12_068_500_000, lines.callback),
   ).rejects.toThrow(/query .* is too large for current binning scheme/)
   lines.clear()
-  await f.getLines('1', 1206810422, 1206810423, lines.callback)
+  await f.getLines('1', 1_206_810_422, 1_206_810_423, lines.callback)
   expect(lines.records.length).toEqual(1)
   expect(lines.records[0].line).toEqual(
     '1	1206810423	.	T	A	25	.	DP=19;VDB=0.0404;AF1=0.5;AC1=1;DP4=3,7,3,6;MQ=37;FQ=28;PV4=1,1,1,0.27	GT:PL:GQ	0/1:55,0,73:58',
   )
   lines.clear()
-  await f.getLines('1', 1206810423, 1206810424, lines.callback)
+  await f.getLines('1', 1_206_810_423, 1_206_810_424, lines.callback)
   expect(lines.records.length).toEqual(0)
-  await f.getLines('1', 1206810423, 1206849288, lines.callback)
+  await f.getLines('1', 1_206_810_423, 1_206_849_288, lines.callback)
   lines.expectNoDuplicates()
   expect(lines.records.length).toEqual(36)
   expect(lines.records[35].line).toEqual(
     '1	1206849288	.	G	A	106	.	DP=23;VDB=0.0399;AF1=1;AC1=2;DP4=0,0,16,7;MQ=35;FQ=-96	GT:PL:GQ	1/1:139,69,0:99',
   )
   lines.clear()
-  await f.getLines('1', 1206810423, 1206810424, lines.callback)
+  await f.getLines('1', 1_206_810_423, 1_206_810_424, lines.callback)
   expect(lines.records.length).toEqual(0)
 })
 
 test('can fetch the entire header for a very large vcf header', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/large_vcf_header.vcf.gz'),
+    path: new URL('data/large_vcf_header.vcf.gz', import.meta.url).pathname,
   })
 
   const h = await f.getHeader()
   const lastBit = 'CN_105715_AGL\tCDC_QG-1_AGL\tCDC_SB-1_AGL\n'
   expect(h.slice(h.length - lastBit.length)).toEqual(lastBit)
   expect(h.at(-1)).toEqual('\n')
-  expect(h.length).toEqual(5315655)
+  expect(h.length).toEqual(5_315_655)
 })
 
 test('can fetch a CNV with length defined by END in INFO field', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/CNVtest.vcf.gz'),
+    path: new URL('data/CNVtest.vcf.gz', import.meta.url).pathname,
   })
 
   const lines = new RecordCollector()
-  await f.getLines('22', 16063470, 16063480, lines.callback)
+  await f.getLines('22', 16_063_470, 16_063_480, lines.callback)
   expect(lines.records.length).toEqual(1)
 })
 
 test('can fetch a CNV with length defined by END in INFO field using the opts.lineCallback', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/CNVtest.vcf.gz'),
+    path: new URL('data/CNVtest.vcf.gz', import.meta.url).pathname,
   })
 
   const lines = new RecordCollector()
-  await f.getLines('22', 16063470, 16063480, { lineCallback: lines.callback })
+  await f.getLines('22', 16_063_470, 16_063_480, {
+    lineCallback: lines.callback,
+  })
   expect(lines.records.length).toEqual(1)
 })
 
 test('returns and empty string for `getHeader()` if there is no header', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/test.bed.gz'),
+    path: new URL('data/test.bed.gz', import.meta.url).pathname,
   })
 
   const headerString = await f.getHeader()
@@ -324,7 +324,7 @@ test('returns and empty string for `getHeader()` if there is no header', async (
 
 test('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
   const f = new TabixIndexedFile({
-    path: require.resolve('./data/ncbi_human.sorted.gff.gz'),
+    path: new URL('data/ncbi_human.sorted.gff.gz', import.meta.url).pathname,
   })
 
   // const headerString = await f.getHeader()
@@ -334,7 +334,7 @@ test('can fetch NC_000001.11:184099343..184125655 correctly', async () => {
   await f.getLines('ctgB', 0, Infinity, lines.callback)
   expect(lines.records.length).toEqual(0)
 
-  await f.getLines('NC_000001.11', 184099343, 184125655, lines.callback)
+  await f.getLines('NC_000001.11', 184_099_343, 184_125_655, lines.callback)
   // expect there to be no duplicate lines
   lines.expectNoDuplicates()
   const text = lines.text()
@@ -364,13 +364,14 @@ NC_000001.11	Gnomon	exon	184121787	184122540	.	+	.	Parent=lnc_RNA1661;Dbxref=Gen
 
 test('usage of the chr22 ultralong nanopore as a bed file', async () => {
   const ti = new TabixIndexedFile({
-    path: require.resolve('./data/chr22_nanopore_subset.bed.gz'),
+    path: new URL('data/chr22_nanopore_subset.bed.gz', import.meta.url)
+      .pathname,
   })
   await ti.getHeader()
   const ret1 = new RecordCollector()
-  await ti.getLines('22', 16559999, 16564499, ret1.callback)
+  await ti.getLines('22', 16_559_999, 16_564_499, ret1.callback)
   const ret2 = new RecordCollector()
-  await ti.getLines('22', 16564499, 16564999, ret2.callback)
+  await ti.getLines('22', 16_564_499, 16_564_999, ret2.callback)
   const [r1, r2] = [ret1.records, ret2.records].map(x =>
     x.find(
       ({ line }) =>
@@ -382,24 +383,27 @@ test('usage of the chr22 ultralong nanopore as a bed file', async () => {
 
 test('too few', async () => {
   const ti = new TabixIndexedFile({
-    path: require.resolve('./data/too_few_reads_if_chunk_merging_on.bed.gz'),
+    path: new URL(
+      'data/too_few_reads_if_chunk_merging_on.bed.gz',
+      import.meta.url,
+    ).pathname,
   })
   await ti.getHeader()
 
   const ret = new RecordCollector()
-  await ti.getLines('1', 10000, 10600, ret.callback)
+  await ti.getLines('1', 10_000, 10_600, ret.callback)
   expect(ret.records.length).toBe(34)
 })
 
 test('long read consistent IDs', async () => {
   const ti = new TabixIndexedFile({
-    path: require.resolve('./data/CHM1_pacbio_clip2.bed.gz'),
+    path: new URL('data/CHM1_pacbio_clip2.bed.gz', import.meta.url).pathname,
   })
   await ti.getHeader()
   const ret1 = new RecordCollector()
-  await ti.getLines('chr1', 110114999, 110117499, ret1.callback)
+  await ti.getLines('chr1', 110_114_999, 110_117_499, ret1.callback)
   const ret2 = new RecordCollector()
-  await ti.getLines('chr1', 110117499, 110119999, ret2.callback)
+  await ti.getLines('chr1', 110_117_499, 110_119_999, ret2.callback)
 
   const [r1, r2] = [ret1.records, ret2.records].map(x =>
     x.find(
@@ -413,12 +417,16 @@ test('long read consistent IDs', async () => {
 
 test('fake large chromosome', async () => {
   const ti = new TabixIndexedFile({
-    path: require.resolve('./data/fake_large_chromosome/test.gff3.gz'),
-    csiPath: require.resolve('./data/fake_large_chromosome/test.gff3.gz.csi'),
+    path: new URL('data/fake_large_chromosome/test.gff3.gz', import.meta.url)
+      .pathname,
+    csiPath: new URL(
+      'data/fake_large_chromosome/test.gff3.gz.csi',
+      import.meta.url,
+    ).pathname,
   })
   await ti.getHeader()
 
-  const [rangeStart, rangeEnd] = [1000001055, 1000002500]
+  const [rangeStart, rangeEnd] = [1_000_001_055, 1_000_002_500]
 
   const items = new RecordCollector()
   await ti.getLines('1', rangeStart, rangeEnd, items.callback)
@@ -426,12 +434,12 @@ test('fake large chromosome', async () => {
 })
 test('start equal to end in tabix columns', async () => {
   const ti = new TabixIndexedFile({
-    path: require.resolve('./data/out.bed.gz'),
-    tbiPath: require.resolve('./data/out.bed.gz.tbi'),
+    path: new URL('data/out.bed.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/out.bed.gz.tbi', import.meta.url).pathname,
   })
   await ti.getHeader()
 
   const items = new RecordCollector()
-  await ti.getLines('ctgA', 26499, 26625, items.callback)
+  await ti.getLines('ctgA', 26_499, 26_625, items.callback)
   expect(items.records[0].line).toBe('ctgA	26499	C	21	0	21	0	0	0:11:0:0')
 })

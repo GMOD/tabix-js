@@ -18,11 +18,11 @@ export default class VirtualOffset {
 }
 export function fromBytes(bytes: Uint8Array, offset = 0) {
   return new VirtualOffset(
-    bytes[offset + 7]! * 0x10000000000 +
-      bytes[offset + 6]! * 0x100000000 +
-      bytes[offset + 5]! * 0x1000000 +
-      bytes[offset + 4]! * 0x10000 +
-      bytes[offset + 3]! * 0x100 +
+    bytes[offset + 7]! * 0x1_00_00_00_00_00 +
+      bytes[offset + 6]! * 0x1_00_00_00_00 +
+      bytes[offset + 5]! * 0x1_00_00_00 +
+      bytes[offset + 4]! * 0x1_00_00 +
+      bytes[offset + 3]! * 0x1_00 +
       bytes[offset + 2]!,
     (bytes[offset + 1]! << 8) | bytes[offset]!,
   )

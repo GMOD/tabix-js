@@ -1,13 +1,16 @@
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import Chunk from './chunk.ts'
-import IndexFile, { Options } from './indexFile.ts'
+import IndexFile from './indexFile.ts'
 import { longFromBytesToUnsigned } from './long.ts'
 import { optimizeChunks } from './util.ts'
 import VirtualOffset, { fromBytes } from './virtualOffset.ts'
 
-const CSI1_MAGIC = 21582659 // CSI\1
-const CSI2_MAGIC = 38359875 // CSI\2
+import type { Options } from './indexFile.ts'
+import type { GenericFilehandle } from 'generic-filehandle2'
+
+const CSI1_MAGIC = 21_582_659 // CSI\1
+const CSI2_MAGIC = 38_359_875 // CSI\2
 
 const formats = {
   0: 'generic',
@@ -26,7 +29,7 @@ export default class CSI extends IndexFile {
   private maxBinNumber: number
   private depth: number
   private minShift: number
-  constructor(args: any) {
+  constructor(args: { filehandle: GenericFilehandle }) {
     super(args)
     this.maxBinNumber = 0
     this.depth = 0
@@ -42,7 +45,7 @@ export default class CSI extends IndexFile {
     if (!idx) {
       return -1
     }
-    const { stats } = indexData.indices[refId]
+    const { stats } = idx
     if (stats) {
       return stats.lineCount
     }
@@ -57,7 +60,7 @@ export default class CSI extends IndexFile {
     const dataView = new DataView(bytes.buffer)
     const formatFlags = dataView.getInt32(offset, true)
     const coordinateType =
-      formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
+      formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'
     const format = formats[(formatFlags & 0xf) as 0 | 1 | 2]
     if (!format) {
       throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
@@ -88,7 +91,8 @@ export default class CSI extends IndexFile {
   }
 
   async _parse(opts: Options = {}) {
-    const bytes = await unzip(await this.filehandle.readFile(opts))
+    const buf = await this.filehandle.readFile({ signal: opts.signal })
+    const bytes = (await unzip(buf)) as Uint8Array
     const dataView = new DataView(bytes.buffer)
 
     // check TBI magic numbers
@@ -122,7 +126,7 @@ export default class CSI extends IndexFile {
     // read the indexes for each reference sequence
     let firstDataLine: VirtualOffset | undefined
     let currOffset = 16 + auxLength + 4
-    const indices = new Array(refCount).fill(0).map(() => {
+    const indices = Array.from({ length: refCount }, () => {
       const binCount = dataView.getInt32(currOffset, true)
       currOffset += 4
       const binIndex: Record<string, Chunk[]> = {}
@@ -139,7 +143,7 @@ export default class CSI extends IndexFile {
           firstDataLine = this._findFirstData(firstDataLine, loffset)
           const chunkCount = dataView.getInt32(currOffset + 12, true)
           currOffset += 16
-          const chunks = new Array(chunkCount)
+          const chunks = Array.from<Chunk>({ length: chunkCount })
           for (let k = 0; k < chunkCount; k += 1) {
             const u = fromBytes(bytes, currOffset)
             const v = fromBytes(bytes, currOffset + 8)
@@ -200,8 +204,9 @@ export default class CSI extends IndexFile {
     // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
     for (const [start, end] of overlappingBins) {
       for (let bin = start; bin <= end; bin++) {
-        if (ba.binIndex[bin]) {
-          for (const c of ba.binIndex[bin]) {
+        const binChunks = ba.binIndex[bin]
+        if (binChunks) {
+          for (const c of binChunks) {
             chunks.push(new Chunk(c.minv, c.maxv, bin))
           }
         }

@@ -1,10 +1,10 @@
-import Chunk from './chunk.ts'
-import VirtualOffset from './virtualOffset.ts'
+import type Chunk from './chunk.ts'
+import type VirtualOffset from './virtualOffset.ts'
 
 export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
   return (
-    chunk2.minv.blockPosition - chunk1.maxv.blockPosition < 65000 &&
-    chunk2.maxv.blockPosition - chunk1.minv.blockPosition < 5000000
+    chunk2.minv.blockPosition - chunk1.maxv.blockPosition < 65_000 &&
+    chunk2.maxv.blockPosition - chunk1.minv.blockPosition < 5_000_000
   )
 }
 

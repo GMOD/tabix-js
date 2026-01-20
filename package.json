@@ -13,7 +13,10 @@
     }
   },
   "license": "MIT",
-  "repository": "GMOD/tabix-js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GMOD/tabix-js.git"
+  },
   "main": "dist/index.js",
   "module": "esm/index.js",
   "author": {
@@ -39,7 +42,7 @@
     "clean": "rimraf dist esm",
     "prebuild": "yarn clean",
     "build:esm": "tsc --target es2020 --outDir esm",
-    "build:es5": "tsc --target es2020 --module commonjs --outDir dist",
+    "build:es5": "tsc --target es2020 --module commonjs --moduleResolution bundler --outDir dist",
     "postbuild:es5": "echo '{\"type\": \"commonjs\"}' > dist/package.json",
     "build": "yarn build:esm && yarn build:es5",
     "postbuild": "webpack",
@@ -54,26 +57,28 @@
     "genomics"
   ],
   "dependencies": {
-    "@gmod/abortable-promise-cache": "^3.0.1",
-    "@gmod/bgzf-filehandle": "^6.0.9",
+    "@gmod/abortable-promise-cache": "^3.0.4",
+    "@gmod/bgzf-filehandle": "^6.0.12",
     "@jbrowse/quick-lru": "^7.3.5",
-    "generic-filehandle2": "^2.0.16"
+    "generic-filehandle2": "^2.1.4"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3",
-    "@vitest/coverage-v8": "^4.0.16",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.2",
     "documentation": "^14.0.3",
-    "eslint": "^9.39.2",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "prettier": "^3.3.3",
-    "rimraf": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "prettier": "^3.8.1",
+    "rimraf": "^6.1.3",
     "standard-changelog": "^7.0.1",
-    "typescript": "^5.7.0",
-    "typescript-eslint": "^8.50.1",
-    "vitest": "^4.0.16",
-    "webpack": "^5.104.1",
-    "webpack-cli": "^6.0.1"
+    "tsdown": "^0.21.6",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.1.2",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^7.0.2"
   },
   "publishConfig": {
     "access": "public"

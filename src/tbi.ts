@@ -1,12 +1,14 @@
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import Chunk from './chunk.ts'
-import IndexFile, { Options } from './indexFile.ts'
+import IndexFile from './indexFile.ts'
 import { longFromBytesToUnsigned } from './long.ts'
 import { optimizeChunks } from './util.ts'
 import VirtualOffset, { fromBytes } from './virtualOffset.ts'
 
-const TBI_MAGIC = 21578324 // TBI\1
+import type { Options } from './indexFile.ts'
+
+const TBI_MAGIC = 21_578_324 // TBI\1
 const TAD_LIDX_SHIFT = 14
 
 /**
@@ -37,13 +39,13 @@ export default class TabixIndex extends IndexFile {
     if (!idx) {
       return -1
     }
-    return indexData.indices[refId].stats?.lineCount ?? -1
+    return idx.stats?.lineCount ?? -1
   }
 
   // fetch and parse the index
   async _parse(opts: Options = {}) {
-    const buf = await this.filehandle.readFile(opts)
-    const bytes = await unzip(buf)
+    const buf = await this.filehandle.readFile({ signal: opts.signal })
+    const bytes = (await unzip(buf)) as Uint8Array
     const dataView = new DataView(bytes.buffer)
 
     const magic = dataView.getUint32(0, true)
@@ -55,7 +57,7 @@ export default class TabixIndex extends IndexFile {
     const refCount = dataView.getUint32(4, true)
     const formatFlags = dataView.getUint32(8, true)
     const coordinateType =
-      formatFlags & 0x10000 ? 'zero-based-half-open' : '1-based-closed'
+      formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'
     const formatOpts: Record<number, string> = {
       0: 'generic',
       1: 'SAM',
@@ -80,13 +82,13 @@ export default class TabixIndex extends IndexFile {
     // read sequence dictionary
     const nameSectionLength = dataView.getInt32(32, true)
     const { refNameToId, refIdToName } = this._parseNameBytes(
-      bytes.slice(36, 36 + nameSectionLength),
+      bytes.subarray(36, 36 + nameSectionLength),
     )
 
     // read the indexes for each reference sequence
     let currOffset = 36 + nameSectionLength
     let firstDataLine: VirtualOffset | undefined
-    const indices = new Array(refCount).fill(0).map(() => {
+    const indices = Array.from({ length: refCount }, () => {
       // the binning index
       const binCount = dataView.getInt32(currOffset, true)
       currOffset += 4
@@ -109,7 +111,7 @@ export default class TabixIndex extends IndexFile {
         } else {
           const chunkCount = dataView.getInt32(currOffset, true)
           currOffset += 4
-          const chunks = new Array(chunkCount)
+          const chunks = Array.from<Chunk>({ length: chunkCount })
           for (let k = 0; k < chunkCount; k += 1) {
             const u = fromBytes(bytes, currOffset)
             const v = fromBytes(bytes, currOffset + 8)
@@ -124,11 +126,12 @@ export default class TabixIndex extends IndexFile {
       // the linear index
       const linearCount = dataView.getInt32(currOffset, true)
       currOffset += 4
-      const linearIndex = new Array(linearCount)
+      const linearIndex = Array.from<VirtualOffset>({ length: linearCount })
       for (let k = 0; k < linearCount; k += 1) {
-        linearIndex[k] = fromBytes(bytes, currOffset)
+        const lv = fromBytes(bytes, currOffset)
+        linearIndex[k] = lv
         currOffset += 8
-        firstDataLine = this._findFirstData(firstDataLine, linearIndex[k])
+        firstDataLine = this._findFirstData(firstDataLine, lv)
       }
       return {
         binIndex,
@@ -179,11 +182,12 @@ export default class TabixIndex extends IndexFile {
       return []
     }
 
+    const linearIndex = ba.linearIndex ?? []
     const minOffset =
-      ba.linearIndex.length > 0
-        ? ba.linearIndex[
-            min >> TAD_LIDX_SHIFT >= ba.linearIndex.length
-              ? ba.linearIndex.length - 1
+      linearIndex.length > 0
+        ? linearIndex[
+            min >> TAD_LIDX_SHIFT >= linearIndex.length
+              ? linearIndex.length - 1
               : min >> TAD_LIDX_SHIFT
           ]
         : new VirtualOffset(0, 0)
@@ -199,8 +203,9 @@ export default class TabixIndex extends IndexFile {
     // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
     for (const [start, end] of overlappingBins) {
       for (let bin = start; bin <= end; bin++) {
-        if (ba.binIndex[bin]) {
-          for (const c of ba.binIndex[bin]) {
+        const binChunks = ba.binIndex[bin]
+        if (binChunks) {
+          for (const c of binChunks) {
             chunks.push(new Chunk(c.minv, c.maxv, bin))
           }
         }
@@ -209,12 +214,12 @@ export default class TabixIndex extends IndexFile {
 
     // Use the linear index to find minimum file position of chunks that could
     // contain alignments in the region
-    const nintv = ba.linearIndex.length
+    const nintv = linearIndex.length
     let lowest: VirtualOffset | undefined
     const minLin = Math.min(min >> 14, nintv - 1)
     const maxLin = Math.min(max >> 14, nintv - 1)
     for (let i = minLin; i <= maxLin; ++i) {
-      const vp = ba.linearIndex[i]
+      const vp = linearIndex[i]
       if (vp && (!lowest || vp.compareTo(lowest) < 0)) {
         lowest = vp
       }

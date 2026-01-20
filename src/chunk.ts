@@ -1,4 +1,4 @@
-import VirtualOffset from './virtualOffset.ts'
+import type VirtualOffset from './virtualOffset.ts'
 
 // little class representing a chunk in the index
 export default class Chunk {
@@ -20,7 +20,7 @@ export default class Chunk {
   }
 
   toUniqueString() {
-    return `${this.minv}..${this.maxv} (bin ${
+    return `${this.minv.toString()}..${this.maxv.toString()} (bin ${
       this.bin
     }, fetchedSize ${this.fetchedSize()})`
   }
