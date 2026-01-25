@@ -337,15 +337,16 @@ export default class TabixIndexedFile {
       return
     }
 
-    // Find tab positions
+    // Find tab positions using indexOf (V8 optimizes this)
     let prev = lineStart - 1
     const tabs = [lineStart - 1]
     for (let i = 0; i < maxColumn; i++) {
-      let pos = prev + 1
-      while (pos < lineEnd && buffer[pos] !== TAB) {
-        pos++
+      const pos = buffer.indexOf(TAB, prev + 1)
+      if (pos === -1 || pos >= lineEnd) {
+        tabs.push(lineEnd)
+        break
       }
-      tabs.push(pos < lineEnd ? pos : lineEnd)
+      tabs.push(pos)
       prev = pos
     }
 
@@ -417,48 +418,59 @@ export default class TabixIndexedFile {
     const refLen = refEnd - refStart
     let endCoordinate = startCoordinate + refLen
 
-    // Check for SVTYPE=TRA
-    const SVTYPE_TRA = [83, 86, 84, 89, 80, 69, 61, 84, 82, 65] // "SVTYPE=TRA"
-    for (let i = infoStart; i <= infoEnd - SVTYPE_TRA.length; i++) {
-      let match = true
-      for (let j = 0; j < SVTYPE_TRA.length; j++) {
-        if (buffer[i + j] !== SVTYPE_TRA[j]) {
-          match = false
-          break
-        }
+    // Check for SVTYPE=TRA - look for 'S' (83) then verify
+    const S = 83
+    let pos = infoStart
+    while (pos <= infoEnd - 10) {
+      const idx = buffer.indexOf(S, pos)
+      if (idx === -1 || idx > infoEnd - 10) {
+        break
       }
-      if (match) {
+      if (
+        buffer[idx + 1] === 86 && // V
+        buffer[idx + 2] === 84 && // T
+        buffer[idx + 3] === 89 && // Y
+        buffer[idx + 4] === 80 && // P
+        buffer[idx + 5] === 69 && // E
+        buffer[idx + 6] === 61 && // =
+        buffer[idx + 7] === 84 && // T
+        buffer[idx + 8] === 82 && // R
+        buffer[idx + 9] === 65 // A
+      ) {
         return startCoordinate + 1
       }
+      pos = idx + 1
     }
 
     // Check for END=
     if (buffer[infoStart] !== 46) {
       // not '.'
-      const END_EQ = [69, 78, 68, 61] // "END="
+      const E = 69
       const SEMICOLON = 59
-      for (let i = infoStart; i <= infoEnd - END_EQ.length; i++) {
-        if (i === infoStart || buffer[i - 1] === SEMICOLON) {
-          let match = true
-          for (let j = 0; j < END_EQ.length; j++) {
-            if (buffer[i + j] !== END_EQ[j]) {
-              match = false
+      pos = infoStart
+      while (pos <= infoEnd - 4) {
+        const idx = buffer.indexOf(E, pos)
+        if (idx === -1 || idx > infoEnd - 4) {
+          break
+        }
+        if (
+          (idx === infoStart || buffer[idx - 1] === SEMICOLON) &&
+          buffer[idx + 1] === 78 && // N
+          buffer[idx + 2] === 68 && // D
+          buffer[idx + 3] === 61 // =
+        ) {
+          endCoordinate = 0
+          for (let k = idx + 4; k < infoEnd; k++) {
+            const c = buffer[k]!
+            if (c >= 48 && c <= 57) {
+              endCoordinate = endCoordinate * 10 + (c - 48)
+            } else if (c === SEMICOLON) {
               break
             }
           }
-          if (match) {
-            endCoordinate = 0
-            for (let k = i + END_EQ.length; k < infoEnd; k++) {
-              const c = buffer[k]!
-              if (c >= 48 && c <= 57) {
-                endCoordinate = endCoordinate * 10 + (c - 48)
-              } else if (c === SEMICOLON) {
-                break
-              }
-            }
-            break
-          }
+          break
         }
+        pos = idx + 1
       }
     }
     return endCoordinate
