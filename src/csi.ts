@@ -1,7 +1,9 @@
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import Chunk from './chunk.ts'
-import IndexFile, { Options } from './indexFile.ts'
+import IndexFile from './indexFile.ts'
+
+import type { Options } from './indexFile.ts'
 import { longFromBytesToUnsigned } from './long.ts'
 import { optimizeChunks } from './util.ts'
 import VirtualOffset, { fromBytes } from './virtualOffset.ts'

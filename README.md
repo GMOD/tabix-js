@@ -15,10 +15,6 @@ Read Tabix-indexed files using either .tbi or .csi indexes.
 ### Importing the module
 
 ```typescript
-// import with require in node.js
-const { TabixIndexedFile } = require('@gmod/tabix')
-
-// or with es6 imports, this will also give typescript types
 import { TabixIndexedFile } from '@gmod/tabix'
 ```
 
@@ -76,7 +72,8 @@ You can also alternatively supply a filehandle-like object with the
 
 ```typescript
 // use a remote file or other filehandle, note RemoteFile comes from https://github.com/GMOD/generic-filehandle2
-const { RemoteFile } = require('generic-filehandle2')
+import { RemoteFile } from 'generic-filehandle2'
+
 const remoteTbiIndexed = new TabixIndexedFile({
   filehandle: new RemoteFile('http://yourhost/file.vcf.gz'),
   tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi'), // can also be csiFilehandle
@@ -88,8 +85,9 @@ have to also supply a custom fetch function to the RemoteFile constructor e.g.
 like this
 
 ```typescript
-// for node.js you have to manually supply a fetch function e.g. node-fetch to RemoteFile
-const fetch = require('node-fetch')
+// for node.js you can supply a fetch function to RemoteFile (optional since Node.js 18+ has native fetch)
+import fetch from 'node-fetch'
+
 const remoteTbiIndexedForNodeJs = new TabixIndexedFile({
   filehandle: new RemoteFile('http://yourhost/file.vcf.gz', { fetch }),
   tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi', { fetch }), // can also be csiFilehandle

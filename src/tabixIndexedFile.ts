@@ -3,12 +3,17 @@ import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
 import LRU from '@jbrowse/quick-lru'
 import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
-import Chunk from './chunk.ts'
 import CSI from './csi.ts'
-import IndexFile, { Options } from './indexFile.ts'
+import IndexFile from './indexFile.ts'
 import TBI from './tbi.ts'
 
+import type Chunk from './chunk.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
+import type { Options } from './indexFile.ts'
+
+const TAB = 9
+const NEWLINE = 10
+const SEMICOLON = 59
 
 type GetLinesCallback = (
   line: string,
@@ -28,9 +33,6 @@ interface ReadChunk {
   cpositions: number[]
   dpositions: number[]
 }
-
-const TAB = 9
-const NEWLINE = 10
 
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
@@ -418,59 +420,51 @@ export default class TabixIndexedFile {
     const refLen = refEnd - refStart
     let endCoordinate = startCoordinate + refLen
 
-    // Check for SVTYPE=TRA - look for 'S' (83) then verify
-    const S = 83
-    let pos = infoStart
-    while (pos <= infoEnd - 10) {
-      const idx = buffer.indexOf(S, pos)
-      if (idx === -1 || idx > infoEnd - 10) {
-        break
-      }
-      if (
-        buffer[idx + 1] === 86 && // V
-        buffer[idx + 2] === 84 && // T
-        buffer[idx + 3] === 89 && // Y
-        buffer[idx + 4] === 80 && // P
-        buffer[idx + 5] === 69 && // E
-        buffer[idx + 6] === 61 && // =
-        buffer[idx + 7] === 84 && // T
-        buffer[idx + 8] === 82 && // R
-        buffer[idx + 9] === 65 // A
-      ) {
-        return startCoordinate + 1
-      }
-      pos = idx + 1
+    if (buffer[infoStart] === 46) {
+      // INFO is '.', no fields to check
+      return endCoordinate
     }
 
-    // Check for END=
-    if (buffer[infoStart] !== 46) {
-      // not '.'
-      const E = 69
-      const SEMICOLON = 59
-      pos = infoStart
-      while (pos <= infoEnd - 4) {
-        const idx = buffer.indexOf(E, pos)
-        if (idx === -1 || idx > infoEnd - 4) {
-          break
+    // Single pass: walk semicolon-delimited fields checking prefixes.
+    // This avoids repeated indexOf scans for common bytes like 'S' and 'E'
+    // that produce many false positives in typical INFO fields.
+    let fieldStart = infoStart
+    for (let i = infoStart; i <= infoEnd; i++) {
+      if (i === infoEnd || buffer[i] === SEMICOLON) {
+        const fieldLen = i - fieldStart
+        if (
+          fieldLen >= 10 &&
+          buffer[fieldStart] === 83 && // S
+          buffer[fieldStart + 1] === 86 && // V
+          buffer[fieldStart + 2] === 84 && // T
+          buffer[fieldStart + 3] === 89 && // Y
+          buffer[fieldStart + 4] === 80 && // P
+          buffer[fieldStart + 5] === 69 && // E
+          buffer[fieldStart + 6] === 61 && // =
+          buffer[fieldStart + 7] === 84 && // T
+          buffer[fieldStart + 8] === 82 && // R
+          buffer[fieldStart + 9] === 65 // A
+        ) {
+          return startCoordinate + 1
         }
         if (
-          (idx === infoStart || buffer[idx - 1] === SEMICOLON) &&
-          buffer[idx + 1] === 78 && // N
-          buffer[idx + 2] === 68 && // D
-          buffer[idx + 3] === 61 // =
+          fieldLen >= 4 &&
+          buffer[fieldStart] === 69 && // E
+          buffer[fieldStart + 1] === 78 && // N
+          buffer[fieldStart + 2] === 68 && // D
+          buffer[fieldStart + 3] === 61 // =
         ) {
           endCoordinate = 0
-          for (let k = idx + 4; k < infoEnd; k++) {
+          for (let k = fieldStart + 4; k < i; k++) {
             const c = buffer[k]!
             if (c >= 48 && c <= 57) {
               endCoordinate = endCoordinate * 10 + (c - 48)
-            } else if (c === SEMICOLON) {
+            } else {
               break
             }
           }
-          break
         }
-        pos = idx + 1
+        fieldStart = i + 1
       }
     }
     return endCoordinate

@@ -1,5 +1,5 @@
-import Chunk from './chunk.ts'
-import VirtualOffset from './virtualOffset.ts'
+import type Chunk from './chunk.ts'
+import type VirtualOffset from './virtualOffset.ts'
 
 export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
   return (

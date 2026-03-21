@@ -1,7 +1,8 @@
-import Chunk from './chunk.ts'
 import VirtualOffset from './virtualOffset.ts'
 
 import type { GenericFilehandle } from 'generic-filehandle2'
+
+import type Chunk from './chunk.ts'
 
 export interface Options {
   signal?: AbortSignal

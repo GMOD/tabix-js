@@ -1,7 +1,9 @@
 import { unzip } from '@gmod/bgzf-filehandle'
 
 import Chunk from './chunk.ts'
-import IndexFile, { Options } from './indexFile.ts'
+import IndexFile from './indexFile.ts'
+
+import type { Options } from './indexFile.ts'
 import { longFromBytesToUnsigned } from './long.ts'
 import { optimizeChunks } from './util.ts'
 import VirtualOffset, { fromBytes } from './virtualOffset.ts'
@@ -80,7 +82,7 @@ export default class TabixIndex extends IndexFile {
     // read sequence dictionary
     const nameSectionLength = dataView.getInt32(32, true)
     const { refNameToId, refIdToName } = this._parseNameBytes(
-      bytes.slice(36, 36 + nameSectionLength),
+      bytes.subarray(36, 36 + nameSectionLength),
     )
 
     // read the indexes for each reference sequence
