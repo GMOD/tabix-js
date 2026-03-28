@@ -36,24 +36,17 @@ path+'.tbi' is the location of the tbiPath.
 // basic usage under node.js provides a file path on the filesystem to bgzipped file
 // it assumes the tbi file is path+'.tbi' if no tbiPath is supplied
 const tbiIndexed = new TabixIndexedFile({
-    path: 'path/to/my/file.gz'
-    tbiPath: 'path/to/my/file.gz.tbi'
+    path: 'path/to/my/file.gz',
+    tbiPath: 'path/to/my/file.gz.tbi',
 })
-
 ```
 
-You can also use CSI indexes. Note also the usage of the `renameRefSeqs`
-callback. The `renameRefSeqs` callback makes it so that you can use
-`file.getLines('1',0,100,...)` even when the file itself contains names like
-'chr1' (can also do the reverse by customizing the `renameRefSeqs` callback)
+You can also use CSI indexes:
 
 ```typescript
-// can also open tabix files that have a .csi index
-// note also usage of renameRefSeqs callback to trim chr off the chr names
 const csiIndexed = new TabixIndexedFile({
   path: 'path/to/my/file.gz',
-  csiPath: 'path/to/my/file.gz.csi'
-  renameRefSeqs: refSeq => refSeq.replace('chr','')
+  csiPath: 'path/to/my/file.gz.csi',
 })
 ```
 
@@ -79,20 +72,6 @@ const remoteTbiIndexed = new TabixIndexedFile({
 })
 ```
 
-This works in both the browser and in node.js, but note that in node.js you may
-have to also supply a custom fetch function to the RemoteFile constructor e.g.
-like this
-
-```typescript
-// for node.js you can supply a fetch function to RemoteFile (optional since Node.js 18+ has native fetch)
-import fetch from 'node-fetch'
-
-const remoteTbiIndexedForNodeJs = new TabixIndexedFile({
-  filehandle: new RemoteFile('http://yourhost/file.vcf.gz', { fetch }),
-  tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi', { fetch }), // can also be csiFilehandle
-})
-```
-
 ### getLines
 
 The basic function this module provides is just called `getLines` and it returns
@@ -106,7 +85,7 @@ are supplied to the tabix command line tool
 ```typescript
 // iterate over lines in the specified region
 const lines = []
-await tbiIndexed.getLines('ctgA', 200, 300, function (line, fileOffset) {
+await tbiIndexed.getLines('ctgA', 200, 300, function (line, fileOffset, start, end) {
   lines.push(line)
 })
 ```
@@ -121,7 +100,7 @@ these are sort of obscure and only used in some circumstances
 const lines = []
 const aborter = new AbortController()
 await tbiIndexed.getLines('ctgA', 200, 300, {
-  lineCallback: (line, fileOffset) => lines.push(line),
+  lineCallback: (line, fileOffset, start, end) => lines.push(line),
   signal: aborter.signal, // an optional AbortSignal from an AbortController
 })
 ```
@@ -141,7 +120,7 @@ Notes about the returned values of `getLines`:
 
 ```typescript
 const lines = []
-await tbiIndexed.getLines('ctgA', 0, undefined, line=>lines.push(line))`
+await tbiIndexed.getLines('ctgA', 0, undefined, line=>lines.push(line))
 console.log(lines)
 ```
 
