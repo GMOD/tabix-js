@@ -36,8 +36,8 @@ path+'.tbi' is the location of the tbiPath.
 // basic usage under node.js provides a file path on the filesystem to bgzipped file
 // it assumes the tbi file is path+'.tbi' if no tbiPath is supplied
 const tbiIndexed = new TabixIndexedFile({
-    path: 'path/to/my/file.gz',
-    tbiPath: 'path/to/my/file.gz.tbi',
+  path: 'path/to/my/file.gz',
+  tbiPath: 'path/to/my/file.gz.tbi',
 })
 ```
 
@@ -85,9 +85,14 @@ are supplied to the tabix command line tool
 ```typescript
 // iterate over lines in the specified region
 const lines = []
-await tbiIndexed.getLines('ctgA', 200, 300, function (line, fileOffset, start, end) {
-  lines.push(line)
-})
+await tbiIndexed.getLines(
+  'ctgA',
+  200,
+  300,
+  function (line, fileOffset, start, end) {
+    lines.push(line)
+  },
+)
 ```
 
 After running this, your `lines` array would contain an array of lines from the
@@ -120,7 +125,7 @@ Notes about the returned values of `getLines`:
 
 ```typescript
 const lines = []
-await tbiIndexed.getLines('ctgA', 0, undefined, line=>lines.push(line))
+await tbiIndexed.getLines('ctgA', 0, undefined, line => lines.push(line))
 console.log(lines)
 ```
 
