@@ -274,10 +274,7 @@ export default class TabixIndexedFile {
         }
 
         // skip meta lines
-        if (
-          metaCharCode !== undefined &&
-          buffer[blockStart] === metaCharCode
-        ) {
+        if (metaCharCode !== undefined && buffer[blockStart] === metaCharCode) {
           blockStart = n + 1
           continue
         }
