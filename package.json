@@ -24,9 +24,6 @@
     "email": "rbuels@gmail.com",
     "url": "https://github.com/rbuels"
   },
-  "engines": {
-    "node": ">=6"
-  },
   "files": [
     "dist",
     "esm",

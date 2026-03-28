@@ -15,6 +15,9 @@ const TAB = 9
 const NEWLINE = 10
 const SEMICOLON = 59
 
+const decoder = new TextDecoder('utf-8')
+const encoder = new TextEncoder()
+
 type GetLinesCallback = (
   line: string,
   fileOffset: number,
@@ -23,7 +26,6 @@ type GetLinesCallback = (
 ) => void
 
 interface GetLinesOpts {
-  [key: string]: unknown
   signal?: AbortSignal
   lineCallback: GetLinesCallback
 }
@@ -32,6 +34,110 @@ interface ReadChunk {
   buffer: Uint8Array
   cpositions: number[]
   dpositions: number[]
+}
+
+function resolveFilehandle(
+  filehandle?: GenericFilehandle,
+  path?: string,
+  url?: string,
+) {
+  if (filehandle) {
+    return filehandle
+  }
+  if (path) {
+    return new LocalFile(path)
+  }
+  if (url) {
+    return new RemoteFile(url)
+  }
+  throw new TypeError('must provide either filehandle, path, or url')
+}
+
+function calculateFileOffset(
+  cpositions: number[],
+  dpositions: number[],
+  pos: number,
+  blockStart: number,
+  minvDataPosition: number,
+) {
+  return (
+    cpositions[pos]! * (1 << 8) +
+    (blockStart - dpositions[pos]!) +
+    minvDataPosition +
+    1
+  )
+}
+
+function getVcfEnd(
+  buffer: Uint8Array,
+  startCoordinate: number,
+  refStart: number,
+  refEnd: number,
+  infoStart: number,
+  infoEnd: number,
+) {
+  const refLen = refEnd - refStart
+  let endCoordinate = startCoordinate + refLen
+
+  // INFO is '.', no fields to check
+  if (buffer[infoStart] === 46) {
+    return endCoordinate
+  }
+
+  // Single pass over semicolon-delimited fields checking prefixes.
+  // Avoids repeated indexOf scans for common bytes like 'S' and 'E'
+  // that produce many false positives in typical INFO fields.
+  let fieldStart = infoStart
+  for (let i = infoStart; i <= infoEnd; i++) {
+    if (i === infoEnd || buffer[i] === SEMICOLON) {
+      const fieldLen = i - fieldStart
+      if (
+        fieldLen >= 10 &&
+        buffer[fieldStart] === 83 && // S
+        buffer[fieldStart + 1] === 86 && // V
+        buffer[fieldStart + 2] === 84 && // T
+        buffer[fieldStart + 3] === 89 && // Y
+        buffer[fieldStart + 4] === 80 && // P
+        buffer[fieldStart + 5] === 69 && // E
+        buffer[fieldStart + 6] === 61 && // =
+        buffer[fieldStart + 7] === 84 && // T
+        buffer[fieldStart + 8] === 82 && // R
+        buffer[fieldStart + 9] === 65 // A
+      ) {
+        return startCoordinate + 1
+      }
+      if (
+        fieldLen >= 4 &&
+        buffer[fieldStart] === 69 && // E
+        buffer[fieldStart + 1] === 78 && // N
+        buffer[fieldStart + 2] === 68 && // D
+        buffer[fieldStart + 3] === 61 // =
+      ) {
+        endCoordinate = 0
+        for (let k = fieldStart + 4; k < i; k++) {
+          const c = buffer[k]!
+          if (c >= 48 && c <= 57) {
+            endCoordinate = endCoordinate * 10 + (c - 48)
+          } else {
+            break
+          }
+        }
+      }
+      fieldStart = i + 1
+    }
+  }
+  return endCoordinate
+}
+
+function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
+  let val = 0
+  for (let i = start; i < end; i++) {
+    const c = buffer[i]!
+    if (c >= 48 && c <= 57) {
+      val = val * 10 + (c - 48)
+    }
+  }
+  return val
 }
 
 export default class TabixIndexedFile {
@@ -45,18 +151,6 @@ export default class TabixIndexedFile {
     maxSize: 1000,
   })
 
-  /**
-   * @param {object} args
-   * @param {string} [args.path]
-   * @param {filehandle} [args.filehandle]
-   * @param {string} [args.tbiPath]
-   * @param {filehandle} [args.tbiFilehandle]
-   * @param {string} [args.csiPath]
-   * @param {filehandle} [args.csiFilehandle]
-   * @param {url} [args.url]
-   * @param {csiUrl} [args.csiUrl]
-   * @param {tbiUrl} [args.tbiUrl]
-   */
   constructor({
     path,
     filehandle,
@@ -80,15 +174,7 @@ export default class TabixIndexedFile {
     csiFilehandle?: GenericFilehandle
     chunkCacheSize?: number
   }) {
-    if (filehandle) {
-      this.filehandle = filehandle
-    } else if (path) {
-      this.filehandle = new LocalFile(path)
-    } else if (url) {
-      this.filehandle = new RemoteFile(url)
-    } else {
-      throw new TypeError('must provide either filehandle or path')
-    }
+    this.filehandle = resolveFilehandle(filehandle, path, url)
 
     if (tbiFilehandle) {
       this.index = new TBI({ filehandle: tbiFilehandle })
@@ -117,34 +203,6 @@ export default class TabixIndexedFile {
       fill: (args: Chunk, signal?: AbortSignal) =>
         this.readChunk(args, { signal }),
     })
-  }
-
-  /**
-   * @param refName name of the reference sequence
-   *
-   * @param start start of the region (in 0-based half-open coordinates)
-   *
-   * @param end end of the region (in 0-based half-open coordinates)
-   *
-   * @param opts callback called for each line in the region. can also pass a
-   * object param containing obj.lineCallback, obj.signal, etc
-   *
-   * @returns promise that is resolved when the whole read is finished,
-   * rejected on error
-   */
-  private calculateFileOffset(
-    cpositions: number[],
-    dpositions: number[],
-    pos: number,
-    blockStart: number,
-    minvDataPosition: number,
-  ) {
-    return (
-      cpositions[pos]! * (1 << 8) +
-      (blockStart - dpositions[pos]!) +
-      minvDataPosition +
-      1
-    )
   }
 
   async getLines(
@@ -178,25 +236,18 @@ export default class TabixIndexedFile {
     }
 
     const chunks = await this.index.blocksForRange(refName, start, end, options)
-    const decoder = new TextDecoder('utf-8')
-    const encoder = new TextEncoder()
 
     const isVCF = metadata.format === 'VCF'
-    const columnNumbersEffective = {
-      ref: metadata.columnNumbers.ref || 0,
-      start: metadata.columnNumbers.start || 0,
-      end: isVCF ? 8 : metadata.columnNumbers.end || 0,
-    }
-    const maxColumn = Math.max(
-      columnNumbersEffective.ref,
-      columnNumbersEffective.start,
-      columnNumbersEffective.end,
-    )
-    const metaCharCode = metadata.metaChar?.codePointAt(0)
+    const refCol = metadata.columnNumbers.ref || 0
+    const startCol = metadata.columnNumbers.start || 0
+    const endCol = isVCF ? 8 : metadata.columnNumbers.end || 0
+    const maxColumn = Math.max(refCol, startCol, endCol)
+    const metaCharCode = metadata.metaChar?.charCodeAt(0)
     const coordinateOffset =
       metadata.coordinateType === '1-based-closed' ? -1 : 0
 
     const regionRefNameBytes = encoder.encode(refName)
+    const tabs = Array.from<number>({ length: maxColumn + 1 })
 
     for (const c of chunks) {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
@@ -222,38 +273,91 @@ export default class TabixIndexedFile {
           }
         }
 
-        const result = this.checkLineBytes(
-          buffer,
-          blockStart,
-          n,
-          regionRefNameBytes,
-          start,
-          end,
-          columnNumbersEffective.ref,
-          columnNumbersEffective.start,
-          columnNumbersEffective.end,
-          maxColumn,
-          metaCharCode,
-          coordinateOffset,
-          isVCF,
-        )
+        // skip meta lines
+        if (
+          metaCharCode !== undefined &&
+          buffer[blockStart] === metaCharCode
+        ) {
+          blockStart = n + 1
+          continue
+        }
 
-        if (result === null) {
+        // find tab positions
+        tabs[0] = blockStart - 1
+        let prev = blockStart - 1
+        for (let i = 0; i < maxColumn; i++) {
+          const tabPos = buffer.indexOf(TAB, prev + 1)
+          if (tabPos === -1 || tabPos >= n) {
+            tabs[i + 1] = n
+            break
+          }
+          tabs[i + 1] = tabPos
+          prev = tabPos
+        }
+
+        // compare ref name bytes directly
+        const refStart = tabs[refCol - 1]! + 1
+        const refEnd = tabs[refCol]!
+        const refLen = refEnd - refStart
+        if (refLen !== regionRefNameBytes.length) {
+          blockStart = n + 1
+          continue
+        }
+        let refMatch = true
+        for (let i = 0; i < refLen; i++) {
+          if (buffer[refStart + i] !== regionRefNameBytes[i]) {
+            refMatch = false
+            break
+          }
+        }
+        if (!refMatch) {
+          blockStart = n + 1
+          continue
+        }
+
+        // parse start coordinate
+        const startCoordinate =
+          parseIntFromBytes(buffer, tabs[startCol - 1]! + 1, tabs[startCol]!) +
+          coordinateOffset
+
+        if (startCoordinate >= end) {
           return
         }
-        if (result !== undefined) {
+
+        // parse end coordinate
+        let endCoordinate: number
+        if (endCol === 0 || endCol === startCol) {
+          endCoordinate = startCoordinate + 1
+        } else if (isVCF) {
+          endCoordinate = getVcfEnd(
+            buffer,
+            startCoordinate,
+            tabs[3]! + 1,
+            tabs[4]!,
+            tabs[endCol - 1]! + 1,
+            tabs[endCol]!,
+          )
+        } else {
+          endCoordinate = parseIntFromBytes(
+            buffer,
+            tabs[endCol - 1]! + 1,
+            tabs[endCol]!,
+          )
+        }
+
+        if (endCoordinate > start) {
           const line = decoder.decode(buffer.subarray(blockStart, n))
           callback(
             line,
-            this.calculateFileOffset(
+            calculateFileOffset(
               cpositions,
               dpositions,
               pos,
               blockStart,
               c.minv.dataPosition,
             ),
-            result.start,
-            result.end,
+            startCoordinate,
+            endCoordinate,
           )
         }
         blockStart = n + 1
@@ -265,10 +369,6 @@ export default class TabixIndexedFile {
     return this.index.getMetadata(opts)
   }
 
-  /**
-   * get a buffer containing the "header" region of the file, which are the
-   * bytes up to the first non-meta line
-   */
   async getHeaderBuffer(opts: Options = {}) {
     const { firstDataLine, metaChar, maxBlockSize } =
       await this.getMetadata(opts)
@@ -280,19 +380,17 @@ export default class TabixIndexedFile {
     const buf = await this.filehandle.read(maxFetch, 0, opts)
     const bytes = (await unzip(buf)) as Uint8Array
 
-    // trim off lines after the last non-meta line
+    // trim off lines after the last meta line
     if (metaChar) {
-      // trim backward from the end
       let lastNewline = -1
-      const newlineByte = NEWLINE
-      const metaByte = metaChar.codePointAt(0)
+      const metaByte = metaChar.charCodeAt(0)
 
       for (let i = 0, l = bytes.length; i < l; i++) {
         const byte = bytes[i]
         if (i === lastNewline + 1 && byte !== metaByte) {
           break
         }
-        if (byte === newlineByte) {
+        if (byte === NEWLINE) {
           lastNewline = i
         }
       }
@@ -301,191 +399,20 @@ export default class TabixIndexedFile {
     return bytes
   }
 
-  /**
-   * get a string containing the "header" region of the file, is the portion up
-   * to the first non-meta line
-   */
   async getHeader(opts: Options = {}) {
-    const decoder = new TextDecoder('utf-8')
     const bytes = await this.getHeaderBuffer(opts)
     return decoder.decode(bytes)
   }
 
-  /**
-   * get an array of reference sequence names, in the order in which they occur
-   * in the file.
-   */
   async getReferenceSequenceNames(opts: Options = {}) {
     const metadata = await this.getMetadata(opts)
     return metadata.refIdToName
   }
 
-  checkLineBytes(
-    buffer: Uint8Array,
-    lineStart: number,
-    lineEnd: number,
-    regionRefNameBytes: Uint8Array,
-    regionStart: number,
-    regionEnd: number,
-    refColumn: number,
-    startColumn: number,
-    endColumn: number,
-    maxColumn: number,
-    metaCharCode: number | undefined,
-    coordinateOffset: number,
-    isVCF: boolean,
-  ): { start: number; end: number } | null | undefined {
-    if (metaCharCode !== undefined && buffer[lineStart] === metaCharCode) {
-      return
-    }
-
-    // Find tab positions using indexOf (V8 optimizes this)
-    let prev = lineStart - 1
-    const tabs = [lineStart - 1]
-    for (let i = 0; i < maxColumn; i++) {
-      const pos = buffer.indexOf(TAB, prev + 1)
-      if (pos === -1 || pos >= lineEnd) {
-        tabs.push(lineEnd)
-        break
-      }
-      tabs.push(pos)
-      prev = pos
-    }
-
-    // Compare ref bytes directly
-    const refStart = tabs[refColumn - 1]! + 1
-    const refEnd = tabs[refColumn]!
-    const refLen = refEnd - refStart
-    if (refLen !== regionRefNameBytes.length) {
-      return
-    }
-    for (let i = 0; i < refLen; i++) {
-      if (buffer[refStart + i] !== regionRefNameBytes[i]) {
-        return
-      }
-    }
-
-    // Parse start coordinate from bytes
-    let startCoordinate = 0
-    for (let i = tabs[startColumn - 1]! + 1; i < tabs[startColumn]!; i++) {
-      const c = buffer[i]!
-      if (c >= 48 && c <= 57) {
-        startCoordinate = startCoordinate * 10 + (c - 48)
-      }
-    }
-    startCoordinate += coordinateOffset
-
-    if (startCoordinate >= regionEnd) {
-      return null
-    }
-
-    // Parse end coordinate
-    let endCoordinate: number
-    if (endColumn === 0 || endColumn === startColumn) {
-      endCoordinate = startCoordinate + 1
-    } else if (isVCF) {
-      endCoordinate = this._getVcfEndBytes(
-        buffer,
-        startCoordinate,
-        tabs[3]! + 1,
-        tabs[4]!,
-        tabs[endColumn - 1]! + 1,
-        tabs[endColumn]!,
-      )
-    } else {
-      endCoordinate = 0
-      for (let i = tabs[endColumn - 1]! + 1; i < tabs[endColumn]!; i++) {
-        const c = buffer[i]!
-        if (c >= 48 && c <= 57) {
-          endCoordinate = endCoordinate * 10 + (c - 48)
-        }
-      }
-    }
-
-    if (endCoordinate <= regionStart) {
-      return
-    }
-
-    return { start: startCoordinate, end: endCoordinate }
-  }
-
-  _getVcfEndBytes(
-    buffer: Uint8Array,
-    startCoordinate: number,
-    refStart: number,
-    refEnd: number,
-    infoStart: number,
-    infoEnd: number,
-  ) {
-    const refLen = refEnd - refStart
-    let endCoordinate = startCoordinate + refLen
-
-    if (buffer[infoStart] === 46) {
-      // INFO is '.', no fields to check
-      return endCoordinate
-    }
-
-    // Single pass: walk semicolon-delimited fields checking prefixes.
-    // This avoids repeated indexOf scans for common bytes like 'S' and 'E'
-    // that produce many false positives in typical INFO fields.
-    let fieldStart = infoStart
-    for (let i = infoStart; i <= infoEnd; i++) {
-      if (i === infoEnd || buffer[i] === SEMICOLON) {
-        const fieldLen = i - fieldStart
-        if (
-          fieldLen >= 10 &&
-          buffer[fieldStart] === 83 && // S
-          buffer[fieldStart + 1] === 86 && // V
-          buffer[fieldStart + 2] === 84 && // T
-          buffer[fieldStart + 3] === 89 && // Y
-          buffer[fieldStart + 4] === 80 && // P
-          buffer[fieldStart + 5] === 69 && // E
-          buffer[fieldStart + 6] === 61 && // =
-          buffer[fieldStart + 7] === 84 && // T
-          buffer[fieldStart + 8] === 82 && // R
-          buffer[fieldStart + 9] === 65 // A
-        ) {
-          return startCoordinate + 1
-        }
-        if (
-          fieldLen >= 4 &&
-          buffer[fieldStart] === 69 && // E
-          buffer[fieldStart + 1] === 78 && // N
-          buffer[fieldStart + 2] === 68 && // D
-          buffer[fieldStart + 3] === 61 // =
-        ) {
-          endCoordinate = 0
-          for (let k = fieldStart + 4; k < i; k++) {
-            const c = buffer[k]!
-            if (c >= 48 && c <= 57) {
-              endCoordinate = endCoordinate * 10 + (c - 48)
-            } else {
-              break
-            }
-          }
-        }
-        fieldStart = i + 1
-      }
-    }
-    return endCoordinate
-  }
-
-  /**
-   * return the approximate number of data lines in the given reference
-   * sequence
-   *
-   * @param refSeq reference sequence name
-   *
-   * @returns number of data lines present on that reference sequence
-   */
   async lineCount(refName: string, opts: Options = {}) {
     return this.index.lineCount(refName, opts)
   }
 
-  /**
-   * read and uncompress the data in a chunk (composed of one or more
-   * contiguous bgzip blocks) of the file
-   */
   async readChunk(c: Chunk, opts: Options = {}) {
     const ret = await this.filehandle.read(
       c.fetchedSize(),
