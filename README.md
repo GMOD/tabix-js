@@ -9,7 +9,9 @@ Read Tabix-indexed files using either .tbi or .csi indexes.
 
     $ npm install @gmod/tabix
 
-Releases are published to npm automatically via GitHub Actions using [npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements) (OIDC provenance) when a `v*` tag is pushed.
+Releases are published to npm automatically via GitHub Actions using
+[npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements)
+(OIDC provenance) when a `v*` tag is pushed.
 
 ## Usage
 
@@ -95,6 +97,7 @@ await tbiIndexed.getLines(
 
 After running this, `lines` contains the matching lines from the file. The
 callback receives:
+
 - `line` — the raw line string
 - `fileOffset` — virtual file offset, useful as a unique line identifier
 - `start` / `end` — the parsed coordinates of that line (0-based half-open)
