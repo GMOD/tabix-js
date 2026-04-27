@@ -59,8 +59,8 @@ const remoteTbiIndexed = new TabixIndexedFile({
 })
 ```
 
-You can also alternatively supply a filehandle-like object with the
-[generic-filehandle2](https://github.com/GMOD/generic-filehandle2): example
+You can also supply a filehandle-like object from
+[generic-filehandle2](https://github.com/GMOD/generic-filehandle2):
 
 ```typescript
 import { RemoteFile } from 'generic-filehandle2'
@@ -114,9 +114,6 @@ Notes about the returned values of `getLines`:
 
 - commented (meta) lines are skipped.
 - line strings do not include any trailing whitespace characters.
-- the callback is also called with a `fileOffset` that can be used to uniquely
-  identify lines based on their virtual file offset where the line is found in
-  the file
 - if `getLines` is called with an undefined `end` parameter it gets all lines
   from start going to the end of the contig e.g.
 
