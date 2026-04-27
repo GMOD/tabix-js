@@ -9,10 +9,6 @@ Read Tabix-indexed files using either .tbi or .csi indexes.
 
     $ npm install @gmod/tabix
 
-Releases are published to npm automatically via GitHub Actions using
-[npm trusted publishing](https://docs.npmjs.com/generating-provenance-statements)
-(OIDC provenance) when a `v*` tag is pushed.
-
 ## Usage
 
 ### Importing the module
@@ -280,6 +276,14 @@ bgzip blocks) of the file
 
 - `c` **Chunk**&#x20;
 - `opts` **Options** (optional, default `{}`)
+
+## Publishing
+
+[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub Actions.
+
+```bash
+npm version patch  # or minor/major
+```
 
 ## Academic Use
 

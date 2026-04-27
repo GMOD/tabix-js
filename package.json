@@ -3,22 +3,16 @@
   "version": "3.3.1",
   "description": "Read Tabix-indexed files, supports both .tbi and .csi indexes",
   "type": "module",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.js",
   "exports": {
-    "import": {
-      "import": "./esm/index.js"
-    },
-    "require": {
-      "require": "./dist/index.js"
-    }
+    "import": "./esm/index.js",
+    "require": "./dist/index.js"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/GMOD/tabix-js.git"
   },
-  "main": "dist/index.js",
-  "module": "esm/index.js",
   "author": {
     "name": "Robert Buels",
     "email": "rbuels@gmail.com",
@@ -37,14 +31,14 @@
     "format": "prettier --write .",
     "docs": "documentation readme --shallow src/tabixIndexedFile.ts --section TabixIndexedFile",
     "clean": "rimraf dist esm",
-    "prebuild": "yarn clean",
+    "prebuild": "pnpm clean",
     "build:esm": "tsc --target es2020 --outDir esm",
     "build:es5": "tsc --target es2020 --module commonjs --moduleResolution bundler --outDir dist",
     "postbuild:es5": "echo '{\"type\": \"commonjs\"}' > dist/package.json",
-    "build": "yarn build:esm && yarn build:es5",
+    "build": "pnpm build:esm && pnpm build:es5",
     "postbuild": "webpack",
-    "preversion": "yarn lint && yarn test run && yarn build",
-    "prepublishOnly": "yarn lint && yarn test run && yarn build",
+    "preversion": "pnpm lint && pnpm test run && pnpm build",
+    "prepublishOnly": "pnpm lint && pnpm test run && pnpm build",
     "version": "standard-changelog && git add CHANGELOG.md",
     "postversion": "git push --follow-tags"
   },
