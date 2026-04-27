@@ -1,3 +1,10 @@
+## [3.3.3](https://github.com/GMOD/tabix-js/compare/v3.3.2...v3.3.3) (2026-04-27)
+
+
+### Bug Fixes
+
+* add non-null assertions for noUncheckedIndexedAccess compliance ([645a56c](https://github.com/GMOD/tabix-js/commit/645a56c1b911704c6d0cb2f7b6f6bca651f278f9))
+
 ## [3.3.2](https://github.com/GMOD/tabix-js/compare/v3.3.1...v3.3.2) (2026-04-27)
 
 ## [3.3.1](https://github.com/GMOD/tabix-js/compare/v3.3.0...v3.3.1) (2026-03-28)
