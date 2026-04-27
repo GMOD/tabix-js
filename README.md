@@ -257,7 +257,7 @@ line that overlaps the given region
 
 #### lineCount
 
-return the approximate number of data lines in the given reference sequence
+return the number of data lines in the given reference sequence
 
 ##### Parameters
 

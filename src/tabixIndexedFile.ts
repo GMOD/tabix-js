@@ -429,7 +429,7 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * return the approximate number of data lines in the given reference sequence
+   * return the number of data lines in the given reference sequence
    * @param {string} refName reference sequence name
    * @returns {number} number of data lines present on that reference sequence
    */
