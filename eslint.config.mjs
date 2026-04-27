@@ -1,7 +1,7 @@
 import eslint from '@eslint/js'
 import eslintPluginUnicorn from 'eslint-plugin-unicorn'
 import { defineConfig } from 'eslint/config'
-import importPlugin from 'eslint-plugin-import'
+import importPlugin from 'eslint-plugin-import-x'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
@@ -73,9 +73,9 @@ export default defineConfig(
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/no-deprecated': 'warn',
 
-      'import/no-unresolved': 'off',
-      'import/extensions': ['error', 'always', { ignorePackages: true }],
-      'import/order': [
+      'import-x/no-unresolved': 'off',
+      'import-x/extensions': ['error', 'always', { ignorePackages: true }],
+      'import-x/order': [
         'error',
         {
           named: true,
