@@ -61,8 +61,8 @@ function calculateFileOffset(
   minvDataPosition: number,
 ) {
   return (
-    cpositions[pos] * (1 << 8) +
-    (blockStart - dpositions[pos]) +
+    cpositions[pos]! * (1 << 8) +
+    (blockStart - dpositions[pos]!) +
     minvDataPosition +
     1
   )
@@ -115,7 +115,7 @@ function getVcfEnd(
       ) {
         endCoordinate = 0
         for (let k = fieldStart + 4; k < i; k++) {
-          const c = buffer[k]
+          const c = buffer[k]!
           if (c >= 48 && c <= 57) {
             endCoordinate = endCoordinate * 10 + (c - 48)
           } else {
@@ -132,7 +132,7 @@ function getVcfEnd(
 function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
   let val = 0
   for (let i = start; i < end; i++) {
-    const c = buffer[i]
+    const c = buffer[i]!
     if (c >= 48 && c <= 57) {
       val = val * 10 + (c - 48)
     }
@@ -290,7 +290,7 @@ export default class TabixIndexedFile {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (dpositions) {
           const target = blockStart + c.minv.dataPosition
-          while (pos < dpositions.length && target >= dpositions[pos]) {
+          while (pos < dpositions.length && target >= dpositions[pos]!) {
             pos++
           }
         }
@@ -315,8 +315,8 @@ export default class TabixIndexedFile {
         }
 
         // compare ref name bytes directly
-        const refStart = tabs[refCol - 1] + 1
-        const refEnd = tabs[refCol]
+        const refStart = tabs[refCol - 1]! + 1
+        const refEnd = tabs[refCol]!
         const refLen = refEnd - refStart
         if (refLen !== regionRefNameBytes.length) {
           blockStart = n + 1
@@ -336,7 +336,7 @@ export default class TabixIndexedFile {
 
         // parse start coordinate
         const startCoordinate =
-          parseIntFromBytes(buffer, tabs[startCol - 1] + 1, tabs[startCol]) +
+          parseIntFromBytes(buffer, tabs[startCol - 1]! + 1, tabs[startCol]!) +
           coordinateOffset
 
         if (startCoordinate >= end) {
@@ -351,16 +351,16 @@ export default class TabixIndexedFile {
           endCoordinate = getVcfEnd(
             buffer,
             startCoordinate,
-            tabs[3] + 1,
-            tabs[4],
-            tabs[endCol - 1] + 1,
-            tabs[endCol],
+            tabs[3]! + 1,
+            tabs[4]!,
+            tabs[endCol - 1]! + 1,
+            tabs[endCol]!,
           )
         } else {
           endCoordinate = parseIntFromBytes(
             buffer,
-            tabs[endCol - 1] + 1,
-            tabs[endCol],
+            tabs[endCol - 1]! + 1,
+            tabs[endCol]!,
           )
         }
 
