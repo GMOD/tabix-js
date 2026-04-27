@@ -151,6 +151,21 @@ export default class TabixIndexedFile {
     maxSize: 1000,
   })
 
+  /**
+   * @param {object} args
+   * @param {string} [args.path]
+   * @param {object} [args.filehandle]
+   * @param {string} [args.url]
+   * @param {string} [args.tbiPath]
+   * @param {string} [args.tbiUrl]
+   * @param {object} [args.tbiFilehandle]
+   * @param {string} [args.csiPath]
+   * @param {string} [args.csiUrl]
+   * @param {object} [args.csiFilehandle]
+   * @param {number} [args.chunkCacheSize]
+   * @param {number} [args.yieldTime] yield to main thread after N milliseconds if reading features is taking a long time to avoid hanging main thread
+   * @param {Function} [args.renameRefSeqs] optional function with sig `string => string` to transform reference sequence names for the purpose of indexing and querying. note that the data that is returned is not altered, just the names of the reference sequences that are used for querying.
+   */
   constructor({
     path,
     filehandle,
@@ -205,6 +220,13 @@ export default class TabixIndexedFile {
     })
   }
 
+  /**
+   * @param {string} refName name of the reference sequence
+   * @param {number|undefined} start start of the region (0-based half-open)
+   * @param {number|undefined} end end of the region (0-based half-open)
+   * @param {GetLinesOpts|GetLinesCallback} opts callback invoked for each line, or an options object with `lineCallback` and optional `signal`
+   * @returns {Promise} promise that is resolved when the whole read is finished, rejected on error
+   */
   async getLines(
     refName: string,
     s: number | undefined,
@@ -406,6 +428,11 @@ export default class TabixIndexedFile {
     return metadata.refIdToName
   }
 
+  /**
+   * return the approximate number of data lines in the given reference sequence
+   * @param {string} refName reference sequence name
+   * @returns {number} number of data lines present on that reference sequence
+   */
   async lineCount(refName: string, opts: Options = {}) {
     return this.index.lineCount(refName, opts)
   }
