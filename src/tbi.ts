@@ -4,12 +4,12 @@ import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import { longFromBytesToUnsigned } from './long.ts'
 import { optimizeChunks } from './util.ts'
-import VirtualOffset, { fromBytes } from './virtualOffset.ts'
+import { fromBytes } from './virtualOffset.ts'
 
 import type { Options } from './indexFile.ts'
+import type VirtualOffset from './virtualOffset.ts'
 
 const TBI_MAGIC = 21_578_324 // TBI\1
-const TAD_LIDX_SHIFT = 14
 
 /**
  * calculate the list of bins that may overlap with region [beg,end)
@@ -183,19 +183,11 @@ export default class TabixIndex extends IndexFile {
     }
 
     const linearIndex = ba.linearIndex ?? []
-    const minOffset =
-      linearIndex.length > 0
-        ? linearIndex[
-            min >> TAD_LIDX_SHIFT >= linearIndex.length
-              ? linearIndex.length - 1
-              : min >> TAD_LIDX_SHIFT
-          ]
-        : new VirtualOffset(0, 0)
-    if (!minOffset) {
+    // a negative shift result indicates min overflowed int32 — query is well
+    // beyond the indexed range
+    if (linearIndex.length > 0 && min >> 14 < 0) {
       console.warn('querying outside of possible tabix range')
     }
-
-    // const { linearIndex, binIndex } = indexes
 
     const overlappingBins = reg2bins(min, max) // List of bin #s that overlap min, max
     const chunks: Chunk[] = []
@@ -206,7 +198,7 @@ export default class TabixIndex extends IndexFile {
         const binChunks = ba.binIndex[bin]
         if (binChunks) {
           for (const c of binChunks) {
-            chunks.push(new Chunk(c.minv, c.maxv, bin))
+            chunks.push(c)
           }
         }
       }

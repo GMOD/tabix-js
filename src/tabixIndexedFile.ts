@@ -136,6 +136,8 @@ function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
     const c = buffer[i]!
     if (c >= 48 && c <= 57) {
       val = val * 10 + (c - 48)
+    } else {
+      break
     }
   }
   return val
@@ -293,7 +295,9 @@ export default class TabixIndexedFile {
       metadata.coordinateType === '1-based-closed' ? -1 : 0
 
     const regionRefNameBytes = encoder.encode(refName)
-    const tabs = Array.from<number>({ length: maxColumn + 1 })
+    // tabs[N] holds the byte offset of the N-th tab on the current line; with
+    // the sentinel tabs[0] = blockStart - 1, column N spans tabs[N-1]+1..tabs[N]
+    const tabs = new Int32Array(maxColumn + 1)
 
     for (const c of chunks) {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
@@ -311,12 +315,9 @@ export default class TabixIndexedFile {
           break
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (dpositions) {
-          const target = blockStart + c.minv.dataPosition
-          while (pos < dpositions.length && target >= dpositions[pos]!) {
-            pos++
-          }
+        const target = blockStart + c.minv.dataPosition
+        while (pos < dpositions.length && target >= dpositions[pos]!) {
+          pos++
         }
 
         // skip meta lines

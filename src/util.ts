@@ -1,4 +1,5 @@
-import type Chunk from './chunk.ts'
+import Chunk from './chunk.ts'
+
 import type VirtualOffset from './virtualOffset.ts'
 
 export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
@@ -9,9 +10,6 @@ export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
 }
 
 export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
-  const mergedChunks: Chunk[] = []
-  let lastChunk: Chunk | undefined
-
   if (chunks.length === 0) {
     return chunks
   }
@@ -21,20 +19,21 @@ export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
     return dif === 0 ? c0.minv.dataPosition - c1.minv.dataPosition : dif
   })
 
+  const mergedChunks: Chunk[] = []
+  let lastChunk: Chunk | undefined
+
   for (const chunk of chunks) {
     if (!lowest || chunk.maxv.compareTo(lowest) > 0) {
-      if (lastChunk === undefined) {
+      if (lastChunk && canMergeBlocks(lastChunk, chunk)) {
+        if (chunk.maxv.compareTo(lastChunk.maxv) > 0) {
+          // produce a new merged Chunk rather than mutating, so callers can
+          // safely pass cached Chunk objects without risk of corruption
+          lastChunk = new Chunk(lastChunk.minv, chunk.maxv, lastChunk.bin)
+          mergedChunks[mergedChunks.length - 1] = lastChunk
+        }
+      } else {
         mergedChunks.push(chunk)
         lastChunk = chunk
-      } else {
-        if (canMergeBlocks(lastChunk, chunk)) {
-          if (chunk.maxv.compareTo(lastChunk.maxv) > 0) {
-            lastChunk.maxv = chunk.maxv
-          }
-        } else {
-          mergedChunks.push(chunk)
-          lastChunk = chunk
-        }
       }
     }
   }
