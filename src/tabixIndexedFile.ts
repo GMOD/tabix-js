@@ -5,6 +5,7 @@ import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
 import TBI from './tbi.ts'
+import { optimizeChunks } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
@@ -218,6 +219,29 @@ export default class TabixIndexedFile {
       fill: (args: Chunk, signal?: AbortSignal) =>
         this.readChunk(args, { signal }),
     })
+  }
+
+  /**
+   * Estimates the compressed byte size of the index chunks covering the given
+   * regions. Useful for byte budgeting before issuing a `getLines` call to
+   * decide whether a region is too large to fetch.
+   */
+  async bytesForRegions(
+    regions: { refName: string; start: number; end: number }[],
+    opts: Options = {},
+  ) {
+    const all: Chunk[] = []
+    for (const { refName, start, end } of regions) {
+      const chunks = await this.index.blocksForRange(refName, start, end, opts)
+      for (const chunk of chunks) {
+        all.push(chunk)
+      }
+    }
+    let bytes = 0
+    for (const chunk of optimizeChunks(all)) {
+      bytes += chunk.fetchedSize()
+    }
+    return bytes
   }
 
   /**
