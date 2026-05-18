@@ -19,14 +19,10 @@ export default class Chunk {
     this._fetchedSize = fetchedSize
   }
 
-  toUniqueString() {
+  toString() {
     return `${this.minv.toString()}..${this.maxv.toString()} (bin ${
       this.bin
     }, fetchedSize ${this.fetchedSize()})`
-  }
-
-  toString() {
-    return this.toUniqueString()
   }
 
   compareTo(b: Chunk) {

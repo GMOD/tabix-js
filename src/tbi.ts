@@ -55,38 +55,13 @@ export default class TabixIndex extends IndexFile {
 
     // number of reference sequences in the index
     const refCount = dataView.getUint32(4, true)
-    const formatFlags = dataView.getUint32(8, true)
-    const coordinateType =
-      formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'
-    const formatOpts: Record<number, string> = {
-      0: 'generic',
-      1: 'SAM',
-      2: 'VCF',
-    }
-    const format = formatOpts[formatFlags & 0xf]
-    if (!format) {
-      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
-    }
-    const columnNumbers = {
-      ref: dataView.getInt32(12, true),
-      start: dataView.getInt32(16, true),
-      end: dataView.getInt32(20, true),
-    }
-    const metaValue = dataView.getInt32(24, true)
+    const { header, namesEnd } = this._parseTabixHeader(bytes, 8)
     const depth = 5
     const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
     const maxRefLength = 2 ** (14 + depth * 3)
-    const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
-    const skipLines = dataView.getInt32(28, true)
-
-    // read sequence dictionary
-    const nameSectionLength = dataView.getInt32(32, true)
-    const { refNameToId, refIdToName } = this._parseNameBytes(
-      bytes.subarray(36, 36 + nameSectionLength),
-    )
 
     // read the indexes for each reference sequence
-    let currOffset = 36 + nameSectionLength
+    let currOffset = namesEnd
     let firstDataLine: VirtualOffset | undefined
     const indices = Array.from({ length: refCount }, () => {
       // the binning index
@@ -141,17 +116,11 @@ export default class TabixIndex extends IndexFile {
     })
 
     return {
+      ...header,
       indices,
-      metaChar,
       maxBinNumber,
       maxRefLength,
-      skipLines,
       firstDataLine,
-      columnNumbers,
-      coordinateType,
-      format,
-      refIdToName,
-      refNameToId,
       maxBlockSize: 1 << 16,
     }
   }
@@ -183,9 +152,9 @@ export default class TabixIndex extends IndexFile {
     }
 
     const linearIndex = ba.linearIndex ?? []
-    // a negative shift result indicates min overflowed int32 — query is well
-    // beyond the indexed range
-    if (linearIndex.length > 0 && min >> 14 < 0) {
+    // min >= 2**31 overflows int32 and produces a negative >> 14 result —
+    // query is well beyond the indexed range
+    if (linearIndex.length > 0 && min >= 2 ** 31) {
       console.warn('querying outside of possible tabix range')
     }
 

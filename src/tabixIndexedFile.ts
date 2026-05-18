@@ -114,15 +114,7 @@ function getVcfEnd(
         buffer[fieldStart + 2] === 68 && // D
         buffer[fieldStart + 3] === 61 // =
       ) {
-        endCoordinate = 0
-        for (let k = fieldStart + 4; k < i; k++) {
-          const c = buffer[k]!
-          if (c >= 48 && c <= 57) {
-            endCoordinate = endCoordinate * 10 + (c - 48)
-          } else {
-            break
-          }
-        }
+        endCoordinate = parseIntFromBytes(buffer, fieldStart + 4, i)
       }
       fieldStart = i + 1
     }

@@ -2,6 +2,12 @@ import type Chunk from './chunk.ts'
 import type VirtualOffset from './virtualOffset.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
+const FORMATS: Record<number, string> = {
+  0: 'generic',
+  1: 'SAM',
+  2: 'VCF',
+}
+
 export interface Options {
   signal?: AbortSignal
 }
@@ -57,13 +63,9 @@ export default abstract class IndexFile {
     currentFdl: VirtualOffset | undefined,
     virtualOffset: VirtualOffset,
   ) {
-    if (currentFdl) {
-      return currentFdl.compareTo(virtualOffset) > 0
-        ? virtualOffset
-        : currentFdl
-    } else {
-      return virtualOffset
-    }
+    return !currentFdl || currentFdl.compareTo(virtualOffset) > 0
+      ? virtualOffset
+      : currentFdl
   }
 
   async parse(opts: Options = {}) {
@@ -77,6 +79,38 @@ export default abstract class IndexFile {
   async hasRefSeq(seqId: number, opts: Options = {}) {
     const idx = await this.parse(opts)
     return !!idx.indices[seqId]?.binIndex
+  }
+
+  // Parses the 28-byte tabix header block (format flags, column numbers,
+  // metaChar, skipLines, nameSectionLength) plus the name section that follows.
+  // `offset` points to the formatFlags int32. Layout is shared between TBI and
+  // CSI aux data — see https://samtools.github.io/hts-specs/.
+  _parseTabixHeader(bytes: Uint8Array, offset: number) {
+    const dataView = new DataView(bytes.buffer)
+    const formatFlags = dataView.getInt32(offset, true)
+    const format = FORMATS[formatFlags & 0xf]
+    if (!format) {
+      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+    }
+    const metaValue = dataView.getInt32(offset + 16, true)
+    const nameSectionLength = dataView.getInt32(offset + 24, true)
+    const namesEnd = offset + 28 + nameSectionLength
+    return {
+      header: {
+        format,
+        coordinateType:
+          formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed',
+        columnNumbers: {
+          ref: dataView.getInt32(offset + 4, true),
+          start: dataView.getInt32(offset + 8, true),
+          end: dataView.getInt32(offset + 12, true),
+        },
+        metaChar: metaValue ? String.fromCharCode(metaValue) : undefined,
+        skipLines: dataView.getInt32(offset + 20, true),
+        ...this._parseNameBytes(bytes.subarray(offset + 28, namesEnd)),
+      },
+      namesEnd,
+    }
   }
 
   _parseNameBytes(namesBytes: Uint8Array) {
