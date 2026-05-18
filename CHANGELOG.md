@@ -1,3 +1,21 @@
+## [3.3.5](https://github.com/GMOD/tabix-js/compare/v3.3.4...v3.3.5) (2026-05-18)
+
+
+### Bug Fixes
+
+* use Array.from({length}) to satisfy unicorn/no-new-array lint rule ([9f6294e](https://github.com/GMOD/tabix-js/commit/9f6294e04ad9425b852fde6d672a425bd8859628))
+
+
+### Performance Improvements
+
+* avoid per-query Chunk clones and tighten getLines hot loop ([2e4488b](https://github.com/GMOD/tabix-js/commit/2e4488bffaf51de85804260b45bede8ab81e1369))
+* reduce allocations and move TextDecoder/TextEncoder to function scope ([3abb846](https://github.com/GMOD/tabix-js/commit/3abb846a9f0c5b6c5cbf4a73a13f9e84bf780922))
+
+
+### Reverts
+
+* inline tabix header parsing back into tbi.ts and csi.ts ([e7cdfd8](https://github.com/GMOD/tabix-js/commit/e7cdfd83f0d40ffc35447cfee4c8a2be130eff39))
+
 ## [3.3.4](https://github.com/GMOD/tabix-js/compare/v3.3.3...v3.3.4) (2026-05-08)
 
 ### Features
