@@ -5,39 +5,73 @@ import { longFromBytesToUnsigned } from './long.ts'
 
 import type VirtualOffset from './virtualOffset.ts'
 
-export function canMergeBlocks(chunk1: Chunk, chunk2: Chunk) {
-  return (
-    chunk2.minv.blockPosition - chunk1.maxv.blockPosition < 65_000 &&
-    chunk2.maxv.blockPosition - chunk1.minv.blockPosition < 5_000_000
-  )
-}
-
+// SYNC: ~/src/gmod/bam-js/src/util.ts optimizeChunks
 export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
-  if (chunks.length === 0) {
+  const n = chunks.length
+  if (n === 0) {
     return chunks
   }
 
-  chunks.sort(function (c0, c1) {
+  // Pre-filter before sorting: discard chunks whose maxv is at or before
+  // `lowest` (the linear-index floor). Avoids sorting chunks that will be
+  // dropped anyway — significant win when the linear index prunes most bins.
+  let filtered: Chunk[]
+  if (lowest) {
+    const lowestBlock = lowest.blockPosition
+    const lowestData = lowest.dataPosition
+    filtered = []
+    for (let i = 0; i < n; i++) {
+      const chunk = chunks[i]!
+      const cmp =
+        chunk.maxv.blockPosition - lowestBlock ||
+        chunk.maxv.dataPosition - lowestData
+      if (cmp > 0) {
+        filtered.push(chunk)
+      }
+    }
+    if (filtered.length === 0) {
+      return filtered
+    }
+  } else {
+    filtered = chunks
+  }
+
+  filtered.sort((c0, c1) => {
     const dif = c0.minv.blockPosition - c1.minv.blockPosition
     return dif === 0 ? c0.minv.dataPosition - c1.minv.dataPosition : dif
   })
 
-  const mergedChunks: Chunk[] = []
-  let lastChunk: Chunk | undefined
+  // Merge adjacent/overlapping chunks. Track min/max blockPositions in locals
+  // to avoid repeated property-chain reads in the hot loop.
+  // Chunks are never mutated — merging produces a new Chunk instance.
+  const mergedChunks: Chunk[] = [filtered[0]!]
+  let lastMinBlock = filtered[0]!.minv.blockPosition
+  let lastMaxBlock = filtered[0]!.maxv.blockPosition
 
-  for (const chunk of chunks) {
-    if (!lowest || chunk.maxv.compareTo(lowest) > 0) {
-      if (lastChunk && canMergeBlocks(lastChunk, chunk)) {
-        if (chunk.maxv.compareTo(lastChunk.maxv) > 0) {
-          // produce a new merged Chunk rather than mutating, so callers can
-          // safely pass cached Chunk objects without risk of corruption
-          lastChunk = new Chunk(lastChunk.minv, chunk.maxv, lastChunk.bin)
-          mergedChunks[mergedChunks.length - 1] = lastChunk
-        }
-      } else {
-        mergedChunks.push(chunk)
-        lastChunk = chunk
+  for (let i = 1; i < filtered.length; i++) {
+    const chunk = filtered[i]!
+    const chunkMinBlock = chunk.minv.blockPosition
+    const chunkMaxBlock = chunk.maxv.blockPosition
+    if (
+      chunkMinBlock - lastMaxBlock < 65_000 &&
+      chunkMaxBlock - lastMinBlock < 5_000_000
+    ) {
+      const lastChunk = mergedChunks.at(-1)!
+      const cmp =
+        chunkMaxBlock - lastMaxBlock ||
+        chunk.maxv.dataPosition - lastChunk.maxv.dataPosition
+      if (cmp > 0) {
+        mergedChunks[mergedChunks.length - 1] = new Chunk(
+          lastChunk.minv,
+          chunk.maxv,
+          lastChunk.bin,
+        )
+        lastMaxBlock = chunkMaxBlock
       }
+    } else {
+      mergedChunks.push(chunk)
+      lastMinBlock = chunkMinBlock
+      lastMaxBlock = chunkMaxBlock
     }
   }
 

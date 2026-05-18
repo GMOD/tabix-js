@@ -2,22 +2,12 @@ import type VirtualOffset from './virtualOffset.ts'
 
 // little class representing a chunk in the index
 export default class Chunk {
-  public minv: VirtualOffset
-  public maxv: VirtualOffset
-  public bin: number
-  public _fetchedSize?: number
-
   constructor(
-    minv: VirtualOffset,
-    maxv: VirtualOffset,
-    bin: number,
-    fetchedSize?: number,
-  ) {
-    this.minv = minv
-    this.maxv = maxv
-    this.bin = bin
-    this._fetchedSize = fetchedSize
-  }
+    public minv: VirtualOffset,
+    public maxv: VirtualOffset,
+    public bin: number,
+    public _fetchedSize?: number,
+  ) {}
 
   toString() {
     return `${this.minv.toString()}..${this.maxv.toString()} (bin ${

@@ -214,18 +214,10 @@ export default class TabixIndex extends IndexFile {
       }
     }
 
-    // Use the linear index to find minimum file position of chunks that could
-    // contain alignments in the region
-    const nintv = linearIndex.length
-    let lowest: VirtualOffset | undefined
-    const minLin = Math.min(min >> 14, nintv - 1)
-    const maxLin = Math.min(max >> 14, nintv - 1)
-    for (let i = minLin; i <= maxLin; ++i) {
-      const vp = linearIndex[i]
-      if (vp && (!lowest || vp.compareTo(lowest) < 0)) {
-        lowest = vp
-      }
-    }
+    // The linear index is monotonically non-decreasing, so the minimum virtual
+    // offset for chunks that could overlap [min, ...) is at index minLin.
+    // SYNC: ~/src/gmod/bam-js/src/bai.ts getLowestChunk
+    const lowest = linearIndex[Math.min(min >> 14, linearIndex.length - 1)]
 
     return optimizeChunks(chunks, lowest)
   }
