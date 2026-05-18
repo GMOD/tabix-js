@@ -166,7 +166,7 @@ export default class CSI extends IndexFile {
           pos += 8 // skip loffset (tracked in first pass)
           const chunkCount = dataView.getInt32(pos, true)
           pos += 4
-          const chunks = new Array<Chunk>(chunkCount)
+          const chunks = Array.from<Chunk>({ length: chunkCount })
           for (let k = 0; k < chunkCount; k++) {
             chunks[k] = new Chunk(fromBytes(bytes, pos), fromBytes(bytes, pos + 8), bin)
             pos += 16

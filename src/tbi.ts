@@ -146,7 +146,7 @@ export default class TabixIndex extends IndexFile {
         } else {
           const chunkCount = dataView.getInt32(pos, true)
           pos += 4
-          const chunks = new Array<Chunk>(chunkCount)
+          const chunks = Array.from<Chunk>({ length: chunkCount })
           for (let k = 0; k < chunkCount; k++) {
             chunks[k] = new Chunk(fromBytes(bytes, pos), fromBytes(bytes, pos + 8), bin)
             pos += 16
@@ -156,7 +156,7 @@ export default class TabixIndex extends IndexFile {
       }
       const linearCount = dataView.getInt32(pos, true)
       pos += 4
-      const linearIndex = new Array<VirtualOffset>(linearCount)
+      const linearIndex = Array.from<VirtualOffset>({ length: linearCount })
       for (let k = 0; k < linearCount; k++) {
         linearIndex[k] = fromBytes(bytes, pos)
         pos += 8
