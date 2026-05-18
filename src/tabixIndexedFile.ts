@@ -16,9 +16,6 @@ const TAB = 9
 const NEWLINE = 10
 const SEMICOLON = 59
 
-const decoder = new TextDecoder('utf-8')
-const encoder = new TextEncoder()
-
 type GetLinesCallback = (
   line: string,
   fileOffset: number,
@@ -284,6 +281,8 @@ export default class TabixIndexedFile {
     const coordinateOffset =
       metadata.coordinateType === '1-based-closed' ? -1 : 0
 
+    const encoder = new TextEncoder()
+    const decoder = new TextDecoder()
     const regionRefNameBytes = encoder.encode(refName)
     // tabs[N] holds the byte offset of the N-th tab on the current line; with
     // the sentinel tabs[0] = blockStart - 1, column N spans tabs[N-1]+1..tabs[N]
@@ -295,6 +294,7 @@ export default class TabixIndexedFile {
         c,
         signal,
       )
+      const minvDataPosition = c.minv.dataPosition
 
       let blockStart = 0
       let pos = 0
@@ -305,7 +305,7 @@ export default class TabixIndexedFile {
           break
         }
 
-        const target = blockStart + c.minv.dataPosition
+        const target = blockStart + minvDataPosition
         while (pos < dpositions.length && target >= dpositions[pos]!) {
           pos++
         }
@@ -318,15 +318,13 @@ export default class TabixIndexedFile {
 
         // find tab positions
         tabs[0] = blockStart - 1
-        let prev = blockStart - 1
         for (let i = 0; i < maxColumn; i++) {
-          const tabPos = buffer.indexOf(TAB, prev + 1)
+          const tabPos = buffer.indexOf(TAB, tabs[i]! + 1)
           if (tabPos === -1 || tabPos >= n) {
             tabs[i + 1] = n
             break
           }
           tabs[i + 1] = tabPos
-          prev = tabPos
         }
 
         // compare ref name bytes directly
@@ -388,7 +386,7 @@ export default class TabixIndexedFile {
               dpositions,
               pos,
               blockStart,
-              c.minv.dataPosition,
+              minvDataPosition,
             ),
             startCoordinate,
             endCoordinate,
@@ -435,7 +433,7 @@ export default class TabixIndexedFile {
 
   async getHeader(opts: Options = {}) {
     const bytes = await this.getHeaderBuffer(opts)
-    return decoder.decode(bytes)
+    return new TextDecoder().decode(bytes)
   }
 
   async getReferenceSequenceNames(opts: Options = {}) {

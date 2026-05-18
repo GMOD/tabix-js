@@ -8,7 +8,8 @@ import {
   parseNameBytes,
   parsePseudoBin,
 } from './util.ts'
-import VirtualOffset, { fromBytes } from './virtualOffset.ts'
+import { fromBytes } from './virtualOffset.ts'
+import type VirtualOffset from './virtualOffset.ts'
 
 import type { Options } from './indexFile.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
@@ -99,11 +100,12 @@ export default class CSI extends IndexFile {
     const bytes = (await unzip(buf)) as Uint8Array
     const dataView = new DataView(bytes.buffer)
 
-    // check TBI magic numbers
+    // check CSI magic numbers
+    const magic = dataView.getUint32(0, true)
     let csiVersion
-    if (dataView.getUint32(0, true) === CSI1_MAGIC) {
+    if (magic === CSI1_MAGIC) {
       csiVersion = 1
-    } else if (dataView.getUint32(0, true) === CSI2_MAGIC) {
+    } else if (magic === CSI2_MAGIC) {
       csiVersion = 2
     } else {
       throw new Error('Not a CSI file')
@@ -211,7 +213,7 @@ export default class CSI extends IndexFile {
       }
     }
 
-    return optimizeChunks(chunks, new VirtualOffset(0, 0))
+    return optimizeChunks(chunks)
   }
 
   /**
