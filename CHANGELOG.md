@@ -1,9 +1,9 @@
 ## [3.3.4](https://github.com/GMOD/tabix-js/compare/v3.3.3...v3.3.4) (2026-05-08)
 
-
 ### Features
 
-* expose bytesForRegions for byte-budget estimates ([c9ae5d4](https://github.com/GMOD/tabix-js/commit/c9ae5d4ca5121274a68c3d9c6bfd2f999b3b386f))
+- expose bytesForRegions for byte-budget estimates
+  ([c9ae5d4](https://github.com/GMOD/tabix-js/commit/c9ae5d4ca5121274a68c3d9c6bfd2f999b3b386f))
 
 ## [3.3.3](https://github.com/GMOD/tabix-js/compare/v3.3.2...v3.3.3) (2026-04-27)
 

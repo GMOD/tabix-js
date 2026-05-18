@@ -55,22 +55,62 @@ export function findFirstData(
 
 export function parseNameBytes(namesBytes: Uint8Array) {
   const decoder = new TextDecoder('utf-8')
-  let currRefId = 0
-  let currNameStart = 0
   const refIdToName: string[] = []
   const refNameToId: Record<string, number> = {}
-  for (let i = 0; i < namesBytes.length; i += 1) {
-    if (!namesBytes[i]) {
-      if (currNameStart < i) {
-        const refName = decoder.decode(namesBytes.subarray(currNameStart, i))
-        refIdToName[currRefId] = refName
-        refNameToId[refName] = currRefId
-      }
-      currNameStart = i + 1
-      currRefId += 1
+  let currRefId = 0
+  let pos = 0
+  while (pos < namesBytes.length) {
+    const end = namesBytes.indexOf(0, pos)
+    if (end === -1) {
+      break
     }
+    if (end > pos) {
+      const refName = decoder.decode(namesBytes.subarray(pos, end))
+      refIdToName[currRefId] = refName
+      refNameToId[refName] = currRefId
+    }
+    pos = end + 1
+    currRefId++
   }
   return { refNameToId, refIdToName }
+}
+
+const tabixFormats: Record<number, string> = {
+  0: 'generic',
+  1: 'SAM',
+  2: 'VCF',
+}
+
+export function parseAuxData(bytes: Uint8Array, offset: number) {
+  const dataView = new DataView(bytes.buffer)
+  const formatFlags = dataView.getInt32(offset, true)
+  const coordinateType =
+    formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'
+  const format = tabixFormats[formatFlags & 0xf]
+  if (!format) {
+    throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
+  }
+  const columnNumbers = {
+    ref: dataView.getInt32(offset + 4, true),
+    start: dataView.getInt32(offset + 8, true),
+    end: dataView.getInt32(offset + 12, true),
+  }
+  const metaValue = dataView.getInt32(offset + 16, true)
+  const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
+  const skipLines = dataView.getInt32(offset + 20, true)
+  const nameSectionLength = dataView.getInt32(offset + 24, true)
+  const { refIdToName, refNameToId } = parseNameBytes(
+    bytes.subarray(offset + 28, offset + 28 + nameSectionLength),
+  )
+  return {
+    refIdToName,
+    refNameToId,
+    skipLines,
+    metaChar,
+    columnNumbers,
+    format,
+    coordinateType,
+  }
 }
 
 export function parsePseudoBin(bytes: Uint8Array, offset: number) {

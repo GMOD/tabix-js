@@ -261,7 +261,7 @@ export default class TabixIndexedFile {
     const metadata = await this.index.getMetadata(options)
     const start = s ?? 0
     const end = e ?? metadata.maxRefLength
-    if (!(start <= end)) {
+    if (start > end) {
       throw new TypeError(
         'invalid start and end coordinates. start must be less than or equal to end',
       )

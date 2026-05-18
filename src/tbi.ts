@@ -6,7 +6,7 @@ import {
   findFirstData,
   memoizeByRefId,
   optimizeChunks,
-  parseNameBytes,
+  parseAuxData,
   parsePseudoBin,
 } from './util.ts'
 import { fromBytes } from './virtualOffset.ts'
@@ -54,34 +54,22 @@ export default class TabixIndex extends IndexFile {
     }
 
     const refCount = dataView.getUint32(4, true)
-    const formatFlags = dataView.getUint32(8, true)
-    const coordinateType =
-      formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'
-    const formatOpts: Record<number, string> = {
-      0: 'generic',
-      1: 'SAM',
-      2: 'VCF',
-    }
-    const format = formatOpts[formatFlags & 0xf]
-    if (!format) {
-      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
-    }
-    const columnNumbers = {
-      ref: dataView.getInt32(12, true),
-      start: dataView.getInt32(16, true),
-      end: dataView.getInt32(20, true),
-    }
-    const metaValue = dataView.getInt32(24, true)
     const depth = 5
     const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
     const maxRefLength = 2 ** (14 + depth * 3)
-    const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
-    const skipLines = dataView.getInt32(28, true)
 
+    // TBI header layout matches CSI aux data; parseAuxData handles both
+    const {
+      refNameToId,
+      refIdToName,
+      coordinateType,
+      format,
+      columnNumbers,
+      metaChar,
+      skipLines,
+    } = parseAuxData(bytes, 8)
+    // nameSectionLength is at TBI offset 32; re-read to find where bin data starts
     const nameSectionLength = dataView.getInt32(32, true)
-    const { refNameToId, refIdToName } = parseNameBytes(
-      bytes.subarray(36, 36 + nameSectionLength),
-    )
 
     // SYNC: ~/src/gmod/bam-js/src/csi.ts _parse — two-pass structure
     // First pass: record per-refId byte offsets and find firstDataLine
@@ -148,7 +136,11 @@ export default class TabixIndex extends IndexFile {
           pos += 4
           const chunks = Array.from<Chunk>({ length: chunkCount })
           for (let k = 0; k < chunkCount; k++) {
-            chunks[k] = new Chunk(fromBytes(bytes, pos), fromBytes(bytes, pos + 8), bin)
+            chunks[k] = new Chunk(
+              fromBytes(bytes, pos),
+              fromBytes(bytes, pos + 8),
+              bin,
+            )
             pos += 16
           }
           binIndex[bin] = chunks

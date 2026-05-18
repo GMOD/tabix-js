@@ -6,7 +6,7 @@ import {
   findFirstData,
   memoizeByRefId,
   optimizeChunks,
-  parseNameBytes,
+  parseAuxData,
   parsePseudoBin,
 } from './util.ts'
 import { fromBytes } from './virtualOffset.ts'
@@ -18,12 +18,8 @@ import type { GenericFilehandle } from 'generic-filehandle2'
 const CSI1_MAGIC = 21_582_659 // CSI\1
 const CSI2_MAGIC = 38_359_875 // CSI\2
 
-const formats = {
-  0: 'generic',
-  1: 'SAM',
-  2: 'VCF',
-}
-
+// CSI coordinates can exceed 2^31, so bitwise << / >> (which truncate to int32)
+// are unsafe here; use multiplication/division instead.
 function lshift(num: number, bits: number) {
   return num * 2 ** bits
 }
@@ -54,40 +50,6 @@ export default class CSI extends IndexFile {
     throw new Error('CSI indexes do not support indexcov')
   }
 
-  parseAuxData(bytes: Uint8Array, offset: number) {
-    const dataView = new DataView(bytes.buffer)
-    const formatFlags = dataView.getInt32(offset, true)
-    const coordinateType =
-      formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'
-    const format = formats[(formatFlags & 0xf) as 0 | 1 | 2]
-    if (!format) {
-      throw new Error(`invalid Tabix preset format flags ${formatFlags}`)
-    }
-    const columnNumbers = {
-      ref: dataView.getInt32(offset + 4, true),
-      start: dataView.getInt32(offset + 8, true),
-      end: dataView.getInt32(offset + 12, true),
-    }
-    const metaValue = dataView.getInt32(offset + 16, true)
-    const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
-    const skipLines = dataView.getInt32(offset + 20, true)
-    const nameSectionLength = dataView.getInt32(offset + 24, true)
-
-    const { refIdToName, refNameToId } = parseNameBytes(
-      bytes.subarray(offset + 28, offset + 28 + nameSectionLength),
-    )
-
-    return {
-      refIdToName,
-      refNameToId,
-      skipLines,
-      metaChar,
-      columnNumbers,
-      format,
-      coordinateType,
-    }
-  }
-
   async _parse(opts: Options = {}) {
     const buf = await this.filehandle.readFile({ signal: opts.signal })
     const bytes = (await unzip(buf)) as Uint8Array
@@ -111,10 +73,10 @@ export default class CSI extends IndexFile {
     const auxLength = dataView.getInt32(12, true)
     const aux =
       auxLength >= 30
-        ? this.parseAuxData(bytes, 16)
+        ? parseAuxData(bytes, 16)
         : {
-            refIdToName: [],
-            refNameToId: {},
+            refIdToName: [] as string[],
+            refNameToId: {} as Record<string, number>,
             metaChar: undefined,
             columnNumbers: { ref: 0, start: 1, end: 2 },
             coordinateType: 'zero-based-half-open',
@@ -168,7 +130,11 @@ export default class CSI extends IndexFile {
           pos += 4
           const chunks = Array.from<Chunk>({ length: chunkCount })
           for (let k = 0; k < chunkCount; k++) {
-            chunks[k] = new Chunk(fromBytes(bytes, pos), fromBytes(bytes, pos + 8), bin)
+            chunks[k] = new Chunk(
+              fromBytes(bytes, pos),
+              fromBytes(bytes, pos + 8),
+              bin,
+            )
             pos += 16
           }
           binIndex[bin] = chunks
