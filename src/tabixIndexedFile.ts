@@ -158,8 +158,6 @@ export default class TabixIndexedFile {
    * @param {string} [args.csiUrl]
    * @param {object} [args.csiFilehandle]
    * @param {number} [args.chunkCacheSize]
-   * @param {number} [args.yieldTime] yield to main thread after N milliseconds if reading features is taking a long time to avoid hanging main thread
-   * @param {Function} [args.renameRefSeqs] optional function with sig `string => string` to transform reference sequence names for the purpose of indexing and querying. note that the data that is returned is not altered, just the names of the reference sequences that are used for querying.
    */
   constructor({
     path,
