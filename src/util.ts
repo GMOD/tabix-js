@@ -1,4 +1,5 @@
 import Chunk from './chunk.ts'
+import { longFromBytesToUnsigned } from './long.ts'
 
 import type VirtualOffset from './virtualOffset.ts'
 
@@ -39,4 +40,37 @@ export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
   }
 
   return mergedChunks
+}
+
+export function findFirstData(
+  currentFdl: VirtualOffset | undefined,
+  virtualOffset: VirtualOffset,
+) {
+  return !currentFdl || currentFdl.compareTo(virtualOffset) > 0
+    ? virtualOffset
+    : currentFdl
+}
+
+export function parseNameBytes(namesBytes: Uint8Array) {
+  const decoder = new TextDecoder('utf-8')
+  let currRefId = 0
+  let currNameStart = 0
+  const refIdToName: string[] = []
+  const refNameToId: Record<string, number> = {}
+  for (let i = 0; i < namesBytes.length; i += 1) {
+    if (!namesBytes[i]) {
+      if (currNameStart < i) {
+        const refName = decoder.decode(namesBytes.subarray(currNameStart, i))
+        refIdToName[currRefId] = refName
+        refNameToId[refName] = currRefId
+      }
+      currNameStart = i + 1
+      currRefId += 1
+    }
+  }
+  return { refNameToId, refIdToName }
+}
+
+export function parsePseudoBin(bytes: Uint8Array, offset: number) {
+  return { lineCount: longFromBytesToUnsigned(bytes, offset) }
 }

@@ -53,15 +53,6 @@ export default abstract class IndexFile {
     opts: Options,
   ): Promise<Chunk[]>
 
-  _findFirstData(
-    currentFdl: VirtualOffset | undefined,
-    virtualOffset: VirtualOffset,
-  ) {
-    return !currentFdl || currentFdl.compareTo(virtualOffset) > 0
-      ? virtualOffset
-      : currentFdl
-  }
-
   async parse(opts: Options = {}) {
     this.parseP ??= this._parse(opts).catch((error: unknown) => {
       this.parseP = undefined
@@ -73,28 +64,5 @@ export default abstract class IndexFile {
   async hasRefSeq(seqId: number, opts: Options = {}) {
     const idx = await this.parse(opts)
     return !!idx.indices[seqId]?.binIndex
-  }
-
-  _parseNameBytes(namesBytes: Uint8Array) {
-    let currRefId = 0
-    let currNameStart = 0
-    const refIdToName: string[] = []
-    const refNameToId: Record<string, number> = {}
-    const decoder = new TextDecoder('utf-8')
-    for (let i = 0; i < namesBytes.length; i += 1) {
-      if (!namesBytes[i]) {
-        if (currNameStart < i) {
-          const refName = decoder.decode(namesBytes.subarray(currNameStart, i))
-          refIdToName[currRefId] = refName
-          refNameToId[refName] = currRefId
-        }
-        currNameStart = i + 1
-        currRefId += 1
-      }
-    }
-    return {
-      refNameToId,
-      refIdToName,
-    }
   }
 }

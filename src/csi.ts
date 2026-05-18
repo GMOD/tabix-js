@@ -2,8 +2,12 @@ import { unzip } from '@gmod/bgzf-filehandle'
 
 import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
-import { longFromBytesToUnsigned } from './long.ts'
-import { optimizeChunks } from './util.ts'
+import {
+  findFirstData,
+  optimizeChunks,
+  parseNameBytes,
+  parsePseudoBin,
+} from './util.ts'
 import VirtualOffset, { fromBytes } from './virtualOffset.ts'
 
 import type { Options } from './indexFile.ts'
@@ -75,7 +79,7 @@ export default class CSI extends IndexFile {
     const skipLines = dataView.getInt32(offset + 20, true)
     const nameSectionLength = dataView.getInt32(offset + 24, true)
 
-    const { refIdToName, refNameToId } = this._parseNameBytes(
+    const { refIdToName, refNameToId } = parseNameBytes(
       bytes.subarray(offset + 28, offset + 28 + nameSectionLength),
     )
 
@@ -136,11 +140,11 @@ export default class CSI extends IndexFile {
         if (bin > this.maxBinNumber) {
           // this is a fake bin that actually has stats information about the
           // reference sequence in it
-          stats = this.parsePseudoBin(bytes, currOffset + 4)
+          stats = parsePseudoBin(bytes, currOffset + 32)
           currOffset += 4 + 8 + 4 + 16 + 16
         } else {
           const loffset = fromBytes(bytes, currOffset + 4)
-          firstDataLine = this._findFirstData(firstDataLine, loffset)
+          firstDataLine = findFirstData(firstDataLine, loffset)
           const chunkCount = dataView.getInt32(currOffset + 12, true)
           currOffset += 16
           const chunks = Array.from<Chunk>({ length: chunkCount })
@@ -168,12 +172,6 @@ export default class CSI extends IndexFile {
       depth: this.depth,
       maxBinNumber: this.maxBinNumber,
       maxRefLength,
-    }
-  }
-
-  parsePseudoBin(bytes: Uint8Array, offset: number) {
-    return {
-      lineCount: longFromBytesToUnsigned(bytes, offset + 28),
     }
   }
 

@@ -2,8 +2,12 @@ import { unzip } from '@gmod/bgzf-filehandle'
 
 import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
-import { longFromBytesToUnsigned } from './long.ts'
-import { optimizeChunks } from './util.ts'
+import {
+  findFirstData,
+  optimizeChunks,
+  parseNameBytes,
+  parsePseudoBin,
+} from './util.ts'
 import { fromBytes } from './virtualOffset.ts'
 
 import type { Options } from './indexFile.ts'
@@ -81,7 +85,7 @@ export default class TabixIndex extends IndexFile {
 
     // read sequence dictionary
     const nameSectionLength = dataView.getInt32(32, true)
-    const { refNameToId, refIdToName } = this._parseNameBytes(
+    const { refNameToId, refIdToName } = parseNameBytes(
       bytes.subarray(36, 36 + nameSectionLength),
     )
 
@@ -105,7 +109,7 @@ export default class TabixIndex extends IndexFile {
           const chunkCount = dataView.getInt32(currOffset, true)
           currOffset += 4
           if (chunkCount === 2) {
-            stats = this.parsePseudoBin(bytes, currOffset)
+            stats = parsePseudoBin(bytes, currOffset + 16)
           }
           currOffset += 16 * chunkCount
         } else {
@@ -116,7 +120,7 @@ export default class TabixIndex extends IndexFile {
             const u = fromBytes(bytes, currOffset)
             const v = fromBytes(bytes, currOffset + 8)
             currOffset += 16
-            firstDataLine = this._findFirstData(firstDataLine, u)
+            firstDataLine = findFirstData(firstDataLine, u)
             chunks[k] = new Chunk(u, v, bin)
           }
           binIndex[bin] = chunks
@@ -131,7 +135,7 @@ export default class TabixIndex extends IndexFile {
         const lv = fromBytes(bytes, currOffset)
         linearIndex[k] = lv
         currOffset += 8
-        firstDataLine = this._findFirstData(firstDataLine, lv)
+        firstDataLine = findFirstData(firstDataLine, lv)
       }
       return {
         binIndex,
@@ -153,12 +157,6 @@ export default class TabixIndex extends IndexFile {
       refIdToName,
       refNameToId,
       maxBlockSize: 1 << 16,
-    }
-  }
-
-  parsePseudoBin(bytes: Uint8Array, offset: number) {
-    return {
-      lineCount: longFromBytesToUnsigned(bytes, offset + 16),
     }
   }
 
