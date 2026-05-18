@@ -1,3 +1,5 @@
+import LRU from '@jbrowse/quick-lru'
+
 import Chunk from './chunk.ts'
 import { longFromBytesToUnsigned } from './long.ts'
 
@@ -73,4 +75,23 @@ export function parseNameBytes(namesBytes: Uint8Array) {
 
 export function parsePseudoBin(bytes: Uint8Array, offset: number) {
   return { lineCount: longFromBytesToUnsigned(bytes, offset) }
+}
+
+// SYNC: ~/src/gmod/bam-js/src/indexFile.ts memoizeByRefId
+export function memoizeByRefId<T>(
+  getIndices: (refId: number) => T | undefined,
+  maxSize = 5,
+): (refId: number) => T | undefined {
+  const lru = new LRU<number, T>({ maxSize })
+  return (refId: number) => {
+    const cached = lru.get(refId)
+    if (cached !== undefined) {
+      return cached
+    }
+    const result = getIndices(refId)
+    if (result !== undefined) {
+      lru.set(refId, result)
+    }
+    return result
+  }
 }

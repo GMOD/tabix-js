@@ -6,6 +6,12 @@ export interface Options {
   signal?: AbortSignal
 }
 
+export interface RefIndex {
+  binIndex: Record<number, Chunk[]>
+  stats?: { lineCount: number }
+  linearIndex?: VirtualOffset[]
+}
+
 export interface IndexData {
   refNameToId: Record<string, number>
   refIdToName: string[]
@@ -13,11 +19,7 @@ export interface IndexData {
   columnNumbers: { ref: number; start: number; end: number }
   coordinateType: string
   format: string
-  indices: {
-    binIndex: Record<number | string, Chunk[]>
-    stats?: { lineCount: number }
-    linearIndex?: VirtualOffset[]
-  }[]
+  indices: (refId: number) => RefIndex | undefined
   maxRefLength: number
   skipLines?: number
   maxBinNumber?: number
@@ -63,6 +65,6 @@ export default abstract class IndexFile {
 
   async hasRefSeq(seqId: number, opts: Options = {}) {
     const idx = await this.parse(opts)
-    return !!idx.indices[seqId]?.binIndex
+    return !!idx.indices(seqId)?.binIndex
   }
 }

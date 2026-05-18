@@ -4,13 +4,14 @@ import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
   findFirstData,
+  memoizeByRefId,
   optimizeChunks,
   parseNameBytes,
   parsePseudoBin,
 } from './util.ts'
 import { fromBytes } from './virtualOffset.ts'
 
-import type { Options } from './indexFile.ts'
+import type { Options, RefIndex } from './indexFile.ts'
 import type VirtualOffset from './virtualOffset.ts'
 
 const TBI_MAGIC = 21_578_324 // TBI\1
@@ -39,11 +40,7 @@ export default class TabixIndex extends IndexFile {
     if (refId === undefined) {
       return -1
     }
-    const idx = indexData.indices[refId]
-    if (!idx) {
-      return -1
-    }
-    return idx.stats?.lineCount ?? -1
+    return indexData.indices(refId)?.stats?.lineCount ?? -1
   }
 
   // fetch and parse the index
@@ -52,12 +49,10 @@ export default class TabixIndex extends IndexFile {
     const bytes = (await unzip(buf)) as Uint8Array
     const dataView = new DataView(bytes.buffer)
 
-    const magic = dataView.getUint32(0, true)
-    if (magic !== TBI_MAGIC /* "TBI\1" */) {
+    if (dataView.getUint32(0, true) !== TBI_MAGIC) {
       throw new Error('Not a TBI file')
     }
 
-    // number of reference sequences in the index
     const refCount = dataView.getUint32(4, true)
     const formatFlags = dataView.getUint32(8, true)
     const coordinateType =
@@ -83,69 +78,94 @@ export default class TabixIndex extends IndexFile {
     const metaChar = metaValue ? String.fromCharCode(metaValue) : undefined
     const skipLines = dataView.getInt32(28, true)
 
-    // read sequence dictionary
     const nameSectionLength = dataView.getInt32(32, true)
     const { refNameToId, refIdToName } = parseNameBytes(
       bytes.subarray(36, 36 + nameSectionLength),
     )
 
-    // read the indexes for each reference sequence
-    let currOffset = 36 + nameSectionLength
+    // SYNC: ~/src/gmod/bam-js/src/csi.ts _parse — two-pass structure
+    // First pass: record per-refId byte offsets and find firstDataLine
+    let curr = 36 + nameSectionLength
     let firstDataLine: VirtualOffset | undefined
-    const indices = Array.from({ length: refCount }, () => {
-      // the binning index
-      const binCount = dataView.getInt32(currOffset, true)
-      currOffset += 4
-      const binIndex: Record<number, Chunk[]> = {}
-      let stats
-      for (let j = 0; j < binCount; j += 1) {
-        const bin = dataView.getUint32(currOffset, true)
-        currOffset += 4
+    const offsets: number[] = []
+
+    for (let i = 0; i < refCount; i++) {
+      offsets.push(curr)
+      const binCount = dataView.getInt32(curr, true)
+      curr += 4
+      for (let j = 0; j < binCount; j++) {
+        const bin = dataView.getUint32(curr, true)
+        curr += 4
+        const chunkCount = dataView.getInt32(curr, true)
+        curr += 4
         if (bin > maxBinNumber + 1) {
           throw new Error(
             'tabix index contains too many bins, please use a CSI index',
           )
         } else if (bin === maxBinNumber + 1) {
-          const chunkCount = dataView.getInt32(currOffset, true)
-          currOffset += 4
-          if (chunkCount === 2) {
-            stats = parsePseudoBin(bytes, currOffset + 16)
-          }
-          currOffset += 16 * chunkCount
+          curr += 16 * chunkCount
         } else {
-          const chunkCount = dataView.getInt32(currOffset, true)
-          currOffset += 4
-          const chunks = Array.from<Chunk>({ length: chunkCount })
-          for (let k = 0; k < chunkCount; k += 1) {
-            const u = fromBytes(bytes, currOffset)
-            const v = fromBytes(bytes, currOffset + 8)
-            currOffset += 16
-            firstDataLine = findFirstData(firstDataLine, u)
-            chunks[k] = new Chunk(u, v, bin)
+          for (let k = 0; k < chunkCount; k++) {
+            firstDataLine = findFirstData(firstDataLine, fromBytes(bytes, curr))
+            curr += 16
+          }
+        }
+      }
+      const linearCount = dataView.getInt32(curr, true)
+      curr += 4
+      for (let k = 0; k < linearCount; k++) {
+        firstDataLine = findFirstData(firstDataLine, fromBytes(bytes, curr))
+        curr += 8
+      }
+    }
+
+    function getIndices(refId: number): RefIndex | undefined {
+      const start = offsets[refId]
+      if (start === undefined) {
+        return undefined
+      }
+      let pos = start
+      const binCount = dataView.getInt32(pos, true)
+      pos += 4
+      const binIndex: Record<number, Chunk[]> = {}
+      let stats
+      for (let j = 0; j < binCount; j++) {
+        const bin = dataView.getUint32(pos, true)
+        pos += 4
+        if (bin > maxBinNumber + 1) {
+          throw new Error(
+            'tabix index contains too many bins, please use a CSI index',
+          )
+        } else if (bin === maxBinNumber + 1) {
+          const chunkCount = dataView.getInt32(pos, true)
+          pos += 4
+          if (chunkCount === 2) {
+            stats = parsePseudoBin(bytes, pos + 16)
+          }
+          pos += 16 * chunkCount
+        } else {
+          const chunkCount = dataView.getInt32(pos, true)
+          pos += 4
+          const chunks = new Array<Chunk>(chunkCount)
+          for (let k = 0; k < chunkCount; k++) {
+            chunks[k] = new Chunk(fromBytes(bytes, pos), fromBytes(bytes, pos + 8), bin)
+            pos += 16
           }
           binIndex[bin] = chunks
         }
       }
-
-      // the linear index
-      const linearCount = dataView.getInt32(currOffset, true)
-      currOffset += 4
-      const linearIndex = Array.from<VirtualOffset>({ length: linearCount })
-      for (let k = 0; k < linearCount; k += 1) {
-        const lv = fromBytes(bytes, currOffset)
-        linearIndex[k] = lv
-        currOffset += 8
-        firstDataLine = findFirstData(firstDataLine, lv)
+      const linearCount = dataView.getInt32(pos, true)
+      pos += 4
+      const linearIndex = new Array<VirtualOffset>(linearCount)
+      for (let k = 0; k < linearCount; k++) {
+        linearIndex[k] = fromBytes(bytes, pos)
+        pos += 8
       }
-      return {
-        binIndex,
-        linearIndex,
-        stats,
-      }
-    })
+      return { binIndex, linearIndex, stats }
+    }
 
     return {
-      indices,
+      indices: memoizeByRefId(getIndices),
       metaChar,
       maxBinNumber,
       maxRefLength,
@@ -175,7 +195,7 @@ export default class TabixIndex extends IndexFile {
     if (refId === undefined) {
       return []
     }
-    const ba = indexData.indices[refId]
+    const ba = indexData.indices(refId)
     if (!ba) {
       return []
     }

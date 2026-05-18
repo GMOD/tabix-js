@@ -256,9 +256,12 @@ test('can query test.vcf.gz with a CSI index', async () => {
   await f.getLines('1', 1_206_810_423, 1_206_810_423, lines.callback)
   expect(lines.records.length).toEqual(0)
   lines.clear()
-  await expect(
-    f.getLines('1', 1_206_808_844, 12_068_500_000, lines.callback),
-  ).rejects.toThrow(/query .* is too large for current binning scheme/)
+  // end (12B) is clamped to maxPos; should return the same results as the bounded query below
+  await f.getLines('1', 1_206_810_422, 12_068_500_000, lines.callback)
+  const clampedCount = lines.records.length
+  lines.clear()
+  await f.getLines('1', 1_206_810_422, Infinity, lines.callback)
+  expect(lines.records.length).toEqual(clampedCount)
   lines.clear()
   await f.getLines('1', 1_206_810_422, 1_206_810_423, lines.callback)
   expect(lines.records.length).toEqual(1)

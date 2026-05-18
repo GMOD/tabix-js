@@ -4,14 +4,15 @@ import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
   findFirstData,
+  memoizeByRefId,
   optimizeChunks,
   parseNameBytes,
   parsePseudoBin,
 } from './util.ts'
 import { fromBytes } from './virtualOffset.ts'
-import type VirtualOffset from './virtualOffset.ts'
 
-import type { Options } from './indexFile.ts'
+import type { Options, RefIndex } from './indexFile.ts'
+import type VirtualOffset from './virtualOffset.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 const CSI1_MAGIC = 21_582_659 // CSI\1
@@ -46,15 +47,7 @@ export default class CSI extends IndexFile {
     if (refId === undefined) {
       return -1
     }
-    const idx = indexData.indices[refId]
-    if (!idx) {
-      return -1
-    }
-    const { stats } = idx
-    if (stats) {
-      return stats.lineCount
-    }
-    return -1
+    return indexData.indices(refId)?.stats?.lineCount ?? -1
   }
 
   indexCov() {
@@ -100,7 +93,6 @@ export default class CSI extends IndexFile {
     const bytes = (await unzip(buf)) as Uint8Array
     const dataView = new DataView(bytes.buffer)
 
-    // check CSI magic numbers
     const magic = dataView.getUint32(0, true)
     let csiVersion
     if (magic === CSI1_MAGIC) {
@@ -108,16 +100,17 @@ export default class CSI extends IndexFile {
     } else if (magic === CSI2_MAGIC) {
       csiVersion = 2
     } else {
-      throw new Error('Not a CSI file')
+      throw new Error(`Not a CSI file (magic=${magic})`)
     }
 
     this.minShift = dataView.getInt32(4, true)
     this.depth = dataView.getInt32(8, true)
     this.maxBinNumber = ((1 << ((this.depth + 1) * 3)) - 1) / 7
+    const maxBinNumber = this.maxBinNumber
     const maxRefLength = 2 ** (this.minShift + this.depth * 3)
     const auxLength = dataView.getInt32(12, true)
     const aux =
-      auxLength && auxLength >= 30
+      auxLength >= 30
         ? this.parseAuxData(bytes, 16)
         : {
             refIdToName: [],
@@ -129,39 +122,60 @@ export default class CSI extends IndexFile {
           }
     const refCount = dataView.getInt32(16 + auxLength, true)
 
-    // read the indexes for each reference sequence
+    // SYNC: ~/src/gmod/bam-js/src/csi.ts _parse — two-pass structure
+    // First pass: record per-refId byte offsets and find firstDataLine via loffsets
+    let curr = 16 + auxLength + 4
     let firstDataLine: VirtualOffset | undefined
-    let currOffset = 16 + auxLength + 4
-    const indices = Array.from({ length: refCount }, () => {
-      const binCount = dataView.getInt32(currOffset, true)
-      currOffset += 4
-      const binIndex: Record<string, Chunk[]> = {}
-      let stats
-      for (let j = 0; j < binCount; j += 1) {
-        const bin = dataView.getUint32(currOffset, true)
-        if (bin > this.maxBinNumber) {
-          // this is a fake bin that actually has stats information about the
-          // reference sequence in it
-          stats = parsePseudoBin(bytes, currOffset + 32)
-          currOffset += 4 + 8 + 4 + 16 + 16
+    const offsets: number[] = []
+
+    for (let i = 0; i < refCount; i++) {
+      offsets.push(curr)
+      const binCount = dataView.getInt32(curr, true)
+      curr += 4
+      for (let j = 0; j < binCount; j++) {
+        const bin = dataView.getUint32(curr, true)
+        curr += 4
+        if (bin > maxBinNumber) {
+          curr += 28 + 16 // skip pseudo-bin (loffset + nchunk + 2 chunks)
         } else {
-          const loffset = fromBytes(bytes, currOffset + 4)
-          firstDataLine = findFirstData(firstDataLine, loffset)
-          const chunkCount = dataView.getInt32(currOffset + 12, true)
-          currOffset += 16
-          const chunks = Array.from<Chunk>({ length: chunkCount })
-          for (let k = 0; k < chunkCount; k += 1) {
-            const u = fromBytes(bytes, currOffset)
-            const v = fromBytes(bytes, currOffset + 8)
-            currOffset += 16
-            chunks[k] = new Chunk(u, v, bin)
+          firstDataLine = findFirstData(firstDataLine, fromBytes(bytes, curr))
+          curr += 8 // loffset
+          const chunkCount = dataView.getInt32(curr, true)
+          curr += 4 + 16 * chunkCount
+        }
+      }
+    }
+
+    function getIndices(refId: number): RefIndex | undefined {
+      const start = offsets[refId]
+      if (start === undefined) {
+        return undefined
+      }
+      let pos = start
+      const binCount = dataView.getInt32(pos, true)
+      pos += 4
+      const binIndex: Record<number, Chunk[]> = {}
+      let stats
+      for (let j = 0; j < binCount; j++) {
+        const bin = dataView.getUint32(pos, true)
+        pos += 4
+        if (bin > maxBinNumber) {
+          stats = parsePseudoBin(bytes, pos + 28)
+          pos += 28 + 16
+        } else {
+          pos += 8 // skip loffset (tracked in first pass)
+          const chunkCount = dataView.getInt32(pos, true)
+          pos += 4
+          const chunks = new Array<Chunk>(chunkCount)
+          for (let k = 0; k < chunkCount; k++) {
+            chunks[k] = new Chunk(fromBytes(bytes, pos), fromBytes(bytes, pos + 8), bin)
+            pos += 16
           }
           binIndex[bin] = chunks
         }
       }
-
       return { binIndex, stats }
-    })
+    }
 
     return {
       ...aux,
@@ -170,9 +184,9 @@ export default class CSI extends IndexFile {
       maxBlockSize: 1 << 16,
       firstDataLine,
       csiVersion,
-      indices,
+      indices: memoizeByRefId(getIndices),
       depth: this.depth,
-      maxBinNumber: this.maxBinNumber,
+      maxBinNumber,
       maxRefLength,
     }
   }
@@ -192,7 +206,7 @@ export default class CSI extends IndexFile {
     if (refId === undefined) {
       return []
     }
-    const ba = indexData.indices[refId]
+    const ba = indexData.indices(refId)
     if (!ba) {
       return []
     }
@@ -220,13 +234,10 @@ export default class CSI extends IndexFile {
    * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
    */
   reg2bins(beg: number, end: number) {
-    beg -= 1 // < convert to 1-based closed
-    if (beg < 1) {
-      beg = 1
+    const maxPos = 2 ** (this.minShift + this.depth * 3)
+    if (end > maxPos) {
+      end = maxPos
     }
-    if (end > 2 ** 50) {
-      end = 2 ** 34
-    } // 17 GiB ought to be enough for anybody
     end -= 1
     let l = 0
     let t = 0
