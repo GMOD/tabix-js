@@ -1,3 +1,10 @@
+## [3.3.6](https://github.com/GMOD/tabix-js/compare/v3.3.5...v3.3.6) (2026-05-18)
+
+
+### Reverts
+
+* expand Chunk constructor back to explicit field declarations ([2b60715](https://github.com/GMOD/tabix-js/commit/2b6071562bb2fd54aea798ea29cd22439f038468))
+
 ## [3.3.5](https://github.com/GMOD/tabix-js/compare/v3.3.4...v3.3.5) (2026-05-18)
 
 
