@@ -5,18 +5,11 @@ export default class Chunk {
   public minv: VirtualOffset
   public maxv: VirtualOffset
   public bin: number
-  public _fetchedSize?: number
 
-  constructor(
-    minv: VirtualOffset,
-    maxv: VirtualOffset,
-    bin: number,
-    fetchedSize?: number,
-  ) {
+  constructor(minv: VirtualOffset, maxv: VirtualOffset, bin: number) {
     this.minv = minv
     this.maxv = maxv
     this.bin = bin
-    this._fetchedSize = fetchedSize
   }
 
   toString() {
@@ -25,18 +18,7 @@ export default class Chunk {
     }, fetchedSize ${this.fetchedSize()})`
   }
 
-  compareTo(b: Chunk) {
-    return (
-      this.minv.compareTo(b.minv) ||
-      this.maxv.compareTo(b.maxv) ||
-      this.bin - b.bin
-    )
-  }
-
   fetchedSize() {
-    if (this._fetchedSize !== undefined) {
-      return this._fetchedSize
-    }
     return this.maxv.blockPosition + (1 << 16) - this.minv.blockPosition
   }
 }

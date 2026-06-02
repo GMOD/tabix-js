@@ -34,15 +34,6 @@ function reg2bins(beg: number, end: number) {
 }
 
 export default class TabixIndex extends IndexFile {
-  async lineCount(refName: string, opts: Options = {}) {
-    const indexData = await this.parse(opts)
-    const refId = indexData.refNameToId[refName]
-    if (refId === undefined) {
-      return -1
-    }
-    return indexData.indices(refId)?.stats?.lineCount ?? -1
-  }
-
   // fetch and parse the index
   async _parse(opts: Options = {}) {
     const buf = await this.filehandle.readFile({ signal: opts.signal })
