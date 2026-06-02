@@ -37,15 +37,6 @@ export default class CSI extends IndexFile {
     this.depth = 0
     this.minShift = 0
   }
-  async lineCount(refName: string, opts: Options = {}): Promise<number> {
-    const indexData = await this.parse(opts)
-    const refId = indexData.refNameToId[refName]
-    if (refId === undefined) {
-      return -1
-    }
-    return indexData.indices(refId)?.stats?.lineCount ?? -1
-  }
-
   indexCov() {
     throw new Error('CSI indexes do not support indexcov')
   }

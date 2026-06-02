@@ -39,9 +39,16 @@ export default abstract class IndexFile {
     this.filehandle = filehandle
   }
 
-  public abstract lineCount(refName: string, args: Options): Promise<number>
-
   protected abstract _parse(opts: Options): Promise<IndexData>
+
+  public async lineCount(refName: string, opts: Options = {}) {
+    const indexData = await this.parse(opts)
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
+      return -1
+    }
+    return indexData.indices(refId)?.stats?.lineCount ?? -1
+  }
 
   public async getMetadata(opts: Options = {}) {
     const { indices: _indices, ...rest } = await this.parse(opts)

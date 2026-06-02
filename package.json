@@ -49,16 +49,16 @@
   ],
   "dependencies": {
     "@gmod/abortable-promise-cache": "^3.0.4",
-    "@gmod/bgzf-filehandle": "^6.0.26",
+    "@gmod/bgzf-filehandle": "^6.2.0",
     "@jbrowse/quick-lru": "^7.3.5",
-    "generic-filehandle2": "^2.1.9"
+    "generic-filehandle2": "^2.1.10"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.1",
-    "@vitest/coverage-v8": "^4.1.7",
+    "@vitest/coverage-v8": "^4.1.8",
     "documentation": "^14.0.3",
-    "eslint": "^10.4.0",
+    "eslint": "^10.4.1",
     "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-unicorn": "^64.0.0",
     "prettier": "^3.8.3",
@@ -66,9 +66,9 @@
     "standard-changelog": "^7.0.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.0",
-    "vitest": "^4.1.7",
+    "vitest": "^4.1.8",
     "webpack": "^5.107.2",
-    "webpack-cli": "^7.0.2"
+    "webpack-cli": "^7.0.3"
   },
   "publishConfig": {
     "access": "public"
