@@ -1,3 +1,12 @@
+## [3.3.9](https://github.com/GMOD/tabix-js/compare/v3.3.8...v3.3.9) (2026-06-02)
+
+
+### Bug Fixes
+
+* remove dead unzipChunkSlice cache arg breaking the build ([#155](https://github.com/GMOD/tabix-js/issues/155)) ([f283ef3](https://github.com/GMOD/tabix-js/commit/f283ef39d8ea20162091228d8d6abb788505fab7))
+* remove stale workflow query link from CI badge ([5001530](https://github.com/GMOD/tabix-js/commit/50015305ccfea8953ea95acab910a15806ba7a16))
+* update CI badge to reference publish.yml workflow ([b58bfa2](https://github.com/GMOD/tabix-js/commit/b58bfa2a234103f34cb4895e64481cbf93e8bf36))
+
 ## [3.3.8](https://github.com/GMOD/tabix-js/compare/v3.3.7...v3.3.8) (2026-05-19)
 
 ## [3.3.7](https://github.com/GMOD/tabix-js/compare/v3.3.6...v3.3.7) (2026-05-19)
