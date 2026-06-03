@@ -41,6 +41,7 @@ export default abstract class IndexFile {
 
   protected abstract _parse(opts: Options): Promise<IndexData>
 
+  /** @internal */
   public async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
     const refId = indexData.refNameToId[refName]
@@ -50,11 +51,13 @@ export default abstract class IndexFile {
     return indexData.indices(refId)?.stats?.lineCount ?? -1
   }
 
+  /** @internal */
   public async getMetadata(opts: Options = {}) {
     const { indices: _indices, ...rest } = await this.parse(opts)
     return rest
   }
 
+  /** @internal */
   public abstract blocksForRange(
     refName: string,
     start: number,
@@ -62,6 +65,7 @@ export default abstract class IndexFile {
     opts: Options,
   ): Promise<Chunk[]>
 
+  /** @internal */
   async parse(opts: Options = {}) {
     this.parseP ??= this._parse(opts).catch((error: unknown) => {
       this.parseP = undefined
@@ -70,6 +74,7 @@ export default abstract class IndexFile {
     return this.parseP
   }
 
+  /** @internal */
   async hasRefSeq(seqId: number, opts: Options = {}) {
     const idx = await this.parse(opts)
     return !!idx.indices(seqId)?.binIndex

@@ -34,7 +34,7 @@ function reg2bins(beg: number, end: number) {
 }
 
 export default class TabixIndex extends IndexFile {
-  // fetch and parse the index
+  /** @internal */
   async _parse(opts: Options = {}) {
     const buf = await this.filehandle.readFile({ signal: opts.signal })
     const bytes = (await unzip(buf)) as Uint8Array

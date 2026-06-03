@@ -132,24 +132,14 @@ function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
   return val
 }
 
+/**
+ * Reads Tabix-indexed files (bgzipped), supporting both .tbi and .csi index formats.
+ */
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
 
-  /**
-   * @param {object} args
-   * @param {string} [args.path]
-   * @param {object} [args.filehandle]
-   * @param {string} [args.url]
-   * @param {string} [args.tbiPath]
-   * @param {string} [args.tbiUrl]
-   * @param {object} [args.tbiFilehandle]
-   * @param {string} [args.csiPath]
-   * @param {string} [args.csiUrl]
-   * @param {object} [args.csiFilehandle]
-   * @param {number} [args.chunkCacheSize]
-   */
   constructor({
     path,
     filehandle,
@@ -228,11 +218,10 @@ export default class TabixIndexedFile {
   }
 
   /**
-   * @param {string} refName name of the reference sequence
-   * @param {number|undefined} start start of the region (0-based half-open)
-   * @param {number|undefined} end end of the region (0-based half-open)
-   * @param {GetLinesOpts|GetLinesCallback} opts callback invoked for each line, or an options object with `lineCallback` and optional `signal`
-   * @returns {Promise} promise that is resolved when the whole read is finished, rejected on error
+   * @param refName name of the reference sequence
+   * @param s start of the region (0-based half-open)
+   * @param e end of the region (0-based half-open)
+   * @param opts callback invoked for each line, or an options object with `lineCallback` and optional `signal`
    */
   async getLines(
     refName: string,
@@ -391,6 +380,7 @@ export default class TabixIndexedFile {
     }
   }
 
+  /** @internal */
   async getMetadata(opts: Options = {}) {
     return this.index.getMetadata(opts)
   }
@@ -435,15 +425,12 @@ export default class TabixIndexedFile {
     return metadata.refIdToName
   }
 
-  /**
-   * return the number of data lines in the given reference sequence
-   * @param {string} refName reference sequence name
-   * @returns {number} number of data lines present on that reference sequence
-   */
+  /** @param refName reference sequence name */
   async lineCount(refName: string, opts: Options = {}) {
     return this.index.lineCount(refName, opts)
   }
 
+  /** @internal */
   async readChunk(c: Chunk, opts: Options = {}) {
     const ret = await this.filehandle.read(
       c.fetchedSize(),

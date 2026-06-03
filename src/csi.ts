@@ -37,10 +37,12 @@ export default class CSI extends IndexFile {
     this.depth = 0
     this.minShift = 0
   }
+  /** @internal */
   indexCov() {
     throw new Error('CSI indexes do not support indexcov')
   }
 
+  /** @internal */
   async _parse(opts: Options = {}) {
     const buf = await this.filehandle.readFile({ signal: opts.signal })
     const bytes = (await unzip(buf)) as Uint8Array
@@ -187,9 +189,7 @@ export default class CSI extends IndexFile {
     return optimizeChunks(chunks)
   }
 
-  /**
-   * calculate the list of bins that may overlap with region [beg,end) (zero-based half-open)
-   */
+  /** @internal */
   reg2bins(beg: number, end: number) {
     const maxPos = 2 ** (this.minShift + this.depth * 3)
     if (end > maxPos) {
