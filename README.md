@@ -13,403 +13,119 @@ npm install @gmod/tabix
 
 ## Usage
 
-### Importing the module
-
 ```typescript
 import { TabixIndexedFile } from '@gmod/tabix'
-```
 
-### Single file bundle
+// Local file — TBI index assumed at path + '.tbi'
+const file = new TabixIndexedFile({ path: 'file.vcf.gz' })
 
-You can use tabix-js without NPM also with the tabix-bundle.js. See the example
-directory for usage with script tag [example/index.html](example/index.html)
-
-```html
-<script src="https://unpkg.com/@gmod/tabix/dist/tabix-bundle.js"></script>
-```
-
-### TabixIndexedFile constructor
-
-Basic usage of TabixIndexedFile under node.js supplies a path and optionally a
-tbiPath to the constructor. If no tbiPath is supplied, it assumes that the
-path+'.tbi' is the location of the tbiPath.
-
-```typescript
-const tbiIndexed = new TabixIndexedFile({
-  path: 'path/to/my/file.gz',
-  tbiPath: 'path/to/my/file.gz.tbi',
+// CSI index
+const file = new TabixIndexedFile({
+  path: 'file.vcf.gz',
+  csiPath: 'file.vcf.gz.csi',
 })
-```
 
-You can also use CSI indexes:
-
-```typescript
-const csiIndexed = new TabixIndexedFile({
-  path: 'path/to/my/file.gz',
-  csiPath: 'path/to/my/file.gz.csi',
+// Remote files
+const file = new TabixIndexedFile({
+  url: 'https://example.com/file.vcf.gz',
+  tbiUrl: 'https://example.com/file.vcf.gz.tbi',
 })
-```
 
-#### TabixIndexedFile constructor with remote files
-
-```typescript
-const remoteTbiIndexed = new TabixIndexedFile({
-  url: 'http://yourhost/file.vcf.gz',
-  tbiUrl: 'http://yourhost/file.vcf.gz.tbi', // can also be csiUrl
-})
-```
-
-You can also supply a filehandle-like object from
-[generic-filehandle2](https://github.com/GMOD/generic-filehandle2):
-
-```typescript
+// Or with a filehandle from generic-filehandle2
 import { RemoteFile } from 'generic-filehandle2'
 
-const remoteTbiIndexed = new TabixIndexedFile({
-  filehandle: new RemoteFile('http://yourhost/file.vcf.gz'),
-  tbiFilehandle: new RemoteFile('http://yourhost/file.vcf.gz.tbi'), // can also be csiFilehandle
+const file = new TabixIndexedFile({
+  filehandle: new RemoteFile('https://example.com/file.vcf.gz'),
+  tbiFilehandle: new RemoteFile('https://example.com/file.vcf.gz.tbi'),
 })
 ```
 
 ### getLines
 
-The basic function this module provides is just called `getLines` and it returns
-text contents from the tabix file (it unzips the bgzipped data) and supplies it
-to a callback that you provide one line at a time.
-
-Important: the `start` and `end` values that are supplied to `getLines` are
-0-based half-open coordinates. This is different from the 1-based values that
-are supplied to the tabix command line tool
+Fetches lines overlapping a region. `start`/`end` are 0-based half-open coordinates (unlike the tabix CLI which uses 1-based closed).
 
 ```typescript
-const lines = []
-await tbiIndexed.getLines(
-  'ctgA',
-  200,
-  300,
-  function (line, fileOffset, start, end) {
-    lines.push(line)
-  },
-)
+const lines: string[] = []
+await file.getLines('chr1', 200, 300, line => lines.push(line))
 ```
 
-After running this, `lines` contains the matching lines from the file. The
-callback receives:
-
-- `line` — the raw line string
-- `fileOffset` — virtual file offset, useful as a unique line identifier
-- `start` / `end` — the parsed coordinates of that line (0-based half-open)
-
-You can also pass an options object instead of a bare callback:
+The callback also receives the virtual file offset and parsed coordinates for the line:
 
 ```typescript
-const lines = []
-const aborter = new AbortController()
-await tbiIndexed.getLines('ctgA', 200, 300, {
-  lineCallback: (line, fileOffset, start, end) => lines.push(line),
-  signal: aborter.signal, // an optional AbortSignal from an AbortController
+await file.getLines('chr1', 200, 300, (line, fileOffset, start, end) => {
+  lines.push(line)
 })
 ```
 
-Notes about the returned values of `getLines`:
-
-- commented (meta) lines are skipped.
-- line strings do not include any trailing whitespace characters.
-- if `getLines` is called with an undefined `end` parameter it gets all lines
-  from start going to the end of the contig e.g.
+Pass an options object to use an `AbortSignal`:
 
 ```typescript
-const lines = []
-await tbiIndexed.getLines('ctgA', 0, undefined, line => lines.push(line))
-console.log(lines)
+const aborter = new AbortController()
+await file.getLines('chr1', 200, 300, {
+  lineCallback: (line, fileOffset, start, end) => lines.push(line),
+  signal: aborter.signal,
+})
 ```
 
-## API Reference
-## Classes
+Notes:
+- Meta/comment lines are skipped
+- Line strings have no trailing whitespace
+- Pass `undefined` for `end` to read to the end of the contig
 
-### CSI
+### Without NPM (CDN)
 
-#### Extends
-
-- `default`
-
-#### Constructors
-
-##### Constructor
-
-```ts
-new CSI(args): CSI;
+```html
+<script src="https://unpkg.com/@gmod/tabix/dist/tabix-bundle.js"></script>
 ```
 
-###### Parameters
+See [example/index.html](example/index.html) for a working demo.
 
-| Parameter | Type |
-| ------ | ------ |
-| `args` | \{ `filehandle`: `GenericFilehandle`; \} |
-| `args.filehandle` | `GenericFilehandle` |
+## API
 
-###### Returns
+### `new TabixIndexedFile(args)`
 
-[`CSI`](#csi)
+| Arg | Type | Description |
+| --- | --- | --- |
+| `path` | `string?` | Local file path |
+| `url` | `string?` | Remote URL |
+| `filehandle` | `GenericFilehandle?` | Custom filehandle (from [generic-filehandle2](https://github.com/GMOD/generic-filehandle2)) |
+| `tbiPath` | `string?` | TBI index path (defaults to `path + '.tbi'`) |
+| `tbiUrl` | `string?` | TBI index URL |
+| `tbiFilehandle` | `GenericFilehandle?` | TBI index filehandle |
+| `csiPath` | `string?` | CSI index path |
+| `csiUrl` | `string?` | CSI index URL |
+| `csiFilehandle` | `GenericFilehandle?` | CSI index filehandle |
+| `chunkCacheSize` | `number?` | Chunk LRU cache size in bytes (default 5 MiB) |
 
-###### Overrides
+### `getLines(refName, start, end, opts)`
 
-```ts
-IndexFile.constructor
-```
+Calls `opts` (or `opts.lineCallback`) for each line overlapping `[start, end)`.
 
-#### Properties
+Callback signature: `(line: string, fileOffset: number, start: number, end: number) => void`
 
-| Property | Modifier | Type | Inherited from |
-| ------ | ------ | ------ | ------ |
-| <a id="filehandle"></a> `filehandle` | `public` | `GenericFilehandle` | `IndexFile.filehandle` |
+### `getHeader(opts?): Promise<string>`
 
-***
+Returns all comment/meta lines before the first data line as a string.
 
-### TabixIndexedFile
+### `getHeaderBuffer(opts?): Promise<Uint8Array>`
 
-Reads Tabix-indexed files (bgzipped), supporting both .tbi and .csi index formats.
+Returns the header as raw bytes.
 
-#### Constructors
+### `getReferenceSequenceNames(opts?): Promise<string[]>`
 
-##### Constructor
+Returns reference sequence names in index order. `renameRefSeqs` is not applied to these names.
 
-```ts
-new TabixIndexedFile(__namedParameters): TabixIndexedFile;
-```
+### `lineCount(refName, opts?): Promise<number>`
 
-###### Parameters
+Returns the number of data lines on the given reference, or `-1` if the reference is not in the index.
 
-| Parameter | Type |
-| ------ | ------ |
-| `__namedParameters` | \{ `chunkCacheSize?`: `number`; `csiFilehandle?`: `GenericFilehandle`; `csiPath?`: `string`; `csiUrl?`: `string`; `filehandle?`: `GenericFilehandle`; `path?`: `string`; `tbiFilehandle?`: `GenericFilehandle`; `tbiPath?`: `string`; `tbiUrl?`: `string`; `url?`: `string`; \} |
-| `__namedParameters.chunkCacheSize?` | `number` |
-| `__namedParameters.csiFilehandle?` | `GenericFilehandle` |
-| `__namedParameters.csiPath?` | `string` |
-| `__namedParameters.csiUrl?` | `string` |
-| `__namedParameters.filehandle?` | `GenericFilehandle` |
-| `__namedParameters.path?` | `string` |
-| `__namedParameters.tbiFilehandle?` | `GenericFilehandle` |
-| `__namedParameters.tbiPath?` | `string` |
-| `__namedParameters.tbiUrl?` | `string` |
-| `__namedParameters.url?` | `string` |
+### `bytesForRegions(regions, opts?): Promise<number>`
 
-###### Returns
-
-[`TabixIndexedFile`](#tabixindexedfile)
-
-#### Methods
-
-##### bytesForRegions()
-
-```ts
-bytesForRegions(regions, opts?): Promise<number>;
-```
-
-Estimates the compressed byte size of the index chunks covering the given
-regions. Useful for byte budgeting before issuing a `getLines` call to
-decide whether a region is too large to fetch.
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `regions` | `object`[] |
-| `opts` | `Options` |
-
-###### Returns
-
-`Promise`\<`number`\>
-
-##### getHeader()
-
-```ts
-getHeader(opts?): Promise<string>;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `opts` | `Options` |
-
-###### Returns
-
-`Promise`\<`string`\>
-
-##### getHeaderBuffer()
-
-```ts
-getHeaderBuffer(opts?): Promise<Uint8Array<ArrayBufferLike>>;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `opts` | `Options` |
-
-###### Returns
-
-`Promise`\<`Uint8Array`\<`ArrayBufferLike`\>\>
-
-##### getLines()
-
-```ts
-getLines(
-   refName, 
-   s, 
-   e, 
-opts): Promise<void>;
-```
-
-###### Parameters
-
-| Parameter | Type | Description |
-| ------ | ------ | ------ |
-| `refName` | `string` | name of the reference sequence |
-| `s` | `number` \| `undefined` | start of the region (0-based half-open) |
-| `e` | `number` \| `undefined` | end of the region (0-based half-open) |
-| `opts` | `GetLinesOpts` \| `GetLinesCallback` | callback invoked for each line, or an options object with `lineCallback` and optional `signal` |
-
-###### Returns
-
-`Promise`\<`void`\>
-
-##### getReferenceSequenceNames()
-
-```ts
-getReferenceSequenceNames(opts?): Promise<string[]>;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `opts` | `Options` |
-
-###### Returns
-
-`Promise`\<`string`[]\>
-
-##### lineCount()
-
-```ts
-lineCount(refName, opts?): Promise<number>;
-```
-
-###### Parameters
-
-| Parameter | Type | Description |
-| ------ | ------ | ------ |
-| `refName` | `string` | reference sequence name |
-| `opts` | `Options` | - |
-
-###### Returns
-
-`Promise`\<`number`\>
-
-***
-
-### TBI
-
-#### Extends
-
-- `default`
-
-#### Constructors
-
-##### Constructor
-
-```ts
-new TBI(__namedParameters): TBI;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `__namedParameters` | \{ `filehandle`: `GenericFilehandle`; \} |
-| `__namedParameters.filehandle` | `GenericFilehandle` |
-
-###### Returns
-
-[`TBI`](#tbi)
-
-###### Inherited from
-
-```ts
-IndexFile.constructor
-```
-
-#### Properties
-
-| Property | Modifier | Type | Inherited from |
-| ------ | ------ | ------ | ------ |
-| <a id="filehandle-1"></a> `filehandle` | `public` | `GenericFilehandle` | `IndexFile.filehandle` |
-
-***
-
-### VirtualOffset
-
-#### Constructors
-
-##### Constructor
-
-```ts
-new VirtualOffset(blockPosition, dataPosition): VirtualOffset;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `blockPosition` | `number` |
-| `dataPosition` | `number` |
-
-###### Returns
-
-[`VirtualOffset`](#virtualoffset)
-
-#### Properties
-
-| Property | Modifier | Type |
-| ------ | ------ | ------ |
-| <a id="blockposition"></a> `blockPosition` | `public` | `number` |
-| <a id="dataposition"></a> `dataPosition` | `public` | `number` |
-
-#### Methods
-
-##### compareTo()
-
-```ts
-compareTo(b): number;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `b` | [`VirtualOffset`](#virtualoffset) |
-
-###### Returns
-
-`number`
-
-##### toString()
-
-```ts
-toString(): string;
-```
-
-###### Returns
-
-`string`
+Estimates the compressed byte size of index chunks covering the given regions. Useful for deciding whether a request is too large before calling `getLines`.
 
 ## Publishing
 
-[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub
-Actions.
+[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub Actions.
 
 ```bash
 pnpm version patch  # or minor/major
@@ -417,10 +133,7 @@ pnpm version patch  # or minor/major
 
 ## Academic Use
 
-This package was written with funding from the [NHGRI](http://genome.gov) as
-part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
-project that you publish, please cite the most recent JBrowse paper, which will
-be linked from [jbrowse.org](http://jbrowse.org).
+This package was written with funding from the [NHGRI](http://genome.gov) as part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic project that you publish, please cite the most recent JBrowse paper, which will be linked from [jbrowse.org](http://jbrowse.org).
 
 ## License
 
