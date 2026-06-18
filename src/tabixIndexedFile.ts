@@ -26,6 +26,14 @@ type GetLinesCallback = (
 interface GetLinesOpts {
   signal?: AbortSignal
   lineCallback: GetLinesCallback
+  /**
+   * Called as the compressed data blocks covering the query are fetched, with
+   * cumulative downloaded bytes and the total bytes to fetch. Reported at block
+   * granularity (one tick per chunk, including instant ticks for cache hits),
+   * which is the natural unit since chunk byte sizes are known up front from
+   * the index. Lets callers render a determinate download progress bar.
+   */
+  onProgress?: (bytesDownloaded: number, totalBytes: number) => void
 }
 
 interface ReadChunk {
@@ -232,6 +240,7 @@ export default class TabixIndexedFile {
     let signal: AbortSignal | undefined
     let options: Options = {}
     let callback: GetLinesCallback
+    let onProgress: GetLinesOpts['onProgress']
 
     if (typeof opts === 'function') {
       callback = opts
@@ -239,6 +248,7 @@ export default class TabixIndexedFile {
       options = opts
       callback = opts.lineCallback
       signal = opts.signal
+      onProgress = opts.onProgress
     }
 
     const metadata = await this.index.getMetadata(options)
@@ -271,12 +281,21 @@ export default class TabixIndexedFile {
     // the sentinel tabs[0] = blockStart - 1, column N spans tabs[N-1]+1..tabs[N]
     const tabs = new Int32Array(maxColumn + 1)
 
+    let totalBytes = 0
+    for (const c of chunks) {
+      totalBytes += c.fetchedSize()
+    }
+    let downloadedBytes = 0
+    onProgress?.(0, totalBytes)
+
     for (const c of chunks) {
       const { buffer, cpositions, dpositions } = await this.chunkCache.get(
         c.toString(),
         c,
         signal,
       )
+      downloadedBytes += c.fetchedSize()
+      onProgress?.(downloadedBytes, totalBytes)
       const minvDataPosition = c.minv.dataPosition
 
       let blockStart = 0

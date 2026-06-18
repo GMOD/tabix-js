@@ -446,3 +446,28 @@ test('start equal to end in tabix columns', async () => {
   await ti.getLines('ctgA', 26_499, 26_625, items.callback)
   expect(items.records[0].line).toBe('ctgA	26499	C	21	0	21	0	0	0:11:0:0')
 })
+
+test('reports download progress at block granularity', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
+  })
+  const items = new RecordCollector()
+  const ticks: [number, number][] = []
+  await f.getLines('contigA', 1000, 4000, {
+    lineCallback: items.callback,
+    onProgress: (downloaded, total) => {
+      ticks.push([downloaded, total])
+    },
+  })
+
+  expect(items.records.length).toEqual(8)
+  // starts at 0, ends fully downloaded, total stays constant and positive
+  expect(ticks[0]![0]).toEqual(0)
+  expect(ticks.at(-1)![0]).toEqual(ticks[0]![1])
+  expect(ticks[0]![1]).toBeGreaterThan(0)
+  // cumulative byte count is monotonically non-decreasing
+  for (let i = 1; i < ticks.length; i++) {
+    expect(ticks[i]![0]).toBeGreaterThanOrEqual(ticks[i - 1]![0])
+  }
+})
