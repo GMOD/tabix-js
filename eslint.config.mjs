@@ -15,8 +15,8 @@ export default defineConfig(
       'profile*',
       'example/*',
       'eslint.config.mjs',
-      '*.mjs',
-      '*.cjs',
+      '**/*.mjs',
+      '**/*.cjs',
     ],
   },
   {
