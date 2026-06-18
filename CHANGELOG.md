@@ -1,3 +1,10 @@
+# [3.4.0](https://github.com/GMOD/tabix-js/compare/v3.3.9...v3.4.0) (2026-06-18)
+
+
+### Features
+
+* report download progress from getLines via onProgress ([3e166b8](https://github.com/GMOD/tabix-js/commit/3e166b83955bd3e7cad9883508a498d2c68ad4c6))
+
 ## [3.3.9](https://github.com/GMOD/tabix-js/compare/v3.3.8...v3.3.9) (2026-06-02)
 
 
