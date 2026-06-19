@@ -1,3 +1,10 @@
+## [3.4.1](https://github.com/GMOD/tabix-js/compare/v3.4.0...v3.4.1) (2026-06-19)
+
+
+### Features
+
+* report .tbi/.csi index download progress via onProgress ([23de497](https://github.com/GMOD/tabix-js/commit/23de497ee9fb2936154100f1667e940d6cbba095))
+
 # [3.4.0](https://github.com/GMOD/tabix-js/compare/v3.3.9...v3.4.0) (2026-06-18)
 
 
