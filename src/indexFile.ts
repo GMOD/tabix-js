@@ -4,6 +4,12 @@ import type { GenericFilehandle } from 'generic-filehandle2'
 
 export interface Options {
   signal?: AbortSignal
+  /**
+   * Called as the index (.tbi/.csi) is downloaded, with cumulative downloaded
+   * bytes and the total. The index is a whole-file read, so this streams real
+   * byte progress. Lets callers show a determinate "downloading index" bar.
+   */
+  onProgress?: (bytesDownloaded: number, totalBytes?: number) => void
 }
 
 export interface RefIndex {

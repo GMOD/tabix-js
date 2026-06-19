@@ -44,7 +44,10 @@ export default class CSI extends IndexFile {
 
   /** @internal */
   async _parse(opts: Options = {}) {
-    const buf = await this.filehandle.readFile({ signal: opts.signal })
+    const buf = await this.filehandle.readFile({
+      signal: opts.signal,
+      onProgress: opts.onProgress,
+    })
     const bytes = (await unzip(buf)) as Uint8Array
     const dataView = new DataView(bytes.buffer)
 

@@ -33,7 +33,7 @@ interface GetLinesOpts {
    * which is the natural unit since chunk byte sizes are known up front from
    * the index. Lets callers render a determinate download progress bar.
    */
-  onProgress?: (bytesDownloaded: number, totalBytes: number) => void
+  onProgress?: (bytesDownloaded: number, totalBytes?: number) => void
 }
 
 interface ReadChunk {
