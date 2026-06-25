@@ -3,6 +3,7 @@ import { unzip } from '@gmod/bgzf-filehandle'
 import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
+  clampChunkEnds,
   findFirstData,
   memoizeByRefId,
   optimizeChunks,
@@ -136,6 +137,7 @@ export default class CSI extends IndexFile {
           binIndex[bin] = chunks
         }
       }
+      clampChunkEnds(Object.values(binIndex).flat())
       return { binIndex, stats }
     }
 

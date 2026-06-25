@@ -3,6 +3,7 @@ import { unzip } from '@gmod/bgzf-filehandle'
 import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
+  clampChunkEnds,
   findFirstData,
   memoizeByRefId,
   optimizeChunks,
@@ -147,6 +148,10 @@ export default class TabixIndex extends IndexFile {
         linearIndex[k] = fromBytes(bytes, pos)
         pos += 8
       }
+      clampChunkEnds(
+        Object.values(binIndex).flat(),
+        linearIndex.map(v => v.blockPosition),
+      )
       return { binIndex, linearIndex, stats }
     }
 

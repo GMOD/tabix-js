@@ -5,11 +5,22 @@ export default class Chunk {
   public minv: VirtualOffset
   public maxv: VirtualOffset
   public bin: number
+  // Absolute byte offset where the fetch for this chunk ends. The compressed
+  // size of the final BGZF block (the one at maxv.blockPosition) is unknown
+  // from the index, so this defaults to a full max-size block past maxv. It can
+  // be tightened to the next known block boundary via clampChunkEnds.
+  public endPosition: number
 
-  constructor(minv: VirtualOffset, maxv: VirtualOffset, bin: number) {
+  constructor(
+    minv: VirtualOffset,
+    maxv: VirtualOffset,
+    bin: number,
+    endPosition = maxv.blockPosition + (1 << 16),
+  ) {
     this.minv = minv
     this.maxv = maxv
     this.bin = bin
+    this.endPosition = endPosition
   }
 
   toString() {
@@ -19,6 +30,6 @@ export default class Chunk {
   }
 
   fetchedSize() {
-    return this.maxv.blockPosition + (1 << 16) - this.minv.blockPosition
+    return this.endPosition - this.minv.blockPosition
   }
 }
