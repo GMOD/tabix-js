@@ -1,3 +1,10 @@
+## [3.4.2](https://github.com/GMOD/tabix-js/compare/v3.4.1...v3.4.2) (2026-06-25)
+
+
+### Features
+
+* tighten index byte-size estimate by clamping chunk ends to next block boundary ([ea67e96](https://github.com/GMOD/tabix-js/commit/ea67e96607877ecacd3aab2a06c78b581fb8e972))
+
 ## [3.4.1](https://github.com/GMOD/tabix-js/compare/v3.4.0...v3.4.1) (2026-06-19)
 
 
