@@ -16,6 +16,8 @@ export interface RefIndex {
   binIndex: Record<number, Chunk[]>
   stats?: { lineCount: number }
   linearIndex?: VirtualOffset[]
+  /** CSI only: per-bin loffset, the linear index's equivalent for pruning */
+  loffsets?: Record<number, VirtualOffset>
 }
 
 export interface IndexData {

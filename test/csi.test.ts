@@ -2,6 +2,7 @@ import { LocalFile } from 'generic-filehandle2'
 import { expect, test } from 'vitest'
 
 import CSI from '../src/csi.ts'
+import TabixIndexedFile from '../src/tabixIndexedFile.ts'
 import VirtualOffset from '../src/virtualOffset.ts'
 
 test('loads test.gff3.gz.csi', async () => {
@@ -81,4 +82,38 @@ test('loads test.vcf.gz.csi', async () => {
     maxBinNumber: 299_593,
     maxRefLength: 4_294_967_296,
   })
+})
+
+// CSI loffset pruning drops chunks that end at or before the earliest record
+// overlapping the query. Over-pruning silently loses records, so pin CSI
+// results against the TBI index over the same data.
+test('loffset pruning agrees with the TBI index', async () => {
+  const csi = new TabixIndexedFile({
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    csiPath: new URL('data/volvox.test.vcf.gz.csi', import.meta.url).pathname,
+  })
+  const tbi = new TabixIndexedFile({
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
+  })
+  const collect = async (f: TabixIndexedFile, start: number, end: number) => {
+    const lines: string[] = []
+    await f.getLines('contigA', start, end, line => lines.push(line))
+    return lines
+  }
+
+  let compared = 0
+  for (const [start, end] of [
+    [0, 50_000],
+    [1000, 4000],
+    [3000, 3001],
+    [16_383, 16_385],
+    [20_000, 21_000],
+  ] as const) {
+    const fromTbi = await collect(tbi, start, end)
+    expect(await collect(csi, start, end)).toEqual(fromTbi)
+    compared += fromTbi.length
+  }
+  // guard against the whole comparison passing on empty results
+  expect(compared).toBeGreaterThan(0)
 })

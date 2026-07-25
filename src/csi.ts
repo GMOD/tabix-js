@@ -107,6 +107,7 @@ export default class CSI extends IndexFile {
       const binCount = dataView.getInt32(pos, true)
       pos += 4
       const binIndex: Record<number, Chunk[]> = {}
+      const loffsets: Record<number, VirtualOffset> = {}
       let stats
       for (let j = 0; j < binCount; j++) {
         const bin = dataView.getUint32(pos, true)
@@ -115,7 +116,8 @@ export default class CSI extends IndexFile {
           stats = parsePseudoBin(bytes, pos + 28)
           pos += 28 + 16
         } else {
-          pos += 8 // skip loffset (tracked in first pass)
+          loffsets[bin] = fromBytes(bytes, pos)
+          pos += 8
           const chunkCount = dataView.getInt32(pos, true)
           pos += 4
           const chunks = Array.from<Chunk>({ length: chunkCount })
@@ -131,7 +133,7 @@ export default class CSI extends IndexFile {
         }
       }
       clampChunkEnds(Object.values(binIndex).flat())
-      return { binIndex, stats }
+      return { binIndex, loffsets, stats }
     }
 
     return {
@@ -184,7 +186,35 @@ export default class CSI extends IndexFile {
       }
     }
 
-    return optimizeChunks(chunks)
+    return optimizeChunks(chunks, this.minOffset(ba.loffsets, min))
+  }
+
+  /**
+   * CSI's equivalent of the BAI/TBI linear index: the loffset of the deepest
+   * indexed bin covering `beg` is the earliest virtual offset any record
+   * overlapping `beg` can have, so chunks ending at or before it are dead.
+   * Walks leaf -> previous sibling -> parent until an indexed bin is found.
+   * SYNC: htslib hts_itr_query min_off computation
+   */
+  private minOffset(
+    loffsets: Record<number, VirtualOffset> | undefined,
+    beg: number,
+  ) {
+    let found: VirtualOffset | undefined
+    if (loffsets) {
+      // first bin of the deepest level, i.e. (8**depth - 1) / 7
+      let bin = (lshift(1, 3 * this.depth) - 1) / 7 + rshift(beg, this.minShift)
+      while (found === undefined && bin > 0) {
+        found = loffsets[bin]
+        if (found === undefined) {
+          const parent = Math.floor((bin - 1) / 8)
+          const firstChild = parent * 8 + 1
+          bin = bin > firstChild ? bin - 1 : parent
+        }
+      }
+      found ??= loffsets[0]
+    }
+    return found
   }
 
   /** @internal */
