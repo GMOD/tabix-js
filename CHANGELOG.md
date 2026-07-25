@@ -1,3 +1,10 @@
+## [3.4.3](https://github.com/GMOD/tabix-js/compare/v3.4.2...v3.4.3) (2026-07-25)
+
+
+### Bug Fixes
+
+* match htslib query semantics for TBI indexes ([c8c8e4c](https://github.com/GMOD/tabix-js/commit/c8c8e4cf261253304ce25f071f6da512c28f043d))
+
 ## [3.4.2](https://github.com/GMOD/tabix-js/compare/v3.4.1...v3.4.2) (2026-06-25)
 
 
