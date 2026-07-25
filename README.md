@@ -42,14 +42,16 @@ const file = new TabixIndexedFile({
 
 ### getLines
 
-Fetches lines overlapping a region. `start`/`end` are 0-based half-open coordinates (unlike the tabix CLI which uses 1-based closed).
+Fetches lines overlapping a region. `start`/`end` are 0-based half-open
+coordinates (unlike the tabix CLI which uses 1-based closed).
 
 ```typescript
 const lines: string[] = []
 await file.getLines('chr1', 200, 300, line => lines.push(line))
 ```
 
-The callback also receives the virtual file offset and parsed coordinates for the line:
+The callback also receives the virtual file offset and parsed coordinates for
+the line:
 
 ```typescript
 await file.getLines('chr1', 200, 300, (line, fileOffset, start, end) => {
@@ -68,6 +70,7 @@ await file.getLines('chr1', 200, 300, {
 ```
 
 Notes:
+
 - Meta/comment lines are skipped
 - Line strings have no trailing whitespace
 - Pass `undefined` for `end` to read to the end of the contig
@@ -84,24 +87,25 @@ See [example/index.html](example/index.html) for a working demo.
 
 ### `new TabixIndexedFile(args)`
 
-| Arg | Type | Description |
-| --- | --- | --- |
-| `path` | `string?` | Local file path |
-| `url` | `string?` | Remote URL |
-| `filehandle` | `GenericFilehandle?` | Custom filehandle (from [generic-filehandle2](https://github.com/GMOD/generic-filehandle2)) |
-| `tbiPath` | `string?` | TBI index path (defaults to `path + '.tbi'`) |
-| `tbiUrl` | `string?` | TBI index URL |
-| `tbiFilehandle` | `GenericFilehandle?` | TBI index filehandle |
-| `csiPath` | `string?` | CSI index path |
-| `csiUrl` | `string?` | CSI index URL |
-| `csiFilehandle` | `GenericFilehandle?` | CSI index filehandle |
-| `chunkCacheSize` | `number?` | Chunk LRU cache size in bytes (default 5 MiB) |
+| Arg              | Type                 | Description                                                                                 |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------- |
+| `path`           | `string?`            | Local file path                                                                             |
+| `url`            | `string?`            | Remote URL                                                                                  |
+| `filehandle`     | `GenericFilehandle?` | Custom filehandle (from [generic-filehandle2](https://github.com/GMOD/generic-filehandle2)) |
+| `tbiPath`        | `string?`            | TBI index path (defaults to `path + '.tbi'`)                                                |
+| `tbiUrl`         | `string?`            | TBI index URL                                                                               |
+| `tbiFilehandle`  | `GenericFilehandle?` | TBI index filehandle                                                                        |
+| `csiPath`        | `string?`            | CSI index path                                                                              |
+| `csiUrl`         | `string?`            | CSI index URL                                                                               |
+| `csiFilehandle`  | `GenericFilehandle?` | CSI index filehandle                                                                        |
+| `chunkCacheSize` | `number?`            | Chunk LRU cache size in bytes (default 5 MiB)                                               |
 
 ### `getLines(refName, start, end, opts)`
 
 Calls `opts` (or `opts.lineCallback`) for each line overlapping `[start, end)`.
 
-Callback signature: `(line: string, fileOffset: number, start: number, end: number) => void`
+Callback signature:
+`(line: string, fileOffset: number, start: number, end: number) => void`
 
 ### `getHeader(opts?): Promise<string>`
 
@@ -113,19 +117,23 @@ Returns the header as raw bytes.
 
 ### `getReferenceSequenceNames(opts?): Promise<string[]>`
 
-Returns reference sequence names in index order. `renameRefSeqs` is not applied to these names.
+Returns reference sequence names in index order. `renameRefSeqs` is not applied
+to these names.
 
 ### `lineCount(refName, opts?): Promise<number>`
 
-Returns the number of data lines on the given reference, or `-1` if the reference is not in the index.
+Returns the number of data lines on the given reference, or `-1` if the
+reference is not in the index.
 
 ### `bytesForRegions(regions, opts?): Promise<number>`
 
-Estimates the compressed byte size of index chunks covering the given regions. Useful for deciding whether a request is too large before calling `getLines`.
+Estimates the compressed byte size of index chunks covering the given regions.
+Useful for deciding whether a request is too large before calling `getLines`.
 
 ## Publishing
 
-[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub Actions.
+[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub
+Actions.
 
 ```bash
 pnpm version patch  # or minor/major
@@ -133,7 +141,10 @@ pnpm version patch  # or minor/major
 
 ## Academic Use
 
-This package was written with funding from the [NHGRI](http://genome.gov) as part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic project that you publish, please cite the most recent JBrowse paper, which will be linked from [jbrowse.org](http://jbrowse.org).
+This package was written with funding from the [NHGRI](http://genome.gov) as
+part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
+project that you publish, please cite the most recent JBrowse paper, which will
+be linked from [jbrowse.org](http://jbrowse.org).
 
 ## License
 

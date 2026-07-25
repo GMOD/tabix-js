@@ -1,6 +1,6 @@
 **@gmod/tabix**
 
-***
+---
 
 # @gmod/tabix
 
@@ -22,10 +22,10 @@ new CSI(args): CSI;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `args` | \{ `filehandle`: `GenericFilehandle`; \} |
-| `args.filehandle` | `GenericFilehandle` |
+| Parameter         | Type                                     |
+| ----------------- | ---------------------------------------- |
+| `args`            | \{ `filehandle`: `GenericFilehandle`; \} |
+| `args.filehandle` | `GenericFilehandle`                      |
 
 ###### Returns
 
@@ -39,15 +39,16 @@ IndexFile.constructor
 
 #### Properties
 
-| Property | Modifier | Type | Inherited from |
-| ------ | ------ | ------ | ------ |
+| Property                             | Modifier | Type                | Inherited from         |
+| ------------------------------------ | -------- | ------------------- | ---------------------- |
 | <a id="filehandle"></a> `filehandle` | `public` | `GenericFilehandle` | `IndexFile.filehandle` |
 
-***
+---
 
 ### TabixIndexedFile
 
-Reads Tabix-indexed files (bgzipped), supporting both .tbi and .csi index formats.
+Reads Tabix-indexed files (bgzipped), supporting both .tbi and .csi index
+formats.
 
 #### Constructors
 
@@ -59,19 +60,19 @@ new TabixIndexedFile(__namedParameters): TabixIndexedFile;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `__namedParameters` | \{ `chunkCacheSize?`: `number`; `csiFilehandle?`: `GenericFilehandle`; `csiPath?`: `string`; `csiUrl?`: `string`; `filehandle?`: `GenericFilehandle`; `path?`: `string`; `tbiFilehandle?`: `GenericFilehandle`; `tbiPath?`: `string`; `tbiUrl?`: `string`; `url?`: `string`; \} |
-| `__namedParameters.chunkCacheSize?` | `number` |
-| `__namedParameters.csiFilehandle?` | `GenericFilehandle` |
-| `__namedParameters.csiPath?` | `string` |
-| `__namedParameters.csiUrl?` | `string` |
-| `__namedParameters.filehandle?` | `GenericFilehandle` |
-| `__namedParameters.path?` | `string` |
-| `__namedParameters.tbiFilehandle?` | `GenericFilehandle` |
-| `__namedParameters.tbiPath?` | `string` |
-| `__namedParameters.tbiUrl?` | `string` |
-| `__namedParameters.url?` | `string` |
+| Parameter                           | Type                                                                                                                                                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__namedParameters`                 | \{ `chunkCacheSize?`: `number`; `csiFilehandle?`: `GenericFilehandle`; `csiPath?`: `string`; `csiUrl?`: `string`; `filehandle?`: `GenericFilehandle`; `path?`: `string`; `tbiFilehandle?`: `GenericFilehandle`; `tbiPath?`: `string`; `tbiUrl?`: `string`; `url?`: `string`; \} |
+| `__namedParameters.chunkCacheSize?` | `number`                                                                                                                                                                                                                                                                        |
+| `__namedParameters.csiFilehandle?`  | `GenericFilehandle`                                                                                                                                                                                                                                                             |
+| `__namedParameters.csiPath?`        | `string`                                                                                                                                                                                                                                                                        |
+| `__namedParameters.csiUrl?`         | `string`                                                                                                                                                                                                                                                                        |
+| `__namedParameters.filehandle?`     | `GenericFilehandle`                                                                                                                                                                                                                                                             |
+| `__namedParameters.path?`           | `string`                                                                                                                                                                                                                                                                        |
+| `__namedParameters.tbiFilehandle?`  | `GenericFilehandle`                                                                                                                                                                                                                                                             |
+| `__namedParameters.tbiPath?`        | `string`                                                                                                                                                                                                                                                                        |
+| `__namedParameters.tbiUrl?`         | `string`                                                                                                                                                                                                                                                                        |
+| `__namedParameters.url?`            | `string`                                                                                                                                                                                                                                                                        |
 
 ###### Returns
 
@@ -86,15 +87,15 @@ bytesForRegions(regions, opts?): Promise<number>;
 ```
 
 Estimates the compressed byte size of the index chunks covering the given
-regions. Useful for byte budgeting before issuing a `getLines` call to
-decide whether a region is too large to fetch.
+regions. Useful for byte budgeting before issuing a `getLines` call to decide
+whether a region is too large to fetch.
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
+| Parameter | Type       |
+| --------- | ---------- |
 | `regions` | `object`[] |
-| `opts` | `Options` |
+| `opts`    | `Options`  |
 
 ###### Returns
 
@@ -108,9 +109,9 @@ getHeader(opts?): Promise<string>;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `opts` | `Options` |
+| Parameter | Type      |
+| --------- | --------- |
+| `opts`    | `Options` |
 
 ###### Returns
 
@@ -124,9 +125,9 @@ getHeaderBuffer(opts?): Promise<Uint8Array<ArrayBufferLike>>;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `opts` | `Options` |
+| Parameter | Type      |
+| --------- | --------- |
+| `opts`    | `Options` |
 
 ###### Returns
 
@@ -136,20 +137,20 @@ getHeaderBuffer(opts?): Promise<Uint8Array<ArrayBufferLike>>;
 
 ```ts
 getLines(
-   refName, 
-   s, 
-   e, 
+   refName,
+   s,
+   e,
 opts): Promise<void>;
 ```
 
 ###### Parameters
 
-| Parameter | Type | Description |
-| ------ | ------ | ------ |
-| `refName` | `string` | name of the reference sequence |
-| `s` | `number` \| `undefined` | start of the region (0-based half-open) |
-| `e` | `number` \| `undefined` | end of the region (0-based half-open) |
-| `opts` | `GetLinesOpts` \| `GetLinesCallback` | callback invoked for each line, or an options object with `lineCallback` and optional `signal` |
+| Parameter | Type                                 | Description                                                                                    |
+| --------- | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `refName` | `string`                             | name of the reference sequence                                                                 |
+| `s`       | `number` \| `undefined`              | start of the region (0-based half-open)                                                        |
+| `e`       | `number` \| `undefined`              | end of the region (0-based half-open)                                                          |
+| `opts`    | `GetLinesOpts` \| `GetLinesCallback` | callback invoked for each line, or an options object with `lineCallback` and optional `signal` |
 
 ###### Returns
 
@@ -163,9 +164,9 @@ getReferenceSequenceNames(opts?): Promise<string[]>;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `opts` | `Options` |
+| Parameter | Type      |
+| --------- | --------- |
+| `opts`    | `Options` |
 
 ###### Returns
 
@@ -179,16 +180,16 @@ lineCount(refName, opts?): Promise<number>;
 
 ###### Parameters
 
-| Parameter | Type | Description |
-| ------ | ------ | ------ |
-| `refName` | `string` | reference sequence name |
-| `opts` | `Options` | - |
+| Parameter | Type      | Description             |
+| --------- | --------- | ----------------------- |
+| `refName` | `string`  | reference sequence name |
+| `opts`    | `Options` | -                       |
 
 ###### Returns
 
 `Promise`\<`number`\>
 
-***
+---
 
 ### TBI
 
@@ -206,10 +207,10 @@ new TBI(__namedParameters): TBI;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `__namedParameters` | \{ `filehandle`: `GenericFilehandle`; \} |
-| `__namedParameters.filehandle` | `GenericFilehandle` |
+| Parameter                      | Type                                     |
+| ------------------------------ | ---------------------------------------- |
+| `__namedParameters`            | \{ `filehandle`: `GenericFilehandle`; \} |
+| `__namedParameters.filehandle` | `GenericFilehandle`                      |
 
 ###### Returns
 
@@ -223,11 +224,11 @@ IndexFile.constructor
 
 #### Properties
 
-| Property | Modifier | Type | Inherited from |
-| ------ | ------ | ------ | ------ |
+| Property                               | Modifier | Type                | Inherited from         |
+| -------------------------------------- | -------- | ------------------- | ---------------------- |
 | <a id="filehandle-1"></a> `filehandle` | `public` | `GenericFilehandle` | `IndexFile.filehandle` |
 
-***
+---
 
 ### VirtualOffset
 
@@ -241,10 +242,10 @@ new VirtualOffset(blockPosition, dataPosition): VirtualOffset;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
+| Parameter       | Type     |
+| --------------- | -------- |
 | `blockPosition` | `number` |
-| `dataPosition` | `number` |
+| `dataPosition`  | `number` |
 
 ###### Returns
 
@@ -252,10 +253,10 @@ new VirtualOffset(blockPosition, dataPosition): VirtualOffset;
 
 #### Properties
 
-| Property | Modifier | Type |
-| ------ | ------ | ------ |
+| Property                                   | Modifier | Type     |
+| ------------------------------------------ | -------- | -------- |
 | <a id="blockposition"></a> `blockPosition` | `public` | `number` |
-| <a id="dataposition"></a> `dataPosition` | `public` | `number` |
+| <a id="dataposition"></a> `dataPosition`   | `public` | `number` |
 
 #### Methods
 
@@ -267,9 +268,9 @@ compareTo(b): number;
 
 ###### Parameters
 
-| Parameter | Type |
-| ------ | ------ |
-| `b` | [`VirtualOffset`](#virtualoffset) |
+| Parameter | Type                              |
+| --------- | --------------------------------- |
+| `b`       | [`VirtualOffset`](#virtualoffset) |
 
 ###### Returns
 

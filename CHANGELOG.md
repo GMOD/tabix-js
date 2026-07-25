@@ -1,46 +1,49 @@
 # [3.5.0](https://github.com/GMOD/tabix-js/compare/v3.4.3...v3.5.0) (2026-07-25)
 
-
 ### Features
 
-* prune CSI chunks using per-bin loffset ([2377ef8](https://github.com/GMOD/tabix-js/commit/2377ef8059d7736f9f7489579129a56cad557b66))
+- prune CSI chunks using per-bin loffset
+  ([2377ef8](https://github.com/GMOD/tabix-js/commit/2377ef8059d7736f9f7489579129a56cad557b66))
 
 ## [3.4.3](https://github.com/GMOD/tabix-js/compare/v3.4.2...v3.4.3) (2026-07-25)
 
-
 ### Bug Fixes
 
-* match htslib query semantics for TBI indexes ([c8c8e4c](https://github.com/GMOD/tabix-js/commit/c8c8e4cf261253304ce25f071f6da512c28f043d))
+- match htslib query semantics for TBI indexes
+  ([c8c8e4c](https://github.com/GMOD/tabix-js/commit/c8c8e4cf261253304ce25f071f6da512c28f043d))
 
 ## [3.4.2](https://github.com/GMOD/tabix-js/compare/v3.4.1...v3.4.2) (2026-06-25)
 
-
 ### Features
 
-* tighten index byte-size estimate by clamping chunk ends to next block boundary ([ea67e96](https://github.com/GMOD/tabix-js/commit/ea67e96607877ecacd3aab2a06c78b581fb8e972))
+- tighten index byte-size estimate by clamping chunk ends to next block boundary
+  ([ea67e96](https://github.com/GMOD/tabix-js/commit/ea67e96607877ecacd3aab2a06c78b581fb8e972))
 
 ## [3.4.1](https://github.com/GMOD/tabix-js/compare/v3.4.0...v3.4.1) (2026-06-19)
 
-
 ### Features
 
-* report .tbi/.csi index download progress via onProgress ([23de497](https://github.com/GMOD/tabix-js/commit/23de497ee9fb2936154100f1667e940d6cbba095))
+- report .tbi/.csi index download progress via onProgress
+  ([23de497](https://github.com/GMOD/tabix-js/commit/23de497ee9fb2936154100f1667e940d6cbba095))
 
 # [3.4.0](https://github.com/GMOD/tabix-js/compare/v3.3.9...v3.4.0) (2026-06-18)
 
-
 ### Features
 
-* report download progress from getLines via onProgress ([3e166b8](https://github.com/GMOD/tabix-js/commit/3e166b83955bd3e7cad9883508a498d2c68ad4c6))
+- report download progress from getLines via onProgress
+  ([3e166b8](https://github.com/GMOD/tabix-js/commit/3e166b83955bd3e7cad9883508a498d2c68ad4c6))
 
 ## [3.3.9](https://github.com/GMOD/tabix-js/compare/v3.3.8...v3.3.9) (2026-06-02)
 
-
 ### Bug Fixes
 
-* remove dead unzipChunkSlice cache arg breaking the build ([#155](https://github.com/GMOD/tabix-js/issues/155)) ([f283ef3](https://github.com/GMOD/tabix-js/commit/f283ef39d8ea20162091228d8d6abb788505fab7))
-* remove stale workflow query link from CI badge ([5001530](https://github.com/GMOD/tabix-js/commit/50015305ccfea8953ea95acab910a15806ba7a16))
-* update CI badge to reference publish.yml workflow ([b58bfa2](https://github.com/GMOD/tabix-js/commit/b58bfa2a234103f34cb4895e64481cbf93e8bf36))
+- remove dead unzipChunkSlice cache arg breaking the build
+  ([#155](https://github.com/GMOD/tabix-js/issues/155))
+  ([f283ef3](https://github.com/GMOD/tabix-js/commit/f283ef39d8ea20162091228d8d6abb788505fab7))
+- remove stale workflow query link from CI badge
+  ([5001530](https://github.com/GMOD/tabix-js/commit/50015305ccfea8953ea95acab910a15806ba7a16))
+- update CI badge to reference publish.yml workflow
+  ([b58bfa2](https://github.com/GMOD/tabix-js/commit/b58bfa2a234103f34cb4895e64481cbf93e8bf36))
 
 ## [3.3.8](https://github.com/GMOD/tabix-js/compare/v3.3.7...v3.3.8) (2026-05-19)
 
@@ -48,28 +51,29 @@
 
 ## [3.3.6](https://github.com/GMOD/tabix-js/compare/v3.3.5...v3.3.6) (2026-05-18)
 
-
 ### Reverts
 
-* expand Chunk constructor back to explicit field declarations ([2b60715](https://github.com/GMOD/tabix-js/commit/2b6071562bb2fd54aea798ea29cd22439f038468))
+- expand Chunk constructor back to explicit field declarations
+  ([2b60715](https://github.com/GMOD/tabix-js/commit/2b6071562bb2fd54aea798ea29cd22439f038468))
 
 ## [3.3.5](https://github.com/GMOD/tabix-js/compare/v3.3.4...v3.3.5) (2026-05-18)
 
-
 ### Bug Fixes
 
-* use Array.from({length}) to satisfy unicorn/no-new-array lint rule ([9f6294e](https://github.com/GMOD/tabix-js/commit/9f6294e04ad9425b852fde6d672a425bd8859628))
-
+- use Array.from({length}) to satisfy unicorn/no-new-array lint rule
+  ([9f6294e](https://github.com/GMOD/tabix-js/commit/9f6294e04ad9425b852fde6d672a425bd8859628))
 
 ### Performance Improvements
 
-* avoid per-query Chunk clones and tighten getLines hot loop ([2e4488b](https://github.com/GMOD/tabix-js/commit/2e4488bffaf51de85804260b45bede8ab81e1369))
-* reduce allocations and move TextDecoder/TextEncoder to function scope ([3abb846](https://github.com/GMOD/tabix-js/commit/3abb846a9f0c5b6c5cbf4a73a13f9e84bf780922))
-
+- avoid per-query Chunk clones and tighten getLines hot loop
+  ([2e4488b](https://github.com/GMOD/tabix-js/commit/2e4488bffaf51de85804260b45bede8ab81e1369))
+- reduce allocations and move TextDecoder/TextEncoder to function scope
+  ([3abb846](https://github.com/GMOD/tabix-js/commit/3abb846a9f0c5b6c5cbf4a73a13f9e84bf780922))
 
 ### Reverts
 
-* inline tabix header parsing back into tbi.ts and csi.ts ([e7cdfd8](https://github.com/GMOD/tabix-js/commit/e7cdfd83f0d40ffc35447cfee4c8a2be130eff39))
+- inline tabix header parsing back into tbi.ts and csi.ts
+  ([e7cdfd8](https://github.com/GMOD/tabix-js/commit/e7cdfd83f0d40ffc35447cfee4c8a2be130eff39))
 
 ## [3.3.4](https://github.com/GMOD/tabix-js/compare/v3.3.3...v3.3.4) (2026-05-08)
 
