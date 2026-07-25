@@ -1,3 +1,10 @@
+# [3.5.0](https://github.com/GMOD/tabix-js/compare/v3.4.3...v3.5.0) (2026-07-25)
+
+
+### Features
+
+* prune CSI chunks using per-bin loffset ([2377ef8](https://github.com/GMOD/tabix-js/commit/2377ef8059d7736f9f7489579129a56cad557b66))
+
 ## [3.4.3](https://github.com/GMOD/tabix-js/compare/v3.4.2...v3.4.3) (2026-07-25)
 
 
