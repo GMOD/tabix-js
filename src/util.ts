@@ -86,7 +86,13 @@ export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
 // maxv.blockPosition is an upper bound on where that final block ends — always at
 // least the true block end, so the clamped fetch still contains the whole block.
 // Shrinks both the byte estimate and the actual fetch with no extra I/O.
-export function clampChunkEnds(chunks: Chunk[], extraBoundaries: number[] = []) {
+export function clampChunkEnds(
+  chunks: Chunk[],
+  extraBoundaries: number[] = [],
+) {
+  // Array#sort with a comparator beats a Float64Array numeric sort here:
+  // extraBoundaries (the linear index) arrives already sorted and TimSort
+  // exploits the existing run, which introsort cannot.
   const boundaries = [...extraBoundaries]
   for (const c of chunks) {
     boundaries.push(c.minv.blockPosition, c.maxv.blockPosition)
@@ -150,7 +156,11 @@ const tabixFormats: Record<number, string> = {
 }
 
 export function parseAuxData(bytes: Uint8Array, offset: number) {
-  const dataView = new DataView(bytes.buffer)
+  const dataView = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  )
   const formatFlags = dataView.getInt32(offset, true)
   const coordinateType =
     formatFlags & 0x1_00_00 ? 'zero-based-half-open' : '1-based-closed'

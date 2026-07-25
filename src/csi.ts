@@ -14,7 +14,6 @@ import { fromBytes } from './virtualOffset.ts'
 
 import type { Options, RefIndex } from './indexFile.ts'
 import type VirtualOffset from './virtualOffset.ts'
-import type { GenericFilehandle } from 'generic-filehandle2'
 
 const CSI1_MAGIC = 21_582_659 // CSI\1
 const CSI2_MAGIC = 38_359_875 // CSI\2
@@ -29,19 +28,9 @@ function rshift(num: number, bits: number) {
 }
 
 export default class CSI extends IndexFile {
-  private maxBinNumber: number
-  private depth: number
-  private minShift: number
-  constructor(args: { filehandle: GenericFilehandle }) {
-    super(args)
-    this.maxBinNumber = 0
-    this.depth = 0
-    this.minShift = 0
-  }
-  /** @internal */
-  indexCov() {
-    throw new Error('CSI indexes do not support indexcov')
-  }
+  private maxBinNumber = 0
+  private depth = 0
+  private minShift = 0
 
   /** @internal */
   async _parse(opts: Options = {}) {
@@ -50,7 +39,11 @@ export default class CSI extends IndexFile {
       onProgress: opts.onProgress,
     })
     const bytes = (await unzip(buf)) as Uint8Array
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(
+      bytes.buffer,
+      bytes.byteOffset,
+      bytes.byteLength,
+    )
 
     const magic = dataView.getUint32(0, true)
     let csiVersion

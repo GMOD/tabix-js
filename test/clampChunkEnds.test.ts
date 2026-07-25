@@ -11,7 +11,11 @@ test('clamps tail to next known block boundary', () => {
   // two chunks whose blocks are adjacent: the second chunk's minv is the next
   // boundary after the first chunk's maxv, so the first chunk's end is clamped
   const c1 = new Chunk(new VirtualOffset(0, 0), new VirtualOffset(1000, 0), 0)
-  const c2 = new Chunk(new VirtualOffset(2000, 0), new VirtualOffset(5000, 0), 1)
+  const c2 = new Chunk(
+    new VirtualOffset(2000, 0),
+    new VirtualOffset(5000, 0),
+    1,
+  )
   expect(c1.fetchedSize()).toEqual(1000 + block)
 
   clampChunkEnds([c1, c2])
