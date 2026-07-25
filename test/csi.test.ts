@@ -98,7 +98,9 @@ test('loffset pruning agrees with the TBI index', async () => {
   })
   const collect = async (f: TabixIndexedFile, start: number, end: number) => {
     const lines: string[] = []
-    await f.getLines('contigA', start, end, line => lines.push(line))
+    await f.getLines('contigA', start, end, line => {
+      lines.push(line)
+    })
     return lines
   }
 

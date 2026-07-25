@@ -375,14 +375,14 @@ export default class TabixIndexedFile {
           blockStart = n + 1
           continue
         }
-        let refMatch = true
+        let isRefMatch = true
         for (let i = 0; i < refLen; i++) {
           if (buffer[refStart + i] !== regionRefNameBytes[i]) {
-            refMatch = false
+            isRefMatch = false
             break
           }
         }
-        if (!refMatch) {
+        if (!isRefMatch) {
           blockStart = n + 1
           continue
         }

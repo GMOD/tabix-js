@@ -46,8 +46,8 @@ test('can read contigA:1000..4000', async () => {
   for (const { line, fileOffset } of items.records) {
     const l = line.split('\t')
     expect(l[0]).toEqual('contigA')
-    expect(Number.parseInt(l[1], 10)).toBeGreaterThan(999)
-    expect(Number.parseInt(l[1], 10)).toBeLessThan(4001)
+    expect(Number(l[1])).toBeGreaterThan(999)
+    expect(Number(l[1])).toBeLessThan(4001)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
 
@@ -91,7 +91,7 @@ test('can read contigA:10000', async () => {
   for (const { line, fileOffset } of items.records) {
     const l = line.split('\t')
     expect(l[0]).toEqual('contigA')
-    expect(Number.parseInt(l[1], 10)).toBeGreaterThan(9999)
+    expect(Number(l[1])).toBeGreaterThan(9999)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
 })
@@ -178,26 +178,42 @@ test('can query gvcf.vcf.gz', async () => {
   expect(headerString.at(-1)).toEqual('\n')
 
   const lines = [] as string[]
-  await f.getLines('ctgB', 0, Infinity, l => lines.push(l))
+  await f.getLines('ctgB', 0, Infinity, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(0)
 
-  await f.getLines('ctgA', -2, 3000, l => lines.push(l))
+  await f.getLines('ctgA', -2, 3000, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(0)
-  await f.getLines('ctgA', -50, -20, l => lines.push(l))
+  await f.getLines('ctgA', -50, -20, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(0)
-  await f.getLines('ctgA', 4000, 5000, l => lines.push(l))
+  await f.getLines('ctgA', 4000, 5000, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(7)
   lines.length = 0
-  await f.getLines('ctgA', 4383, 4384, l => lines.push(l))
+  await f.getLines('ctgA', 4383, 4384, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(1)
   lines.length = 0
-  await f.getLines('ctgA', 4384, 4385, l => lines.push(l))
+  await f.getLines('ctgA', 4384, 4385, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(1)
   lines.length = 0
-  await f.getLines('ctgA', 4385, 4386, l => lines.push(l))
+  await f.getLines('ctgA', 4385, 4386, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(1)
   lines.length = 0
-  await f.getLines('ctgA', 4369, 4370, l => lines.push(l))
+  await f.getLines('ctgA', 4369, 4370, l => {
+    lines.push(l)
+  })
   expect(lines.length).toEqual(1)
 })
 
@@ -219,8 +235,8 @@ test('can query out.gff.gz with a TBI index', async () => {
     const fields = line.split('\t')
     lineCount += 1
     expect(fields[0]).toEqual('NC_000001.11')
-    expect(Number.parseInt(fields[3], 10)).toBeLessThan(55_000)
-    expect(Number.parseInt(fields[4], 10)).toBeGreaterThan(3000)
+    expect(Number(fields[3])).toBeLessThan(55_000)
+    expect(Number(fields[4])).toBeGreaterThan(3000)
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
   expect(lineCount).toEqual(23)
@@ -378,7 +394,7 @@ test('usage of the chr22 ultralong nanopore as a bed file', async () => {
   const [r1, r2] = [ret1.records, ret2.records].map(x =>
     x.find(
       ({ line }) =>
-        line.split('\t')[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5',
+        line.split('\t', 4)[3] === '3d509937-5c54-46d7-8dec-c49c7165d2d5',
     ),
   )
   expect(r1?.fileOffset).toEqual(r2?.fileOffset)
@@ -411,7 +427,7 @@ test('long read consistent IDs', async () => {
   const [r1, r2] = [ret1.records, ret2.records].map(x =>
     x.find(
       ({ line }) =>
-        line.split('\t')[3] ===
+        line.split('\t', 4)[3] ===
         'm131004_105332_42213_c100572142530000001823103304021442_s1_p0/103296',
     ),
   )
@@ -481,7 +497,9 @@ test('features ending exactly on a bin boundary', async () => {
   })
   const query = async (start: number, end: number) => {
     const lines: string[] = []
-    await f.getLines('ctgA', start, end, line => lines.push(line))
+    await f.getLines('ctgA', start, end, line => {
+      lines.push(line)
+    })
     return lines
   }
 
@@ -522,7 +540,9 @@ test('strips CRLF line terminators like htslib does', async () => {
     path: new URL('data/CrlfOffsetTest.vcf.gz', import.meta.url).pathname,
   })
   const lines: string[] = []
-  await f.getLines('contigA', 0, 50_000, line => lines.push(line))
+  await f.getLines('contigA', 0, 50_000, line => {
+    lines.push(line)
+  })
   expect(lines).toEqual([
     'contigA\t3000\trs17883296\tG\tT\t100\tPASS\tTEST=abc',
     'contigA\t3105\trs17878855\tG\tC\t100\tq10\tTEST=def',

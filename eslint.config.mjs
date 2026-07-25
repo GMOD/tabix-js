@@ -53,7 +53,26 @@ export default defineConfig(
       'unicorn/no-null': 'off',
       'unicorn/prefer-module': 'off',
       'unicorn/filename-case': 'off',
-      'unicorn/prevent-abbreviations': 'off',
+      // unicorn 72 dropped prevent-abbreviations in favor of name-replacements
+      'unicorn/name-replacements': 'off',
+
+      // new in unicorn 72, each off for a specific reason:
+      // _parse implements `protected abstract _parse` in indexFile.ts, which a
+      // `#private` field cannot do
+      'unicorn/prefer-private-class-fields': 'off',
+      // indexFile.ts memoizes the promise (`this.parseP ??= this._parse().catch()`);
+      // awaiting it there would defeat the memoization
+      'unicorn/prefer-await': 'off',
+      // the byte-scanning loops in tabixIndexedFile.ts are indexed and inlined
+      // deliberately; for-of/entries() and extracted functions cost throughput
+      'unicorn/no-for-loop': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/prefer-simple-condition-first': 'off',
+      // these push toward early-exit style, which this codebase avoids
+      'unicorn/prefer-continue': 'off',
+      'unicorn/no-useless-else': 'off',
+      // csi.ts member order mirrors bam-js/src/csi.ts on purpose
+      'unicorn/consistent-class-member-order': 'off',
       'unicorn/prefer-code-point': 'off',
 
       '@typescript-eslint/no-unused-vars': [
