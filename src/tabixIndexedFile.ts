@@ -14,6 +14,7 @@ import type { GenericFilehandle } from 'generic-filehandle2'
 
 const TAB = 9
 const NEWLINE = 10
+const CARRIAGE_RETURN = 13
 const SEMICOLON = 59
 
 type GetLinesCallback = (
@@ -57,6 +58,56 @@ function resolveFilehandle(
     return new RemoteFile(url)
   }
   throw new TypeError('must provide either filehandle, path, or url')
+}
+
+// An explicitly supplied index always wins over the `<path>.tbi` /
+// `<url>.tbi` names derived from the data file, whichever kind it is.
+function resolveIndex({
+  tbiFilehandle,
+  csiFilehandle,
+  tbiPath,
+  csiPath,
+  tbiUrl,
+  csiUrl,
+  path,
+  url,
+}: {
+  tbiFilehandle?: GenericFilehandle
+  csiFilehandle?: GenericFilehandle
+  tbiPath?: string
+  csiPath?: string
+  tbiUrl?: string
+  csiUrl?: string
+  path?: string
+  url?: string
+}) {
+  if (tbiFilehandle) {
+    return new TBI({ filehandle: tbiFilehandle })
+  }
+  if (csiFilehandle) {
+    return new CSI({ filehandle: csiFilehandle })
+  }
+  if (tbiPath) {
+    return new TBI({ filehandle: new LocalFile(tbiPath) })
+  }
+  if (csiPath) {
+    return new CSI({ filehandle: new LocalFile(csiPath) })
+  }
+  if (csiUrl) {
+    return new CSI({ filehandle: new RemoteFile(csiUrl) })
+  }
+  if (tbiUrl) {
+    return new TBI({ filehandle: new RemoteFile(tbiUrl) })
+  }
+  if (path) {
+    return new TBI({ filehandle: new LocalFile(`${path}.tbi`) })
+  }
+  if (url) {
+    return new TBI({ filehandle: new RemoteFile(`${url}.tbi`) })
+  }
+  throw new TypeError(
+    'must provide one of tbiFilehandle, tbiPath, csiFilehandle, csiPath, tbiUrl, csiUrl',
+  )
 }
 
 function calculateFileOffset(
@@ -172,28 +223,16 @@ export default class TabixIndexedFile {
     chunkCacheSize?: number
   }) {
     this.filehandle = resolveFilehandle(filehandle, path, url)
-
-    if (tbiFilehandle) {
-      this.index = new TBI({ filehandle: tbiFilehandle })
-    } else if (csiFilehandle) {
-      this.index = new CSI({ filehandle: csiFilehandle })
-    } else if (tbiPath) {
-      this.index = new TBI({ filehandle: new LocalFile(tbiPath) })
-    } else if (csiPath) {
-      this.index = new CSI({ filehandle: new LocalFile(csiPath) })
-    } else if (path) {
-      this.index = new TBI({ filehandle: new LocalFile(`${path}.tbi`) })
-    } else if (csiUrl) {
-      this.index = new CSI({ filehandle: new RemoteFile(csiUrl) })
-    } else if (tbiUrl) {
-      this.index = new TBI({ filehandle: new RemoteFile(tbiUrl) })
-    } else if (url) {
-      this.index = new TBI({ filehandle: new RemoteFile(`${url}.tbi`) })
-    } else {
-      throw new TypeError(
-        'must provide one of tbiFilehandle, tbiPath, csiFilehandle, csiPath, tbiUrl, csiUrl',
-      )
-    }
+    this.index = resolveIndex({
+      tbiFilehandle,
+      csiFilehandle,
+      tbiPath,
+      csiPath,
+      tbiUrl,
+      csiUrl,
+      path,
+      url,
+    })
 
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
       cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
@@ -318,15 +357,14 @@ export default class TabixIndexedFile {
           continue
         }
 
-        // find tab positions
+        // find tab positions. Columns past the end of the line all get `n`
+        // rather than breaking out, which would leave stale offsets from the
+        // previous line in the tail of the array.
         tabs[0] = blockStart - 1
         for (let i = 0; i < maxColumn; i++) {
-          const tabPos = buffer.indexOf(TAB, tabs[i]! + 1)
-          if (tabPos === -1 || tabPos >= n) {
-            tabs[i + 1] = n
-            break
-          }
-          tabs[i + 1] = tabPos
+          const prev = tabs[i]!
+          const tabPos = prev < n ? buffer.indexOf(TAB, prev + 1) : -1
+          tabs[i + 1] = tabPos === -1 || tabPos >= n ? n : tabPos
         }
 
         // compare ref name bytes directly
@@ -380,7 +418,9 @@ export default class TabixIndexedFile {
         }
 
         if (endCoordinate > start) {
-          const line = decoder.decode(buffer.subarray(blockStart, n))
+          // trim a CRLF terminator, matching htslib's line reader
+          const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
+          const line = decoder.decode(buffer.subarray(blockStart, lineEnd))
           callback(
             line,
             calculateFileOffset(

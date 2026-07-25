@@ -471,3 +471,60 @@ test('reports download progress at block granularity', async () => {
     expect(ticks[i]![0]).toBeGreaterThanOrEqual(ticks[i - 1]![0])
   }
 })
+
+// features whose end lands exactly on a 16kb bin boundary live in the leaf bin
+// below the boundary; reg2bins must not skip that bin. Compare with
+// `tabix bin_boundary.bed.gz ctgA:16384-16384`
+test('features ending exactly on a bin boundary', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/bin_boundary.bed.gz', import.meta.url).pathname,
+  })
+  const query = async (start: number, end: number) => {
+    const lines: string[] = []
+    await f.getLines('ctgA', start, end, line => lines.push(line))
+    return lines
+  }
+
+  expect(await query(16_383, 16_384)).toEqual([
+    'ctgA\t16380\t16384\tends_at_bin_boundary',
+  ])
+  expect(await query(32_767, 32_768)).toEqual([
+    'ctgA\t32760\t32768\tends_at_bin_boundary2',
+  ])
+  expect(await query(16_383, 16_385)).toEqual([
+    'ctgA\t16380\t16384\tends_at_bin_boundary',
+    'ctgA\t16384\t16390\tnext_bin',
+  ])
+})
+
+test('end coordinates beyond the tabix binning range are clamped', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/volvox-remark.bed.gz', import.meta.url).pathname,
+  })
+  const count = async (end: number) => {
+    let n = 0
+    await f.getLines('ctgA', 0, end, () => {
+      n++
+    })
+    return n
+  }
+
+  // 2**29 is the largest coordinate the fixed depth-5 TBI scheme can address.
+  // Anything past it used to overflow int32 and silently return nothing.
+  const expected = await count(2 ** 29)
+  expect(expected).toBeGreaterThan(0)
+  expect(await count(3e9)).toEqual(expected)
+  expect(await count(Number.MAX_SAFE_INTEGER)).toEqual(expected)
+})
+
+test('strips CRLF line terminators like htslib does', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/CrlfOffsetTest.vcf.gz', import.meta.url).pathname,
+  })
+  const lines: string[] = []
+  await f.getLines('contigA', 0, 50_000, line => lines.push(line))
+  expect(lines).toEqual([
+    'contigA\t3000\trs17883296\tG\tT\t100\tPASS\tTEST=abc',
+    'contigA\t3105\trs17878855\tG\tC\t100\tq10\tTEST=def',
+  ])
+})

@@ -17,21 +17,31 @@ import type VirtualOffset from './virtualOffset.ts'
 
 const TBI_MAGIC = 21_578_324 // TBI\1
 
+// TBI is always the fixed depth-5, 14-bit-leaf binning scheme
+const TBI_DEPTH = 5
+const TBI_MAX_REF_LENGTH = 2 ** (14 + TBI_DEPTH * 3)
+
 /**
  * calculate the list of bins that may overlap with region [beg,end)
  * (zero-based half-open)
  */
 function reg2bins(beg: number, end: number) {
-  beg += 1 // < convert to 1-based closed
-  end -= 1
-  return [
-    [0, 0],
-    [1 + (beg >> 26), 1 + (end >> 26)],
-    [9 + (beg >> 23), 9 + (end >> 23)],
-    [73 + (beg >> 20), 73 + (end >> 20)],
-    [585 + (beg >> 17), 585 + (end >> 17)],
-    [4681 + (beg >> 14), 4681 + (end >> 14)],
-  ] as const
+  // Clamp into the binning scheme's range. Past 2**31 the shifts below
+  // truncate to int32 and go negative, which would silently yield no bins.
+  const b = Math.min(Math.max(beg, 0), TBI_MAX_REF_LENGTH)
+  const e = Math.min(end, TBI_MAX_REF_LENGTH) - 1
+  const bins: (readonly [number, number])[] = []
+  if (b <= e) {
+    bins.push(
+      [0, 0],
+      [1 + (b >> 26), 1 + (e >> 26)],
+      [9 + (b >> 23), 9 + (e >> 23)],
+      [73 + (b >> 20), 73 + (e >> 20)],
+      [585 + (b >> 17), 585 + (e >> 17)],
+      [4681 + (b >> 14), 4681 + (e >> 14)],
+    )
+  }
+  return bins
 }
 
 export default class TabixIndex extends IndexFile {
@@ -42,16 +52,18 @@ export default class TabixIndex extends IndexFile {
       onProgress: opts.onProgress,
     })
     const bytes = (await unzip(buf)) as Uint8Array
-    const dataView = new DataView(bytes.buffer)
+    const dataView = new DataView(
+      bytes.buffer,
+      bytes.byteOffset,
+      bytes.byteLength,
+    )
 
     if (dataView.getUint32(0, true) !== TBI_MAGIC) {
       throw new Error('Not a TBI file')
     }
 
     const refCount = dataView.getUint32(4, true)
-    const depth = 5
-    const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
-    const maxRefLength = 2 ** (14 + depth * 3)
+    const maxBinNumber = ((1 << ((TBI_DEPTH + 1) * 3)) - 1) / 7
 
     // TBI header layout matches CSI aux data; parseAuxData handles both
     const {
@@ -159,7 +171,7 @@ export default class TabixIndex extends IndexFile {
       indices: memoizeByRefId(getIndices),
       metaChar,
       maxBinNumber,
-      maxRefLength,
+      maxRefLength: TBI_MAX_REF_LENGTH,
       skipLines,
       firstDataLine,
       columnNumbers,
@@ -177,10 +189,6 @@ export default class TabixIndex extends IndexFile {
     max: number,
     opts: Options = {},
   ) {
-    if (min < 0) {
-      min = 0
-    }
-
     const indexData = await this.parse(opts)
     const refId = indexData.refNameToId[refName]
     if (refId === undefined) {
@@ -191,13 +199,12 @@ export default class TabixIndex extends IndexFile {
       return []
     }
 
-    const linearIndex = ba.linearIndex ?? []
-    // min >= 2**31 overflows int32 and produces a negative >> 14 result —
-    // query is well beyond the indexed range
-    if (linearIndex.length > 0 && min >= 2 ** 31) {
+    if (min > TBI_MAX_REF_LENGTH) {
       console.warn('querying outside of possible tabix range')
     }
-
+    // clamp before the >> 14 below, which would truncate to int32 and go
+    // negative past 2**31
+    const beg = Math.min(Math.max(min, 0), TBI_MAX_REF_LENGTH)
     const overlappingBins = reg2bins(min, max) // List of bin #s that overlap min, max
     const chunks: Chunk[] = []
 
@@ -216,7 +223,8 @@ export default class TabixIndex extends IndexFile {
     // The linear index is monotonically non-decreasing, so the minimum virtual
     // offset for chunks that could overlap [min, ...) is at index minLin.
     // SYNC: ~/src/gmod/bam-js/src/bai.ts getLowestChunk
-    const lowest = linearIndex[Math.min(min >> 14, linearIndex.length - 1)]
+    const linearIndex = ba.linearIndex
+    const lowest = linearIndex?.[Math.min(beg >> 14, linearIndex.length - 1)]
 
     return optimizeChunks(chunks, lowest)
   }
