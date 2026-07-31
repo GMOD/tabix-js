@@ -23,10 +23,12 @@ const MAX_READ_AHEAD_CHUNKS = 6
 
 // SYNC: ~/src/gmod/bam-js/src/bamFile.ts DEFAULT_MAX_CACHE_BYTES
 //
-// A cached entry pins its chunk's whole decompressed buffer, and optimizeChunks
-// merges spans up to 5MB *compressed* — so one entry can be tens of MB and a
-// count-based LRU bounds nothing at all. This budgets by decompressed bytes.
-const DEFAULT_CHUNK_CACHE_BYTES = 50 * 2 ** 20
+// We fetch compressed and cache decompressed, and an entry is a whole chunk, so
+// entry count says nothing about memory. How little is easy to underestimate:
+// a dense VCF (test/data/1kg.chr1.subset.vcf.gz — 213MB over 600kb of chr1)
+// has single index bins of 17MB compressed, 120MB decompressed. Panning it
+// under the old 80-entry cache peaked at 2GB RSS.
+const DEFAULT_CHUNK_CACHE_BYTES = 100 * 2 ** 20
 
 // The entry type AbortablePromiseCache stores in its backing cache. Not exported
 // by the package, so it is recovered from the constructor signature rather than
