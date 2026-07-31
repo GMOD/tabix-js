@@ -1,6 +1,5 @@
 import AbortablePromiseCache from '@gmod/abortable-promise-cache'
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
-import LRU from '@jbrowse/quick-lru'
 import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
@@ -21,6 +20,111 @@ const SEMICOLON = 59
 // is parsing. Six is the HTTP/1.1 per-host connection cap browsers enforce, so
 // going much above it buys nothing on the transport that matters.
 const MAX_READ_AHEAD_CHUNKS = 6
+
+// SYNC: ~/src/gmod/bam-js/src/bamFile.ts DEFAULT_MAX_CACHE_BYTES
+//
+// A cached entry pins its chunk's whole decompressed buffer, and optimizeChunks
+// merges spans up to 5MB *compressed* — so one entry can be tens of MB and a
+// count-based LRU bounds nothing at all. This budgets by decompressed bytes.
+const DEFAULT_CHUNK_CACHE_BYTES = 50 * 2 ** 20
+
+// The entry type AbortablePromiseCache stores in its backing cache. Not exported
+// by the package, so it is recovered from the constructor signature rather than
+// restated (and left to drift) here.
+type CacheEntry = NonNullable<
+  ReturnType<
+    ConstructorParameters<
+      typeof AbortablePromiseCache<Chunk, ReadChunk>
+    >[0]['cache']['get']
+  >
+>
+
+interface CachedChunk {
+  entry: CacheEntry
+  /** 0 until the read settles and the decompressed size is known */
+  bytes: number
+}
+
+/**
+ * Backing store for the chunk cache, bounded by the decompressed size of the
+ * chunks it holds rather than by entry count.
+ *
+ * A chunk's size is only known once its read settles, so `set` records the
+ * entry immediately and charges it to the budget later. Unsettled entries are
+ * therefore free, which is what we want: they are reads a query is waiting on.
+ */
+class ByteBoundedChunkCache {
+  private entries = new Map<string, CachedChunk>()
+  private bytes = 0
+  private maxBytes: number
+
+  constructor(maxBytes: number) {
+    this.maxBytes = maxBytes
+  }
+
+  get byteSize() {
+    return this.bytes
+  }
+
+  get size() {
+    return this.entries.size
+  }
+
+  has(key: string) {
+    return this.entries.has(key)
+  }
+
+  get(key: string) {
+    const cached = this.entries.get(key)
+    if (cached) {
+      // re-insert so Map iteration order stays least-recently-used first
+      this.entries.delete(key)
+      this.entries.set(key, cached)
+    }
+    return cached?.entry
+  }
+
+  set(key: string, entry: CacheEntry) {
+    this.delete(key)
+    const cached = { entry, bytes: 0 }
+    this.entries.set(key, cached)
+    void entry.promise
+      .then(chunk => {
+        // a later set() may have replaced this key while the read was in
+        // flight; charging these bytes to it would then double-count
+        if (this.entries.get(key) === cached) {
+          cached.bytes = chunk.buffer.byteLength
+          this.bytes += cached.bytes
+          this.evict()
+        }
+      })
+      .catch(() => {
+        // a failed or aborted read caches nothing and costs nothing
+      })
+  }
+
+  delete(key: string) {
+    const cached = this.entries.get(key)
+    if (cached) {
+      this.entries.delete(key)
+      this.bytes -= cached.bytes
+    }
+  }
+
+  keys() {
+    return this.entries.keys()
+  }
+
+  // Evict from the least-recently-used end. The size > 1 guard means a single
+  // chunk larger than the whole budget is still kept: the caller needs it for
+  // the query in flight, and dropping it would only force a re-decompress.
+  private evict() {
+    const lru = this.entries.keys()
+    while (this.bytes > this.maxBytes && this.entries.size > 1) {
+      this.delete(lru.next().value!)
+    }
+  }
+}
 
 type GetLinesCallback = (
   line: string,
@@ -214,7 +318,7 @@ export default class TabixIndexedFile {
     csiPath,
     csiUrl,
     csiFilehandle,
-    chunkCacheSize = 5 * 2 ** 20,
+    chunkCacheSize = DEFAULT_CHUNK_CACHE_BYTES,
   }: {
     path?: string
     filehandle?: GenericFilehandle
@@ -225,6 +329,7 @@ export default class TabixIndexedFile {
     csiPath?: string
     csiUrl?: string
     csiFilehandle?: GenericFilehandle
+    /** budget for the decompressed chunk cache, in bytes */
     chunkCacheSize?: number
   }) {
     this.filehandle = resolveFilehandle(filehandle, path, url)
@@ -240,7 +345,7 @@ export default class TabixIndexedFile {
     })
 
     this.chunkCache = new AbortablePromiseCache<Chunk, ReadChunk>({
-      cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) }),
+      cache: new ByteBoundedChunkCache(chunkCacheSize),
       fill: (args: Chunk, signal?: AbortSignal) =>
         this.readChunk(args, { signal }),
     })
