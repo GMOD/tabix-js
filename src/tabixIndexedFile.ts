@@ -17,6 +17,11 @@ const NEWLINE = 10
 const CARRIAGE_RETURN = 13
 const SEMICOLON = 59
 
+// Ceiling on how many chunk reads getLines keeps in flight ahead of the one it
+// is parsing. Six is the HTTP/1.1 per-host connection cap browsers enforce, so
+// going much above it buys nothing on the transport that matters.
+const MAX_READ_AHEAD_CHUNKS = 6
+
 type GetLinesCallback = (
   line: string,
   fileOffset: number,
@@ -327,12 +332,39 @@ export default class TabixIndexedFile {
     let downloadedBytes = 0
     onProgress?.(0, totalBytes)
 
-    for (const c of chunks) {
-      const { buffer, cpositions, dpositions } = await this.chunkCache.get(
-        c.toString(),
-        c,
-        signal,
-      )
+    // Read ahead, but only as far as the scan has earned. Every chunk is its
+    // own range request, so a query spanning many of them pays a network round
+    // trip apiece, serially — for a remote file that dominates, well ahead of
+    // decompression (1kg.chr1 over a 1Mb window reads 22 chunks in a row).
+    //
+    // A fixed window would be wrong, though: blocksForRange offers a chunk per
+    // overlapping bin across every level, and on a sparse file the early return
+    // below stops the scan inside the first one, leaving the rest untouched
+    // (chr22_nanopore_subset offers 7 chunks and reads 1). Prefetching those
+    // would multiply the bytes such a query fetches for no gain.
+    //
+    // Finishing a chunk without hitting the early return proves the next chunk
+    // has to be examined, so the window starts at one and doubles per chunk
+    // consumed. A query that stops in its first chunk issues exactly the reads
+    // a sequential scan did; a long scan reaches full concurrency after three.
+    let readAhead = 1
+    const reads: Promise<ReadChunk>[] = []
+    const ensureReadsStarted = (count: number) => {
+      while (reads.length < Math.min(count, chunks.length)) {
+        const c = chunks[reads.length]!
+        const read = this.chunkCache.get(c.toString(), c, signal)
+        void read.catch(() => {
+          // a prefetch the early return skips is never awaited, so swallow its
+          // rejection here rather than let it surface unhandled
+        })
+        reads.push(read)
+      }
+    }
+    ensureReadsStarted(1)
+
+    for (let ci = 0, cl = chunks.length; ci < cl; ci++) {
+      const c = chunks[ci]!
+      const { buffer, cpositions, dpositions } = await reads[ci]!
       downloadedBytes += c.fetchedSize()
       onProgress?.(downloadedBytes, totalBytes)
       const minvDataPosition = c.minv.dataPosition
@@ -436,6 +468,11 @@ export default class TabixIndexedFile {
         }
         blockStart = n + 1
       }
+
+      // every line in this chunk was still inside the query, so the next chunk
+      // has to be examined too - widen the window and start the reads for it
+      readAhead = Math.min(readAhead * 2, MAX_READ_AHEAD_CHUNKS)
+      ensureReadsStarted(ci + 1 + readAhead)
     }
   }
 
