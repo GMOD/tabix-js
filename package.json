@@ -37,6 +37,7 @@
     "preversion": "pnpm lint && pnpm test --run && pnpm build",
     "postversion": "git push --follow-tags",
     "build": "pnpm build:esm && pnpm build:es5",
+    "differential": "vite-node scripts/differential.mjs",
     "benchonly": "vitest bench",
     "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "build:docs": "typedoc && node scripts/build-docs.mjs",

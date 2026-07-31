@@ -2,8 +2,7 @@ import LRU from '@jbrowse/quick-lru'
 
 import Chunk from './chunk.ts'
 import { longFromBytesToUnsigned } from './long.ts'
-
-import type VirtualOffset from './virtualOffset.ts'
+import VirtualOffset from './virtualOffset.ts'
 
 // SYNC: ~/src/gmod/bam-js/src/util.ts optimizeChunks
 export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
@@ -118,13 +117,41 @@ export function clampChunkEnds(
   }
 }
 
-export function findFirstData(
-  currentFdl: VirtualOffset | undefined,
-  virtualOffset: VirtualOffset,
+/**
+ * The smallest of `current` and the `count` packed virtual offsets starting at
+ * `offset`, allocating at most one VirtualOffset rather than one per entry.
+ *
+ * The index first pass exists only to find this minimum, and it visits every
+ * linear-index entry in the file to do it — 301k of them on
+ * test/data/failing_tabix.vcf.gz.tbi against 19k bin chunks. Building a
+ * VirtualOffset per entry to compare and discard it is the bulk of that pass.
+ */
+export function minVirtualOffset(
+  bytes: Uint8Array,
+  offset: number,
+  count: number,
+  current: VirtualOffset | undefined,
 ) {
-  return !currentFdl || currentFdl.compareTo(virtualOffset) > 0
-    ? virtualOffset
-    : currentFdl
+  let minBlock = current ? current.blockPosition : Infinity
+  let minData = current ? current.dataPosition : 0
+  let found = false
+  for (let i = 0; i < count; i++) {
+    const p = offset + i * 8
+    const block =
+      bytes[p + 7]! * 0x1_00_00_00_00_00 +
+      bytes[p + 6]! * 0x1_00_00_00_00 +
+      bytes[p + 5]! * 0x1_00_00_00 +
+      bytes[p + 4]! * 0x1_00_00 +
+      bytes[p + 3]! * 0x1_00 +
+      bytes[p + 2]!
+    const data = (bytes[p + 1]! << 8) | bytes[p]!
+    if (block < minBlock || (block === minBlock && data < minData)) {
+      minBlock = block
+      minData = data
+      found = true
+    }
+  }
+  return found ? new VirtualOffset(minBlock, minData) : current
 }
 
 export function parseNameBytes(namesBytes: Uint8Array) {

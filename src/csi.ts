@@ -4,8 +4,8 @@ import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
   clampChunkEnds,
-  findFirstData,
   memoizeByRefId,
+  minVirtualOffset,
   optimizeChunks,
   parseAuxData,
   parsePseudoBin,
@@ -90,7 +90,7 @@ export default class CSI extends IndexFile {
         if (bin > maxBinNumber) {
           curr += 28 + 16 // skip pseudo-bin (loffset + nchunk + 2 chunks)
         } else {
-          firstDataLine = findFirstData(firstDataLine, fromBytes(bytes, curr))
+          firstDataLine = minVirtualOffset(bytes, curr, 1, firstDataLine)
           curr += 8 // loffset
           const chunkCount = dataView.getInt32(curr, true)
           curr += 4 + 16 * chunkCount

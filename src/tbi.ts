@@ -4,8 +4,8 @@ import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
   clampChunkEnds,
-  findFirstData,
   memoizeByRefId,
+  minVirtualOffset,
   optimizeChunks,
   parseAuxData,
   parsePseudoBin,
@@ -78,8 +78,15 @@ export default class TabixIndex extends IndexFile {
     // nameSectionLength is at TBI offset 32; re-read to find where bin data starts
     const nameSectionLength = dataView.getInt32(32, true)
 
-    // SYNC: ~/src/gmod/bam-js/src/csi.ts _parse — two-pass structure
-    // First pass: record per-refId byte offsets and find firstDataLine
+    // SYNC: ~/src/gmod/bam-js/src/bai.ts _parse — two-pass structure
+    // First pass: record per-refId byte offsets and find firstDataLine.
+    //
+    // Only the linear index is consulted. Its entry for a window is the
+    // smallest virtual offset of any record overlapping that window, so the
+    // minimum over the linear index is already the minimum over the bin chunks
+    // — walking the chunks too only re-derives it. Checked against every .tbi
+    // in test/data: same answer on all 23, and no ref has bins without a
+    // linear index.
     let curr = 36 + nameSectionLength
     let firstDataLine: VirtualOffset | undefined
     const offsets: number[] = []
@@ -97,21 +104,13 @@ export default class TabixIndex extends IndexFile {
           throw new Error(
             'tabix index contains too many bins, please use a CSI index',
           )
-        } else if (bin === maxBinNumber + 1) {
-          curr += 16 * chunkCount
-        } else {
-          for (let k = 0; k < chunkCount; k++) {
-            firstDataLine = findFirstData(firstDataLine, fromBytes(bytes, curr))
-            curr += 16
-          }
         }
+        curr += 16 * chunkCount
       }
       const linearCount = dataView.getInt32(curr, true)
       curr += 4
-      for (let k = 0; k < linearCount; k++) {
-        firstDataLine = findFirstData(firstDataLine, fromBytes(bytes, curr))
-        curr += 8
-      }
+      firstDataLine = minVirtualOffset(bytes, curr, linearCount, firstDataLine)
+      curr += 8 * linearCount
     }
 
     function getIndices(refId: number): RefIndex | undefined {
