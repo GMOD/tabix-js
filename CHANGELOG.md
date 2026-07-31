@@ -1,3 +1,13 @@
+## [3.5.1](https://github.com/GMOD/tabix-js/compare/v3.5.0...v3.5.1) (2026-07-31)
+
+### Bug Fixes
+
+* satisfy eslint-plugin-unicorn 72 ([fd12751](https://github.com/GMOD/tabix-js/commit/fd127514cb685238f8b2de4640a4103ad37c0cee)), closes [#private](https://github.com/GMOD/tabix-js/issues/private)
+
+### Performance Improvements
+
+* read a query's chunks ahead, as far as the scan earns ([8340c33](https://github.com/GMOD/tabix-js/commit/8340c33a95929402fc49c87a12ea34f714ec21a0))
+
 # [3.5.0](https://github.com/GMOD/tabix-js/compare/v3.4.3...v3.5.0) (2026-07-25)
 
 ### Features
