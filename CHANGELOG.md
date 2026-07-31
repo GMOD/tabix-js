@@ -1,3 +1,14 @@
+## [3.5.2](https://github.com/GMOD/tabix-js/compare/v3.5.1...v3.5.2) (2026-07-31)
+
+### Bug Fixes
+
+* default the chunk cache to 100MB, and correct why entries get large ([4936495](https://github.com/GMOD/tabix-js/commit/4936495ac588687e1665b0be55661b63c79daa10))
+
+### Performance Improvements
+
+* bound the chunk cache by decompressed bytes, not entry count ([25783a1](https://github.com/GMOD/tabix-js/commit/25783a16b6977c72aa15d18550d07176dfb29de1))
+* find firstDataLine without allocating a VirtualOffset per index entry ([e5173e4](https://github.com/GMOD/tabix-js/commit/e5173e4fbc6bcb9562dfbfcc1e13a423a2530c69))
+
 ## [3.5.1](https://github.com/GMOD/tabix-js/compare/v3.5.0...v3.5.1) (2026-07-31)
 
 ### Bug Fixes
