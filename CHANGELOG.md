@@ -68,7 +68,13 @@
 
 ## [3.3.8](https://github.com/GMOD/tabix-js/compare/v3.3.7...v3.3.8) (2026-05-19)
 
+- ci: rename the merged workflow back to `publish.yml` — npm's OIDC
+  trusted-publishing config pins to that exact file path
+
 ## [3.3.7](https://github.com/GMOD/tabix-js/compare/v3.3.6...v3.3.7) (2026-05-19)
+
+- ci: fold the publish workflow into `push.yml`, gated on the test job
+  succeeding first
 
 ## [3.3.6](https://github.com/GMOD/tabix-js/compare/v3.3.5...v3.3.6) (2026-05-18)
 
@@ -112,49 +118,124 @@
 
 ## [3.3.2](https://github.com/GMOD/tabix-js/compare/v3.3.1...v3.3.2) (2026-04-27)
 
+- Multiple README clarity and doc-error fixes; correct the `lineCount`
+  docs (count is exact, not approximate); add JSDoc so auto-generated API
+  docs pick it up
+- Routine dependency bumps
+
 ## [3.3.1](https://github.com/GMOD/tabix-js/compare/v3.3.0...v3.3.1) (2026-03-28)
+
+- Export the `VirtualOffset` type from the package entrypoint
+- Fix the npm trusted-publishing workflow (remove a now-invalid token
+  override and provenance flag)
+- README cleanups
 
 # [3.3.0](https://github.com/GMOD/tabix-js/compare/v3.2.2...v3.3.0) (2026-03-28)
 
+- perf: scan for tabs with `Uint8Array.indexOf`, and parse VCF
+  `SVTYPE=TRA`/`END=` INFO fields in a single pass instead of two
+- refactor: simplify `tabixIndexedFile.ts` by extracting standalone helper
+  functions and inlining the line-check loop
+- chore: switch from yarn to pnpm; upgrade TypeScript to v6 with
+  `nodenext` module resolution; tighten the ESLint config (no `any`,
+  consistent type imports, etc.)
+- ci: add an npm publish workflow using OIDC trusted publishing
+- docs: add CONTRIBUTING.md
+
 ## [3.2.2](https://github.com/GMOD/tabix-js/compare/v3.2.1...v3.2.2) (2025-12-24)
+
+- Rework `checkLine` to take precomputed column/format constants instead of
+  the metadata object, hoisting per-call work out of the `getLines` hot
+  loop, and extend the `getLines` callback with parsed start/end
+  coordinates
+- Reorganize benchmarks into `benchmarks/`, adding a dedicated `checkLine`
+  benchmark suite
 
 ## [3.2.1](https://github.com/GMOD/tabix-js/compare/v3.2.0...v3.2.1) (2025-12-17)
 
+- Bump `quick-lru` to a current major version
+
 # [3.2.0](https://github.com/GMOD/tabix-js/compare/v3.1.2...v3.2.0) (2025-12-11)
+
+- Migrate to the WASM-based `@gmod/bgzf-filehandle` for bgzf decompression
+  (#153)
 
 ## [3.1.2](https://github.com/GMOD/tabix-js/compare/v3.1.1...v3.1.2) (2025-11-24)
 
+- Routine dependency bumps (`@gmod/bgzf-filehandle`); switch to yarn
+
 ## [3.1.1](https://github.com/GMOD/tabix-js/compare/v3.1.0...v3.1.1) (2025-11-19)
+
+- Eliminate a regex-based ASCII check from the `getLines` hot path (#152);
+  add a CPU profiling script for benchmarking
 
 # [3.1.0](https://github.com/GMOD/tabix-js/compare/v3.0.5...v3.1.0) (2025-10-01)
 
+- Add an in-memory LRU cache for decompressed bgzf blocks, avoiding
+  redundant unzips on repeated reads
+
 ## [3.0.5](https://github.com/GMOD/tabix-js/compare/v3.0.4...v3.0.5) (2025-05-26)
+
+- Bump `@gmod/bgzf-filehandle`
 
 ## [3.0.4](https://github.com/GMOD/tabix-js/compare/v3.0.3...v3.0.4) (2025-05-13)
 
+- Restore a webpack config for browser bundle builds
+
 ## [3.0.3](https://github.com/GMOD/tabix-js/compare/v3.0.2...v3.0.3) (2025-05-13)
+
+- Add a `postbuild` script
 
 ## [3.0.2](https://github.com/GMOD/tabix-js/compare/v3.0.1...v3.0.2) (2025-04-30)
 
+- Bump `@gmod/abortable-promise-cache` and `@gmod/bgzf-filehandle` to their
+  ESM-only major versions
+
 ## [3.0.1](https://github.com/GMOD/tabix-js/compare/v3.0.0...v3.0.1) (2025-04-30)
+
+- Bump `generic-filehandle2`
 
 # [3.0.0](https://github.com/GMOD/tabix-js/compare/v2.0.5...v3.0.0) (2025-04-30)
 
+- Switch to a pure-ESM package build (#151) — breaking change, hence the
+  major version bump
+
 ## [2.0.5](https://github.com/GMOD/tabix-js/compare/v2.0.4...v2.0.5) (2025-03-18)
+
+- Update README for the `generic-filehandle2` migration; tighten the
+  `Options` type by dropping its arbitrary-key index signature
 
 ## [2.0.4](https://github.com/GMOD/tabix-js/compare/v2.0.3...v2.0.4) (2024-12-18)
 
+- Drop `longfn` too, in favor of a small inline 64-bit unsigned-integer
+  parser
+
 ## [2.0.3](https://github.com/GMOD/tabix-js/compare/v2.0.2...v2.0.3) (2024-12-18)
+
+- Replace the `long` dependency with the smaller `longfn` package for
+  parsing pseudo-bin line counts
 
 ## [2.0.2](https://github.com/GMOD/tabix-js/compare/v2.0.0...v2.0.2) (2024-12-12)
 
+- Bump `generic-filehandle2` to its stable release
+
 # [2.0.0](https://github.com/GMOD/tabix-js/compare/v1.6.1...v2.0.0) (2024-12-12)
+
+- Migrate from `generic-filehandle` to `generic-filehandle2` (#150) —
+  breaking change, hence the major version bump
 
 ## [1.6.1](https://github.com/GMOD/tabix-js/compare/v1.6.0...v1.6.1) (2024-12-07)
 
+- Pin typescript to `~5.6` to fix broken `.d.ts` generation
+
 # [1.6.0](https://github.com/GMOD/tabix-js/compare/v1.5.15...v1.6.0) (2024-11-30)
 
+- Optimize `getLines` for large GWAS-style tabix files (#148)
+
 ## [1.5.15](https://github.com/GMOD/tabix-js/compare/v1.5.14...v1.5.15) (2024-08-30)
+
+- Add a single-file minified browser bundle via webpack, with new usage
+  examples
 
 ## [1.5.14](https://github.com/GMOD/tabix-js/compare/v1.5.13...v1.5.14) (2024-07-23)
 
