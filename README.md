@@ -20,13 +20,13 @@ import { TabixIndexedFile } from '@gmod/tabix'
 const file = new TabixIndexedFile({ path: 'file.vcf.gz' })
 
 // CSI index
-const file = new TabixIndexedFile({
+const csi = new TabixIndexedFile({
   path: 'file.vcf.gz',
   csiPath: 'file.vcf.gz.csi',
 })
 
 // Remote files
-const file = new TabixIndexedFile({
+const remote = new TabixIndexedFile({
   url: 'https://example.com/file.vcf.gz',
   tbiUrl: 'https://example.com/file.vcf.gz.tbi',
 })
@@ -34,7 +34,7 @@ const file = new TabixIndexedFile({
 // Or with a filehandle from generic-filehandle2
 import { RemoteFile } from 'generic-filehandle2'
 
-const file = new TabixIndexedFile({
+const custom = new TabixIndexedFile({
   filehandle: new RemoteFile('https://example.com/file.vcf.gz'),
   tbiFilehandle: new RemoteFile('https://example.com/file.vcf.gz.tbi'),
 })
@@ -59,21 +59,34 @@ await file.getLines('chr1', 200, 300, (line, fileOffset, start, end) => {
 })
 ```
 
-Pass an options object to use an `AbortSignal`:
+Pass an options object instead of a bare callback to abort the query or track
+download progress:
 
 ```typescript
 const aborter = new AbortController()
 await file.getLines('chr1', 200, 300, {
   lineCallback: (line, fileOffset, start, end) => lines.push(line),
   signal: aborter.signal,
+  onProgress: (bytesDownloaded, totalBytes) => {
+    console.log(`${bytesDownloaded}/${totalBytes}`)
+  },
 })
 ```
+
+`onProgress` ticks once per compressed block, including instant ticks for cache
+hits, and `totalBytes` is known up front from the index — enough for a
+determinate progress bar.
 
 Notes:
 
 - Meta/comment lines are skipped
 - Line strings have no trailing whitespace
 - Pass `undefined` for `end` to read to the end of the contig
+- A `refName` that is not in the index yields no lines and no error, so a
+  `chr1`/`1` naming mismatch looks like an empty region. Check against
+  [`getReferenceSequenceNames`](#getreferencesequencenamesopts-promisestring) if
+  a query comes back unexpectedly empty
+- `start > end` throws a `TypeError`; `start === end` returns without reading
 
 ### Without NPM (CDN)
 
@@ -81,7 +94,9 @@ Notes:
 <script src="https://unpkg.com/@gmod/tabix/dist/tabix-bundle.js"></script>
 ```
 
-See [example/index.html](example/index.html) for a working demo.
+See [example/index.html](example/index.html) for a working demo. It fetches the
+VCF over HTTP, so serve the directory (e.g. `npx serve example`) rather than
+opening the file directly.
 
 ## API
 
@@ -98,14 +113,19 @@ See [example/index.html](example/index.html) for a working demo.
 | `csiPath`        | `string?`            | CSI index path                                                                              |
 | `csiUrl`         | `string?`            | CSI index URL                                                                               |
 | `csiFilehandle`  | `GenericFilehandle?` | CSI index filehandle                                                                        |
-| `chunkCacheSize` | `number?`            | Chunk LRU cache size in bytes (default 5 MiB)                                               |
+| `chunkCacheSize` | `number?`            | Chunk LRU cache budget, in _decompressed_ bytes (default 100 MiB)                           |
 
 ### `getLines(refName, start, end, opts)`
 
-Calls `opts` (or `opts.lineCallback`) for each line overlapping `[start, end)`.
+Calls the line callback for each line overlapping `[start, end)`. `start`
+defaults to `0` and `end` to the end of the contig when `undefined`. `opts` is
+either the callback itself or an object:
 
-Callback signature:
-`(line: string, fileOffset: number, start: number, end: number) => void`
+| Option         | Type                                                     | Description                             |
+| -------------- | -------------------------------------------------------- | --------------------------------------- |
+| `lineCallback` | `(line, fileOffset, start, end) => void`                 | Required                                |
+| `signal`       | `AbortSignal?`                                           | Aborts the in-flight reads              |
+| `onProgress`   | `(bytesDownloaded: number, totalBytes?: number) => void` | Called as compressed blocks are fetched |
 
 ### `getHeader(opts?): Promise<string>`
 
@@ -117,8 +137,7 @@ Returns the header as raw bytes.
 
 ### `getReferenceSequenceNames(opts?): Promise<string[]>`
 
-Returns reference sequence names in index order. `renameRefSeqs` is not applied
-to these names.
+Returns reference sequence names in index order.
 
 ### `lineCount(refName, opts?): Promise<number>`
 
@@ -130,14 +149,9 @@ reference is not in the index.
 Estimates the compressed byte size of index chunks covering the given regions.
 Useful for deciding whether a request is too large before calling `getLines`.
 
-## Publishing
+## Contributing
 
-[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub
-Actions.
-
-```bash
-pnpm version patch  # or minor/major
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release steps.
 
 ## Academic Use
 
