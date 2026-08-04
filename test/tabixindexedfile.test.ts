@@ -640,6 +640,15 @@ test('getHeaderLines falls back to the rows the index counted', async () => {
   expect(await f.getHeaderLines()).toEqual(['chrom\tstart\tend\tname'])
 })
 
+test('getHeaderLines is empty for a file that keeps no header either way', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/chr22_nanopore_subset.bed.gz', import.meta.url)
+      .pathname,
+  })
+
+  expect(await f.getHeaderLines()).toEqual([])
+})
+
 // Both header forms come out of the same leading blocks. Reading them twice was
 // a second fetch and a second decompress on every file whose header is a bare
 // row, which is exactly the file getSkippedLines exists for.
