@@ -1,3 +1,13 @@
+## [3.5.4](https://github.com/GMOD/tabix-js/compare/v3.5.3...v3.5.4) (2026-08-04)
+
+### Chores
+
+- Depend on @gmod/bgzf-filehandle 6.3.2
+
+### Features
+
+- GetHeaderLines, and one read of the header instead of two
+
 ## [3.5.3](https://github.com/GMOD/tabix-js/compare/v3.5.2...v3.5.3) (2026-08-04)
 
 ### Chores
