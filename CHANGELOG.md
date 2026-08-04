@@ -1,3 +1,13 @@
+## [3.5.5](https://github.com/GMOD/tabix-js/compare/v3.5.4...v3.5.5) (2026-08-04)
+
+### Bug Fixes
+
+- Stop returning lines twice when a query's chunks overlap
+
+### Tests
+
+- Cover getHeaderLines for a file that keeps no header either way
+
 ## [3.5.4](https://github.com/GMOD/tabix-js/compare/v3.5.3...v3.5.4) (2026-08-04)
 
 ### Chores
