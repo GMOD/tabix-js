@@ -1,3 +1,23 @@
+## [3.5.3](https://github.com/GMOD/tabix-js/compare/v3.5.2...v3.5.3) (2026-08-04)
+
+### Chores
+
+- Replace standard-changelog with git-cliff for changelog generation
+
+### Documentation
+
+- Correct stale README facts and drop the README generator
+- Backfill blank CHANGELOG.md entries from git history
+- Mark breaking changes in the generated changelog
+
+### Features
+
+- GetSkippedLines, for a header the index counted rather than commented
+
+### Tests
+
+- Pin getHeader to `tabix -H` semantics for a `skip`-counted header
+
 ## [3.5.2](https://github.com/GMOD/tabix-js/compare/v3.5.1...v3.5.2) (2026-07-31)
 
 ### Bug Fixes
