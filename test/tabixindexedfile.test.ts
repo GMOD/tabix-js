@@ -548,3 +548,40 @@ test('strips CRLF line terminators like htslib does', async () => {
     'contigA\t3105\trs17878855\tG\tC\t100\tq10\tTEST=def',
   ])
 })
+
+// htslib distinguishes "not data" from "the header", and so does this.
+//
+// Its indexer (tbx.c) treats a line as non-data when `lineno <= line_skip` OR
+// it begins with the meta character. But `tabix -H` (tabix.c) prints only the
+// leading meta-character lines and never consults line_skip — it breaks on the
+// first line that is not commented. So a header row kept with `tabix -S 1`,
+// which is how a file whose header is not commented gets indexed, is NOT part
+// of the header as tabix reports it.
+//
+// getHeader mirrors `tabix -H`. Verified against htslib 1.24: this fixture is
+// indexed `-S 1`, and `tabix -H` on it prints nothing.
+//
+// Callers that want the skipped lines want a different question answered, and
+// should read them themselves rather than have this quietly disagree with the
+// reference implementation.
+test('does not report a `skip`-counted header, matching `tabix -H`', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/skiplines_header.bed.gz', import.meta.url).pathname,
+  })
+
+  expect(await f.getHeader()).toBe('')
+})
+
+test('a `skip`-counted header is not returned as data either', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/skiplines_header.bed.gz', import.meta.url).pathname,
+  })
+
+  const lines: string[] = []
+  await f.getLines('ctgA', 0, 1000, {
+    lineCallback: line => {
+      lines.push(line)
+    },
+  })
+  expect(lines).toEqual(['ctgA\t100\t200\tfeat1', 'ctgA\t300\t400\tfeat2'])
+})
