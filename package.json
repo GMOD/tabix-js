@@ -50,7 +50,7 @@
   ],
   "dependencies": {
     "@gmod/abortable-promise-cache": "^3.0.4",
-    "@gmod/bgzf-filehandle": "^6.2.0",
+    "@gmod/bgzf-filehandle": "^6.3.2",
     "@jbrowse/quick-lru": "^7.3.5",
     "generic-filehandle2": "^2.2.0"
   },

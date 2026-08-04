@@ -89,9 +89,7 @@ export default abstract class IndexFile {
       signal: opts.signal,
       onProgress: opts.onProgress,
     })
-    // the assertion is for @gmod/bgzf-filehandle <= 6.3.1, which infers unzip()
-    // as `any`; it can go once this depends on a release that annotates it
-    const bytes = (await unzip(buf)) as Uint8Array
+    const bytes = await unzip(buf)
     return {
       bytes,
       dataView: new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),

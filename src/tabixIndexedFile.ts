@@ -9,6 +9,7 @@ import { optimizeChunks } from './util.ts'
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
 import type { Options } from './indexFile.ts'
+import type { ChunkSlice } from '@gmod/bgzf-filehandle'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 const TAB = 9
@@ -148,18 +149,11 @@ interface GetLinesOpts {
   onProgress?: (bytesDownloaded: number, totalBytes?: number) => void
 }
 
-// SYNC: ~/src/gmod/bam-js/src/bamFile.ts readBamFeatures
-//
-// cpositions/dpositions are `ArrayLike`, not `number[]`: the wasm decompressor
-// produces them as Float64Arrays, and @gmod/bgzf-filehandle hands them back as
-// such rather than copying every block offset into a plain array. Only indexed
-// reads and `.length` are used here, so either form works — which is what lets
-// this typing span the versions on both sides of that change.
-interface ReadChunk {
-  buffer: Uint8Array
-  cpositions: ArrayLike<number>
-  dpositions: ArrayLike<number>
-}
+// The decompressed chunk plus its block offsets, as @gmod/bgzf-filehandle
+// returns them: cpositions/dpositions are Float64Arrays, which is what the
+// wasm decompressor produces, and only indexed reads and `.length` are used
+// here. Taken from the package rather than restated so the two can't drift.
+type ReadChunk = ChunkSlice
 
 function resolveFilehandle(
   filehandle?: GenericFilehandle,
@@ -652,9 +646,7 @@ export default class TabixIndexedFile {
     // takes up more than one block? this case is not covered here
 
     const buf = await this.filehandle.read(maxFetch, 0, opts)
-    // the assertion is for @gmod/bgzf-filehandle <= 6.3.1, which infers unzip()
-    // as `any`; it can go once this depends on a release that annotates it
-    return (await unzip(buf)) as Uint8Array
+    return unzip(buf)
   }
 
   /**

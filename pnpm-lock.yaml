@@ -12,8 +12,8 @@ importers:
         specifier: ^3.0.4
         version: 3.0.4
       '@gmod/bgzf-filehandle':
-        specifier: ^6.2.0
-        version: 6.2.0
+        specifier: ^6.3.2
+        version: 6.3.2
       '@jbrowse/quick-lru':
         specifier: ^7.3.5
         version: 7.3.5
@@ -146,8 +146,8 @@ packages:
   '@gmod/abortable-promise-cache@3.0.4':
     resolution: {integrity: sha512-kxRJj5fyRKFuZDp/YvnHeadYCV2EEUKyH2T4a2Iz9O7T/thOWWHUDiiD/Mg6WZP/RNNDIcfSHl/xVHHy/+j8qg==}
 
-  '@gmod/bgzf-filehandle@6.2.0':
-    resolution: {integrity: sha512-az2V3+hhpEUHBdJsN6SuSHu7rHFqIIssuZFeerRe8fvEcI/qW+BqB3vT5YC0CNU/SqQB8HREeWu8RoLQbmumdw==}
+  '@gmod/bgzf-filehandle@6.3.2':
+    resolution: {integrity: sha512-ZgVK7PGUMOByRQn5inARjcz2fSOH1hyIidPj1TBmPZVwVrIXeigHW6rAIs/U8UkxV0c8Xez2D14HGnF3uiq4UQ==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1845,7 +1845,7 @@ snapshots:
 
   '@gmod/abortable-promise-cache@3.0.4': {}
 
-  '@gmod/bgzf-filehandle@6.2.0':
+  '@gmod/bgzf-filehandle@6.3.2':
     dependencies:
       generic-filehandle2: 2.2.0
       pako-esm2: 2.0.2
