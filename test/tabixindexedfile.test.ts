@@ -585,3 +585,21 @@ test('a `skip`-counted header is not returned as data either', async () => {
   })
   expect(lines).toEqual(['ctgA\t100\t200\tfeat1', 'ctgA\t300\t400\tfeat2'])
 })
+
+// The other half of the distinction above: what getHeader deliberately omits is
+// still reachable, without callers re-reading the file and guessing a size.
+test('getSkippedLines returns the header the index counted', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/skiplines_header.bed.gz', import.meta.url).pathname,
+  })
+
+  expect(await f.getSkippedLines()).toEqual(['chrom\tstart\tend\tname'])
+})
+
+test('getSkippedLines is empty when the index counted none', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+  })
+
+  expect(await f.getSkippedLines()).toEqual([])
+})

@@ -618,6 +618,42 @@ export default class TabixIndexedFile {
     return bytes
   }
 
+  /**
+   * The leading lines the index says to skip — `tabix -S N` — which is where a
+   * file whose header row is not commented keeps it. Empty when the index
+   * records no skipped lines.
+   *
+   * Deliberately not part of `getHeader`. htslib draws the same distinction:
+   * its indexer treats a line as non-data when `lineno <= line_skip` OR it
+   * begins with the meta character (tbx.c), while `tabix -H` prints only the
+   * leading meta-character lines and never consults line_skip (tabix.c).
+   * `getHeader` mirrors `-H`, so a bare header row is absent from it, and
+   * callers that need one were left re-reading the file themselves — guessing
+   * at a read size, and unable to tell a headerless file from an uncommented
+   * one. PLINK `.ld`, bedGraph and BED deflines are all routinely written this
+   * way.
+   */
+  async getSkippedLines(opts: Options = {}) {
+    const {
+      firstDataLine,
+      skipLines = 0,
+      maxBlockSize,
+    } = await this.getMetadata(opts)
+    if (skipLines <= 0) {
+      return []
+    }
+
+    // same read getHeaderBuffer makes, and the same caveat: a header spanning
+    // more blocks than this is not covered
+    const buf = await this.filehandle.read(
+      (firstDataLine?.blockPosition ?? 0) + maxBlockSize,
+      0,
+      opts,
+    )
+    const bytes = (await unzip(buf)) as Uint8Array
+    return new TextDecoder().decode(bytes).split(/\r?\n/).slice(0, skipLines)
+  }
+
   async getHeader(opts: Options = {}) {
     const bytes = await this.getHeaderBuffer(opts)
     return new TextDecoder().decode(bytes)

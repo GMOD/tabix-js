@@ -129,11 +129,24 @@ either the callback itself or an object:
 
 ### `getHeader(opts?): Promise<string>`
 
-Returns all comment/meta lines before the first data line as a string.
+Returns all comment/meta lines before the first data line as a string, matching
+what `tabix -H` prints. A header row that is not commented is therefore not
+included, even when the index counted it as a line to skip — see
+`getSkippedLines`.
 
 ### `getHeaderBuffer(opts?): Promise<Uint8Array>`
 
 Returns the header as raw bytes.
+
+### `getSkippedLines(opts?): Promise<string[]>`
+
+Returns the leading lines the index says to skip (`tabix -S N`), or `[]` when it
+records none. This is where a file whose header row is not commented keeps it,
+which PLINK `.ld`, bedGraph and BED deflines routinely are.
+
+Separate from `getHeader` because htslib treats the two differently: a line is
+not data when the index's skip count covers it **or** it starts with the meta
+character, but `tabix -H` prints only the latter.
 
 ### `getReferenceSequenceNames(opts?): Promise<string[]>`
 
