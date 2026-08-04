@@ -148,10 +148,17 @@ interface GetLinesOpts {
   onProgress?: (bytesDownloaded: number, totalBytes?: number) => void
 }
 
+// SYNC: ~/src/gmod/bam-js/src/bamFile.ts readBamFeatures
+//
+// cpositions/dpositions are `ArrayLike`, not `number[]`: the wasm decompressor
+// produces them as Float64Arrays, and @gmod/bgzf-filehandle hands them back as
+// such rather than copying every block offset into a plain array. Only indexed
+// reads and `.length` are used here, so either form works — which is what lets
+// this typing span the versions on both sides of that change.
 interface ReadChunk {
   buffer: Uint8Array
-  cpositions: number[]
-  dpositions: number[]
+  cpositions: ArrayLike<number>
+  dpositions: ArrayLike<number>
 }
 
 function resolveFilehandle(
@@ -222,8 +229,8 @@ function resolveIndex({
 }
 
 function calculateFileOffset(
-  cpositions: number[],
-  dpositions: number[],
+  cpositions: ArrayLike<number>,
+  dpositions: ArrayLike<number>,
   pos: number,
   blockStart: number,
   minvDataPosition: number,
@@ -289,6 +296,50 @@ function getVcfEnd(
   return endCoordinate
 }
 
+const textDecoder = new TextDecoder()
+
+/**
+ * The leading run of meta-character lines — what `tabix -H` prints. Everything
+ * from the first line that doesn't begin with the meta character is dropped.
+ */
+function trimToMetaLines(bytes: Uint8Array, metaChar: string) {
+  let lastNewline = -1
+  const metaByte = metaChar.charCodeAt(0)
+
+  for (let i = 0, l = bytes.length; i < l; i++) {
+    const byte = bytes[i]
+    if (i === lastNewline + 1 && byte !== metaByte) {
+      break
+    }
+    if (byte === NEWLINE) {
+      lastNewline = i
+    }
+  }
+  return bytes.subarray(0, lastNewline + 1)
+}
+
+/**
+ * The first `count` lines. Scans for the count-th newline and decodes only that
+ * far, rather than decoding and splitting the whole buffer to keep its first
+ * few lines — the buffer runs to the first data line, which for a file with a
+ * long commented preamble above its counted rows can be megabytes.
+ */
+function firstLines(bytes: Uint8Array, count: number) {
+  let end = 0
+  for (let i = 0; i < count; i++) {
+    const n = bytes.indexOf(NEWLINE, end)
+    if (n === -1) {
+      end = bytes.length
+      break
+    }
+    end = n + 1
+  }
+  return textDecoder
+    .decode(bytes.subarray(0, end))
+    .split(/\r?\n/)
+    .slice(0, count)
+}
+
 function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
   let val = 0
   for (let i = start; i < end; i++) {
@@ -309,6 +360,7 @@ export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
+  private headerP?: Promise<{ header: string; skippedLines: string[] }>
 
   constructor({
     path,
@@ -588,34 +640,61 @@ export default class TabixIndexedFile {
     return this.index.getMetadata(opts)
   }
 
-  async getHeaderBuffer(opts: Options = {}) {
-    const { firstDataLine, metaChar, maxBlockSize } =
-      await this.getMetadata(opts)
+  /**
+   * The file's leading blocks, decompressed: everything from the start through
+   * the end of the block holding the first data line.
+   */
+  private async readHeaderBytes(opts: Options) {
+    const { firstDataLine, maxBlockSize } = await this.getMetadata(opts)
 
     const maxFetch = (firstDataLine?.blockPosition ?? 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header actually
     // takes up more than one block? this case is not covered here
 
     const buf = await this.filehandle.read(maxFetch, 0, opts)
-    const bytes = (await unzip(buf)) as Uint8Array
+    // the assertion is for @gmod/bgzf-filehandle <= 6.3.1, which infers unzip()
+    // as `any`; it can go once this depends on a release that annotates it
+    return (await unzip(buf)) as Uint8Array
+  }
 
-    // trim off lines after the last meta line
-    if (metaChar) {
-      let lastNewline = -1
-      const metaByte = metaChar.charCodeAt(0)
-
-      for (let i = 0, l = bytes.length; i < l; i++) {
-        const byte = bytes[i]
-        if (i === lastNewline + 1 && byte !== metaByte) {
-          break
-        }
-        if (byte === NEWLINE) {
-          lastNewline = i
-        }
-      }
-      return bytes.subarray(0, lastNewline + 1)
+  /**
+   * Both header forms, from one read of the same bytes: the commented block
+   * `tabix -H` prints, and the rows `tabix -S N` counted.
+   *
+   * Memoized, because asking for one and then the other is the normal way to
+   * find a header whichever way the file keeps it (see `getHeaderLines`), and
+   * that used to fetch and decompress the file's leading blocks twice. Only
+   * the parsed results are retained — the decompressed bytes are dropped,
+   * which matters for a VCF header that can run to megabytes.
+   */
+  private async parseHeader(opts: Options) {
+    const { metaChar, skipLines = 0 } = await this.getMetadata(opts)
+    const bytes = await this.readHeaderBytes(opts)
+    return {
+      header: textDecoder.decode(
+        metaChar ? trimToMetaLines(bytes, metaChar) : bytes,
+      ),
+      skippedLines: skipLines > 0 ? firstLines(bytes, skipLines) : [],
     }
-    return bytes
+  }
+
+  private async getParsedHeader(opts: Options = {}) {
+    this.headerP ??= this.parseHeader(opts).catch((error: unknown) => {
+      this.headerP = undefined
+      throw error
+    })
+    return this.headerP
+  }
+
+  /**
+   * The bytes of the commented header. Deliberately not memoized, unlike the
+   * string form: this hands back the buffer, and holding one for the lifetime
+   * of the file is the caller's decision to make.
+   */
+  async getHeaderBuffer(opts: Options = {}) {
+    const { metaChar } = await this.getMetadata(opts)
+    const bytes = await this.readHeaderBytes(opts)
+    return metaChar ? trimToMetaLines(bytes, metaChar) : bytes
   }
 
   /**
@@ -634,29 +713,34 @@ export default class TabixIndexedFile {
    * way.
    */
   async getSkippedLines(opts: Options = {}) {
-    const {
-      firstDataLine,
-      skipLines = 0,
-      maxBlockSize,
-    } = await this.getMetadata(opts)
+    const { skipLines = 0 } = await this.getMetadata(opts)
+    // the index already answers this without reading the file at all
     if (skipLines <= 0) {
       return []
     }
-
-    // same read getHeaderBuffer makes, and the same caveat: a header spanning
-    // more blocks than this is not covered
-    const buf = await this.filehandle.read(
-      (firstDataLine?.blockPosition ?? 0) + maxBlockSize,
-      0,
-      opts,
-    )
-    const bytes = (await unzip(buf)) as Uint8Array
-    return new TextDecoder().decode(bytes).split(/\r?\n/).slice(0, skipLines)
+    return (await this.getParsedHeader(opts)).skippedLines
   }
 
   async getHeader(opts: Options = {}) {
-    const bytes = await this.getHeaderBuffer(opts)
-    return new TextDecoder().decode(bytes)
+    return (await this.getParsedHeader(opts)).header
+  }
+
+  /**
+   * The file's header lines, however that file keeps them: the meta-character
+   * block when there is one, and otherwise the rows the index counted. Empty
+   * lines are dropped.
+   *
+   * The two halves answer different questions (see `getSkippedLines`), but
+   * "what are this file's header lines" is nearly always the question a caller
+   * actually has, and answering it from `getHeader` alone is wrong in a way
+   * that doesn't announce itself: a bare header row comes back as the empty
+   * string, indistinguishable from a file that has no header, so callers fall
+   * back to an assumed column layout and quietly mis-name columns. Deciding it
+   * here also means one read of the leading blocks instead of two.
+   */
+  async getHeaderLines(opts: Options = {}) {
+    const { header, skippedLines } = await this.getParsedHeader(opts)
+    return (header ? header.split(/\r?\n/) : skippedLines).filter(Boolean)
   }
 
   async getReferenceSequenceNames(opts: Options = {}) {

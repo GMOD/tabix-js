@@ -1,18 +1,15 @@
-import { unzip } from '@gmod/bgzf-filehandle'
-
 import Chunk from './chunk.ts'
 import IndexFile from './indexFile.ts'
 import {
   clampChunkEnds,
   memoizeByRefId,
   minVirtualOffset,
-  optimizeChunks,
   parseAuxData,
   parsePseudoBin,
 } from './util.ts'
 import { fromBytes } from './virtualOffset.ts'
 
-import type { Options, RefIndex } from './indexFile.ts'
+import type { IndexData, Options, RefIndex } from './indexFile.ts'
 import type VirtualOffset from './virtualOffset.ts'
 
 const CSI1_MAGIC = 21_582_659 // CSI\1
@@ -28,22 +25,9 @@ function rshift(num: number, bits: number) {
 }
 
 export default class CSI extends IndexFile {
-  private maxBinNumber = 0
-  private depth = 0
-  private minShift = 0
-
   /** @internal */
   async _parse(opts: Options = {}) {
-    const buf = await this.filehandle.readFile({
-      signal: opts.signal,
-      onProgress: opts.onProgress,
-    })
-    const bytes = (await unzip(buf)) as Uint8Array
-    const dataView = new DataView(
-      bytes.buffer,
-      bytes.byteOffset,
-      bytes.byteLength,
-    )
+    const { bytes, dataView } = await this.readIndexBytes(opts)
 
     const magic = dataView.getUint32(0, true)
     let csiVersion
@@ -55,11 +39,10 @@ export default class CSI extends IndexFile {
       throw new Error(`Not a CSI file (magic=${magic})`)
     }
 
-    this.minShift = dataView.getInt32(4, true)
-    this.depth = dataView.getInt32(8, true)
-    this.maxBinNumber = ((1 << ((this.depth + 1) * 3)) - 1) / 7
-    const maxBinNumber = this.maxBinNumber
-    const maxRefLength = 2 ** (this.minShift + this.depth * 3)
+    const minShift = dataView.getInt32(4, true)
+    const depth = dataView.getInt32(8, true)
+    const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
+    const maxRefLength = 2 ** (minShift + depth * 3)
     const auxLength = dataView.getInt32(12, true)
     const aux =
       auxLength >= 30
@@ -144,49 +127,11 @@ export default class CSI extends IndexFile {
       firstDataLine,
       csiVersion,
       indices: memoizeByRefId(getIndices),
-      depth: this.depth,
+      minShift,
+      depth,
       maxBinNumber,
       maxRefLength,
     }
-  }
-
-  async blocksForRange(
-    refName: string,
-    min: number,
-    max: number,
-    opts: Options = {},
-  ) {
-    if (min < 0) {
-      min = 0
-    }
-
-    const indexData = await this.parse(opts)
-    const refId = indexData.refNameToId[refName]
-    if (refId === undefined) {
-      return []
-    }
-    const ba = indexData.indices(refId)
-    if (!ba) {
-      return []
-    }
-
-    // List of bin #s that overlap min, max
-    const overlappingBins = this.reg2bins(min, max)
-    const chunks: Chunk[] = []
-
-    // Find chunks in overlapping bins.  Leaf bins (< 4681) are not pruned
-    for (const [start, end] of overlappingBins) {
-      for (let bin = start; bin <= end; bin++) {
-        const binChunks = ba.binIndex[bin]
-        if (binChunks) {
-          for (const c of binChunks) {
-            chunks.push(c)
-          }
-        }
-      }
-    }
-
-    return optimizeChunks(chunks, this.minOffset(ba.loffsets, min))
   }
 
   /**
@@ -196,14 +141,17 @@ export default class CSI extends IndexFile {
    * Walks leaf -> previous sibling -> parent until an indexed bin is found.
    * SYNC: htslib hts_itr_query min_off computation
    */
-  private minOffset(
-    loffsets: Record<number, VirtualOffset> | undefined,
+  protected lowestOffset(
+    ref: RefIndex,
     beg: number,
+    { minShift, depth }: IndexData,
   ) {
+    const { loffsets } = ref
     let found: VirtualOffset | undefined
     if (loffsets) {
       // first bin of the deepest level, i.e. (8**depth - 1) / 7
-      let bin = (lshift(1, 3 * this.depth) - 1) / 7 + rshift(beg, this.minShift)
+      let bin =
+        (lshift(1, 3 * depth) - 1) / 7 + rshift(Math.max(beg, 0), minShift)
       while (found === undefined && bin > 0) {
         found = loffsets[bin]
         if (found === undefined) {
@@ -217,23 +165,27 @@ export default class CSI extends IndexFile {
     return found
   }
 
-  /** @internal */
-  reg2bins(beg: number, end: number) {
-    const maxPos = 2 ** (this.minShift + this.depth * 3)
+  protected reg2bins(
+    beg: number,
+    end: number,
+    { minShift, depth, maxBinNumber }: IndexData,
+  ) {
+    beg = Math.max(beg, 0)
+    const maxPos = 2 ** (minShift + depth * 3)
     if (end > maxPos) {
       end = maxPos
     }
     end -= 1
     let l = 0
     let t = 0
-    let s = this.minShift + this.depth * 3
-    const bins = []
-    for (; l <= this.depth; s -= 3, t += lshift(1, l * 3), l += 1) {
+    let s = minShift + depth * 3
+    const bins: (readonly [number, number])[] = []
+    for (; l <= depth; s -= 3, t += lshift(1, l * 3), l += 1) {
       const b = t + rshift(beg, s)
       const e = t + rshift(end, s)
-      if (e - b + bins.length > this.maxBinNumber) {
+      if (e - b + bins.length > maxBinNumber) {
         throw new Error(
-          `query ${beg}-${end} is too large for current binning scheme (shift ${this.minShift}, depth ${this.depth}), try a smaller query or a coarser index binning scheme`,
+          `query ${beg}-${end} is too large for current binning scheme (shift ${minShift}, depth ${depth}), try a smaller query or a coarser index binning scheme`,
         )
       }
       bins.push([b, e] as const)

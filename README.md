@@ -148,6 +148,18 @@ Separate from `getHeader` because htslib treats the two differently: a line is
 not data when the index's skip count covers it **or** it starts with the meta
 character, but `tabix -H` prints only the latter.
 
+### `getHeaderLines(opts?): Promise<string[]>`
+
+Returns the file's header lines however the file keeps them: the commented block
+when there is one, and otherwise the rows the index counted. Empty lines are
+dropped.
+
+This is usually the one you want. Reading `getHeader` alone cannot tell a file
+that has no header from one whose header is not commented — both come back as
+the empty string — so callers fall back to an assumed column layout and quietly
+mis-name columns. Both forms are parsed from a single read of the file's leading
+blocks, which is also shared with `getHeader` and `getSkippedLines`.
+
 ### `getReferenceSequenceNames(opts?): Promise<string[]>`
 
 Returns reference sequence names in index order.

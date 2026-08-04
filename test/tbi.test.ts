@@ -28,6 +28,8 @@ test('loads', async () => {
     format: 'VCF',
     metaChar: '#',
     maxBinNumber: 37_449,
+    minShift: 14,
+    depth: 5,
     firstDataLine: new VirtualOffset(0, 10_431),
     refIdToName: ['contigA'],
     refNameToId: { contigA: 0 },

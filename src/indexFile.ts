@@ -1,3 +1,7 @@
+import { unzip } from '@gmod/bgzf-filehandle'
+
+import { optimizeChunks } from './util.ts'
+
 import type Chunk from './chunk.ts'
 import type VirtualOffset from './virtualOffset.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
@@ -30,13 +34,19 @@ export interface IndexData {
   indices: (refId: number) => RefIndex | undefined
   maxRefLength: number
   skipLines?: number
-  maxBinNumber?: number
   maxBlockSize: number
   firstDataLine?: VirtualOffset
   refCount?: number
   csi?: boolean
   csiVersion?: number
-  depth?: number
+  /**
+   * The binning scheme. TBI reports these too, though its own are fixed by the
+   * format (minShift 14, depth 5) rather than read from the file: they are the
+   * same scheme, and CSI exists to let a file choose other values for them.
+   */
+  minShift: number
+  depth: number
+  maxBinNumber: number
 }
 
 export default abstract class IndexFile {
@@ -48,6 +58,45 @@ export default abstract class IndexFile {
   }
 
   protected abstract _parse(opts: Options): Promise<IndexData>
+
+  /**
+   * The bins that may overlap [beg, end), as one inclusive [first, last] range
+   * per level of the binning scheme.
+   */
+  protected abstract reg2bins(
+    beg: number,
+    end: number,
+    indexData: IndexData,
+  ): (readonly [number, number])[]
+
+  /**
+   * The earliest virtual offset any record overlapping `beg` can have, so that
+   * chunks ending at or before it can be dropped. TBI reads it off the linear
+   * index; CSI, which has none, off the bins' loffsets.
+   */
+  protected abstract lowestOffset(
+    ref: RefIndex,
+    beg: number,
+    indexData: IndexData,
+  ): VirtualOffset | undefined
+
+  /**
+   * The whole index file, decompressed, with a DataView over it. Both .tbi and
+   * .csi are bgzf-compressed and read whole, so both parsers start here.
+   */
+  protected async readIndexBytes(opts: Options) {
+    const buf = await this.filehandle.readFile({
+      signal: opts.signal,
+      onProgress: opts.onProgress,
+    })
+    // the assertion is for @gmod/bgzf-filehandle <= 6.3.1, which infers unzip()
+    // as `any`; it can go once this depends on a release that annotates it
+    const bytes = (await unzip(buf)) as Uint8Array
+    return {
+      bytes,
+      dataView: new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    }
+  }
 
   /** @internal */
   public async lineCount(refName: string, opts: Options = {}) {
@@ -65,13 +114,44 @@ export default abstract class IndexFile {
     return rest
   }
 
-  /** @internal */
-  public abstract blocksForRange(
+  /**
+   * The chunks of the data file that may hold records overlapping the region.
+   * The two index formats differ only in their binning scheme and in where
+   * they keep the pruning floor, which is what the two hooks above supply.
+   *
+   * @internal
+   */
+  public async blocksForRange(
     refName: string,
-    start: number,
-    end: number,
-    opts: Options,
-  ): Promise<Chunk[]>
+    min: number,
+    max: number,
+    opts: Options = {},
+  ) {
+    const indexData = await this.parse(opts)
+    const refId = indexData.refNameToId[refName]
+    if (refId === undefined) {
+      return []
+    }
+    const ba = indexData.indices(refId)
+    if (!ba) {
+      return []
+    }
+
+    // Find chunks in overlapping bins. Leaf bins are not pruned.
+    const chunks: Chunk[] = []
+    for (const [start, end] of this.reg2bins(min, max, indexData)) {
+      for (let bin = start; bin <= end; bin++) {
+        const binChunks = ba.binIndex[bin]
+        if (binChunks) {
+          for (const c of binChunks) {
+            chunks.push(c)
+          }
+        }
+      }
+    }
+
+    return optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
+  }
 
   /** @internal */
   async parse(opts: Options = {}) {

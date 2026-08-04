@@ -1,7 +1,16 @@
+import { LocalFile } from 'generic-filehandle2'
 import { expect, test } from 'vitest'
 
 import TabixIndexedFile from '../src/tabixIndexedFile.ts'
 import VirtualOffset from '../src/virtualOffset.ts'
+
+class CountingFile extends LocalFile {
+  public reads = 0
+  override async read(length: number, position?: number) {
+    this.reads++
+    return super.read(length, position)
+  }
+}
 
 class RecordCollector {
   records: { line: string; fileOffset: number }[] = []
@@ -76,6 +85,8 @@ test('can read contigA:1000..4000', async () => {
     refNameToId: { contigA: 0 },
     skipLines: 0,
     maxBinNumber: 37_449,
+    minShift: 14,
+    depth: 5,
     maxRefLength: 536_870_912,
   })
 })
@@ -602,4 +613,66 @@ test('getSkippedLines is empty when the index counted none', async () => {
   })
 
   expect(await f.getSkippedLines()).toEqual([])
+})
+
+// getHeaderLines answers "what are this file's header lines" without the caller
+// having to know which of the two ways the file kept them.
+test('getHeaderLines returns the commented block when there is one', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+  })
+
+  const lines = await f.getHeaderLines()
+  expect(lines[0]).toBe('##fileformat=VCFv4.1')
+  expect(lines.at(-1)).toMatch(/^#CHROM\t/)
+  // the trailing newline must not come back as an empty final line
+  expect(lines.every(Boolean)).toBe(true)
+})
+
+test('getHeaderLines falls back to the rows the index counted', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/skiplines_header.bed.gz', import.meta.url).pathname,
+  })
+
+  // getHeader is empty for this file — it mirrors `tabix -H`, which prints
+  // nothing here — so a caller reading only that sees a headerless file
+  expect(await f.getHeader()).toBe('')
+  expect(await f.getHeaderLines()).toEqual(['chrom\tstart\tend\tname'])
+})
+
+// Both header forms come out of the same leading blocks. Reading them twice was
+// a second fetch and a second decompress on every file whose header is a bare
+// row, which is exactly the file getSkippedLines exists for.
+test('the header is read once no matter which forms are asked for', async () => {
+  const filehandle = new CountingFile(
+    new URL('data/skiplines_header.bed.gz', import.meta.url).pathname,
+  )
+  const f = new TabixIndexedFile({
+    filehandle,
+    tbiFilehandle: new LocalFile(
+      new URL('data/skiplines_header.bed.gz.tbi', import.meta.url).pathname,
+    ),
+  })
+
+  expect(await f.getHeader()).toBe('')
+  expect(filehandle.reads).toBe(1)
+  expect(await f.getSkippedLines()).toEqual(['chrom\tstart\tend\tname'])
+  expect(await f.getHeaderLines()).toEqual(['chrom\tstart\tend\tname'])
+  expect(filehandle.reads).toBe(1)
+})
+
+// The index alone says there are none, so answering costs nothing.
+test('getSkippedLines reads nothing when the index counted none', async () => {
+  const filehandle = new CountingFile(
+    new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+  )
+  const f = new TabixIndexedFile({
+    filehandle,
+    tbiFilehandle: new LocalFile(
+      new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
+    ),
+  })
+
+  expect(await f.getSkippedLines()).toEqual([])
+  expect(filehandle.reads).toBe(0)
 })

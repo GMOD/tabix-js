@@ -40,6 +40,7 @@ test('loads test.gff3.gz.csi', async () => {
     skipLines: 0,
     maxBlockSize: 1 << 16,
     maxBinNumber: 299_593,
+    minShift: 14,
     maxRefLength: 4_294_967_296,
   })
 })
@@ -80,6 +81,7 @@ test('loads test.vcf.gz.csi', async () => {
     maxBlockSize: 1 << 16,
     skipLines: 0,
     maxBinNumber: 299_593,
+    minShift: 14,
     maxRefLength: 4_294_967_296,
   })
 })
