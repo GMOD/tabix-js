@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 
 import Chunk from '../src/chunk.ts'
 import TabixIndexedFile from '../src/tabixIndexedFile.ts'
-import { clampChunkEnds } from '../src/util.ts'
+import { clampChunkEnds, optimizeChunks } from '../src/util.ts'
 import VirtualOffset from '../src/virtualOffset.ts'
 
 const block = 1 << 16
@@ -63,4 +63,46 @@ test('clamped estimate still fetches correct lines', async () => {
   ])
   // clamped estimate is well under the naive 7-chunk * 64KB worst case
   expect(est).toBeLessThan(7 * block)
+})
+
+// SYNC: ~/src/gmod/bam-js/test/util.test.ts
+// Two chunks from different bins can overlap inside one BGZF block while the
+// merge still declines to join them, because the combined span would exceed its
+// 5MB cap. The overlapping bytes were then decoded twice and every line in them
+// returned twice from getLines.
+test('optimizeChunks leaves no overlapping spans', () => {
+  const a = new Chunk(
+    new VirtualOffset(3804, 0),
+    new VirtualOffset(4977599, 16404),
+    1,
+  )
+  const b = new Chunk(
+    new VirtualOffset(4977599, 5843),
+    new VirtualOffset(9719917, 27612),
+    2,
+  )
+  const out = optimizeChunks([a, b])
+
+  expect(out.length).toBe(2)
+  expect(out[1]!.minv.blockPosition).toBe(4977599)
+  expect(out[1]!.minv.dataPosition).toBe(16404)
+  expect(out[0]!.minv.blockPosition).toBe(3804)
+  expect(out[1]!.maxv.blockPosition).toBe(9719917)
+  expect(out[1]!.maxv.dataPosition).toBe(27612)
+})
+
+test('optimizeChunks drops a chunk contained in its predecessor', () => {
+  const a = new Chunk(
+    new VirtualOffset(0, 0),
+    new VirtualOffset(6_000_000, 500),
+    1,
+  )
+  const b = new Chunk(
+    new VirtualOffset(10, 0),
+    new VirtualOffset(6_000_000, 100),
+    2,
+  )
+  const out = optimizeChunks([a, b])
+  expect(out.length).toBe(1)
+  expect(out[0]!.maxv.dataPosition).toBe(500)
 })

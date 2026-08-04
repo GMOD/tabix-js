@@ -75,7 +75,49 @@ export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
     }
   }
 
-  return mergedChunks
+  return makeDisjoint(mergedChunks)
+}
+
+// SYNC: ~/src/gmod/bam-js/src/util.ts makeDisjoint
+/**
+ * Trim any chunk that starts before its predecessor ends, so the spans a query
+ * reads never overlap.
+ *
+ * Merging alone does not guarantee this. Two chunks from different bins can
+ * overlap inside a single BGZF block while the merge above still declines to
+ * join them, because the combined span would exceed its 5MB cap. The shared
+ * bytes are then fetched, decompressed and decoded by both chunks, and every
+ * line in the overlap is returned TWICE from getLines — a duplicated VCF
+ * record or GFF feature, with a duplicated fileOffset.
+ *
+ * Safe because a chunk's `maxv` is the virtual offset just past its last
+ * record — a record boundary — so no record begins inside the trimmed span and
+ * the union of the chunks is unchanged.
+ *
+ * No fixture here reproduces it (@gmod/bam found it on an 18MB BAM, where
+ * out.bam returned 5 of its 6551 records twice); this keeps the two copies of
+ * optimizeChunks in step and pins the invariant.
+ */
+function makeDisjoint(chunks: Chunk[]) {
+  const out: Chunk[] = [chunks[0]!]
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i]!
+    const prevMax = out.at(-1)!.maxv
+    const cmp =
+      chunk.minv.blockPosition - prevMax.blockPosition ||
+      chunk.minv.dataPosition - prevMax.dataPosition
+    if (cmp >= 0) {
+      out.push(chunk)
+      continue
+    }
+    const stillHasData =
+      chunk.maxv.blockPosition - prevMax.blockPosition ||
+      chunk.maxv.dataPosition - prevMax.dataPosition
+    if (stillHasData > 0) {
+      out.push(new Chunk(prevMax, chunk.maxv, chunk.bin, chunk.endPosition))
+    }
+  }
+  return out
 }
 
 // Tighten each chunk's endPosition (default: a full max-size BGZF block past
