@@ -10,7 +10,10 @@ import type {
 } from 'generic-filehandle2'
 
 
-const TBI_PATH = 'test/data/1kg.chr1.subset.vcf.gz.tbi'
+// A fixture that is TRACKED IN GIT. test/data/1kg.chr1.subset.vcf.gz* is
+// gitignored — it exists locally but not in CI, where the read is an ENOENT
+// rather than the parked read these tests are about.
+const TBI_PATH = 'test/data/CNVtest.vcf.gz.tbi'
 
 // A filehandle that honours the signal — LocalFile does not — and can park its
 // readFile, so the shared index parse can be caught mid-flight.
