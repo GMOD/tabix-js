@@ -3,17 +3,26 @@ import { expect, test } from 'vitest'
 
 import TBI from '../src/tbi.ts'
 
-import type { FilehandleOptions } from 'generic-filehandle2'
+import type {
+  BufferEncoding,
+  FilehandleOptions,
+  GenericFilehandle,
+} from 'generic-filehandle2'
 
 
 const TBI_PATH = 'test/data/1kg.chr1.subset.vcf.gz.tbi'
 
 // A filehandle that honours the signal — LocalFile does not — and can park its
 // readFile, so the shared index parse can be caught mid-flight.
-class GatedIndexFile extends LocalFile {
+class GatedIndexFile implements GenericFilehandle {
   reads = 0
+  private inner: LocalFile
   private waiting: (() => void)[] = []
   private held = true
+
+  constructor(path: string) {
+    this.inner = new LocalFile(path)
+  }
 
   open() {
     this.held = false
@@ -24,17 +33,41 @@ class GatedIndexFile extends LocalFile {
     }
   }
 
-  override async readFile(opts?: FilehandleOptions) {
+  // The overload pair rather than one signature, because GenericFilehandle's
+  // readFile is overloaded on `encoding`. tsconfig.json only includes src, so
+  // nothing type-checks test/ and a single signature would pass silently.
+  readFile(
+    options?: Omit<FilehandleOptions, 'encoding'>,
+  ): Promise<Uint8Array<ArrayBuffer>>
+  readFile(
+    options:
+      | BufferEncoding
+      | (Omit<FilehandleOptions, 'encoding'> & { encoding: BufferEncoding }),
+  ): Promise<string>
+  async readFile(
+    options?: BufferEncoding | FilehandleOptions,
+  ): Promise<Uint8Array<ArrayBuffer> | string> {
     this.reads++
+    const signal = typeof options === 'string' ? undefined : options?.signal
     if (this.held) {
       await new Promise<void>((resolve, reject) => {
         this.waiting.push(resolve)
-        opts?.signal?.addEventListener('abort', () => {
+        signal?.addEventListener('abort', () => {
           reject(new Error('aborted'))
         })
       })
     }
-    return super.readFile()
+    return this.inner.readFile()
+  }
+
+  read(length: number, position: number) {
+    return this.inner.read(length, position)
+  }
+  stat() {
+    return this.inner.stat()
+  }
+  close() {
+    return Promise.resolve()
   }
 }
 
