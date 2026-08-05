@@ -1,3 +1,9 @@
+## [3.5.7](https://github.com/GMOD/tabix-js/compare/v3.5.6...v3.5.7) (2026-08-05)
+
+### Tests
+
+- Use a fixture that is actually tracked in git
+
 ## [3.5.6](https://github.com/GMOD/tabix-js/compare/v3.5.5...v3.5.6) (2026-08-05)
 
 ### Bug Fixes
