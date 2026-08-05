@@ -1,6 +1,6 @@
 import { unzip } from '@gmod/bgzf-filehandle'
 
-import { optimizeChunks } from './util.ts'
+import { optimizeChunks, throwIfAborted } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type VirtualOffset from './virtualOffset.ts'
@@ -52,6 +52,13 @@ export interface IndexData {
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
   private parseP?: Promise<IndexData>
+  /**
+   * The signal `parseP` was started under, while it is still in flight. The
+   * index is parsed once and shared by every query against the file, so without
+   * this the first query to arrive would own a read all the others depend on —
+   * see {@link parse}.
+   */
+  private parseSignal?: AbortSignal
 
   constructor({ filehandle }: { filehandle: GenericFilehandle }) {
     this.filehandle = filehandle
@@ -151,13 +158,78 @@ export default abstract class IndexFile {
     return optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
   }
 
-  /** @internal */
-  async parse(opts: Options = {}) {
-    this.parseP ??= this._parse(opts).catch((error: unknown) => {
-      this.parseP = undefined
-      throw error
-    })
-    return this.parseP
+  /**
+   * Parse the index, or join the parse already running.
+   *
+   * The index is downloaded and parsed once for the life of this object, so it
+   * is the one read here that is shared between queries — and therefore the one
+   * place a cancellation can leak from the query that asked for it to a query
+   * that did not. `_parse` hands `opts` straight to `readIndexBytes`, so
+   * without this the first query to arrive owns a read every other query
+   * depends on: when it pans away, every concurrent query fails with its abort.
+   *
+   * A caller that joined someone else's parse and saw it fail because *they*
+   * aborted starts over rather than inheriting the failure — once, then
+   * propagates. Bounding it at one attempt is what jbrowse's
+   * `RemoteFileWithRangeCache.joinChunk` does with the same retry one layer
+   * down, and for the reason it gives: the pathological case becomes one
+   * duplicate parse rather than a recursion whose depth depends on how the
+   * aborts interleave.
+   *
+   * A retry rather than the reference count `chunkCache` gets from
+   * `@gmod/abortable-promise-cache`, because the index is parsed once for the
+   * life of the object: there is no repeated waste to recover, and this is a
+   * dozen lines against restructuring the memo. `@gmod/bam`'s `IndexFile` and
+   * `@gmod/cram`'s `CraiIndex` make the same split for the same reason.
+   *
+   * @internal
+   */
+  async parse(opts: Options = {}, retried = false): Promise<IndexData> {
+    throwIfAborted(opts.signal)
+    const pending = this.parseP
+    if (!pending) {
+      return this.startParse(opts)
+    }
+
+    // read before awaiting: the owner is forgotten as soon as the parse settles
+    const ownerSignal = this.parseSignal
+    try {
+      return await pending
+    } catch (e) {
+      if (retried || !ownerSignal?.aborted || opts.signal?.aborted) {
+        throw e
+      }
+      return this.parse(opts, true)
+    }
+  }
+
+  private startParse(opts: Options) {
+    const pending = this._parse(opts)
+    this.parseP = pending
+    this.parseSignal = opts.signal
+    // Drop a rejection rather than keeping it, so one transient failure does not
+    // poison the index for the lifetime of the file. Identity-checked so a retry
+    // started after this settles is not cleared by the attempt it replaced.
+    //
+    // Written as one try/catch rather than `.then(onFulfilled, onRejected)`
+    // because `unicorn/prefer-then-catch` rewrites the two-argument form to
+    // `.then(...).catch(...)`, which is not the same thing — that catch would
+    // also swallow anything the fulfilment handler threw.
+    void (async () => {
+      let failed = false
+      try {
+        await pending
+      } catch {
+        failed = true
+      }
+      if (this.parseP === pending) {
+        if (failed) {
+          this.parseP = undefined
+        }
+        this.parseSignal = undefined
+      }
+    })()
+    return pending
   }
 
   /** @internal */

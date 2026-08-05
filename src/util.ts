@@ -5,6 +5,37 @@ import { longFromBytesToUnsigned } from './long.ts'
 import VirtualOffset from './virtualOffset.ts'
 
 // SYNC: ~/src/gmod/bam-js/src/util.ts optimizeChunks
+/**
+ * `signal.throwIfAborted()`, without requiring either that method or `reason`.
+ *
+ * Two reasons not to call the built-in directly. It assumes a *real*
+ * `AbortSignal`, and callers pass duck-typed ones, where calling a missing
+ * method is a `TypeError` rather than the cancellation the caller asked for —
+ * a strictly worse failure.
+ *
+ * And it sets a browser floor. `AbortSignal.prototype.throwIfAborted` and
+ * `AbortSignal.reason` are Safari 15.4 / Chrome 100 / Firefox 97 (March 2022),
+ * higher than anything else here needs: this package otherwise touches only
+ * `.aborted`, and `generic-filehandle2` only forwards a signal to `fetch`.
+ *
+ * Faithful to the spec otherwise: an aborted signal throws its `reason`
+ * whatever that is, and only synthesizes an `AbortError` when there is none.
+ * Kept in sync with the copy in `@gmod/bam`'s `src/util.ts`.
+ */
+export function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    const reason: unknown = signal.reason
+    // Spec-faithful: throwIfAborted throws `reason` verbatim, and `reason` is
+    // whatever the caller passed to abort() — `controller.abort('too slow')`
+    // makes it a string. Coercing it to an Error here would hide that from a
+    // consumer who set it deliberately.
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw reason === undefined
+      ? new DOMException('This operation was aborted', 'AbortError')
+      : reason
+  }
+}
+
 export function optimizeChunks(chunks: Chunk[], lowest?: VirtualOffset) {
   const n = chunks.length
   if (n === 0) {
