@@ -77,6 +77,31 @@ await file.getLines('chr1', 200, 300, {
 hits, and `totalBytes` is known up front from the index — enough for a
 determinate progress bar.
 
+### lineBytesCallback
+
+`lineBytesCallback` replaces `lineCallback` and hands over the line as bytes —
+the decompressed buffer plus the line's range within it — instead of a decoded
+string:
+
+```typescript
+await file.getLines('chr1', 200, 300, {
+  lineBytesCallback: (buffer, lineStart, lineEnd, fileOffset, start, end) => {
+    // parse straight out of `buffer` between lineStart and lineEnd
+  },
+})
+```
+
+Finding and filtering a line is already byte-wise here — the tab scan, the
+reference-name compare, both coordinate parses — and the decode at the end is
+the only place a string appears. A consumer that is going to re-split the line
+and parse numbers back out of it can skip that decode and read the bytes it
+wants, which for a dense format is a large share of the cost of a query.
+
+The buffer is the reader's own decompressed block, handed over without a copy,
+so **the bytes are only valid for the duration of the call**. Copy out anything
+you keep. The range excludes the newline and a CRLF terminator, the same as the
+string form.
+
 Notes:
 
 - Meta/comment lines are skipped
@@ -122,11 +147,12 @@ Calls the line callback for each line overlapping `[start, end)`. `start`
 defaults to `0` and `end` to the end of the contig when `undefined`. `opts` is
 either the callback itself or an object:
 
-| Option         | Type                                                     | Description                             |
-| -------------- | -------------------------------------------------------- | --------------------------------------- |
-| `lineCallback` | `(line, fileOffset, start, end) => void`                 | Required                                |
-| `signal`       | `AbortSignal?`                                           | Aborts the in-flight reads              |
-| `onProgress`   | `(bytesDownloaded: number, totalBytes?: number) => void` | Called as compressed blocks are fetched |
+| Option              | Type                                                           | Description                                                                          |
+| ------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `lineCallback`      | `(line, fileOffset, start, end) => void`                       | This or `lineBytesCallback`, not both                                                |
+| `lineBytesCallback` | `(buffer, lineStart, lineEnd, fileOffset, start, end) => void` | The line as bytes, no decode. Buffer valid only during the call — copy what you keep |
+| `signal`            | `AbortSignal?`                                                 | Aborts the in-flight reads                                                           |
+| `onProgress`        | `(bytesDownloaded: number, totalBytes?: number) => void`       | Called as compressed blocks are fetched                                              |
 
 ### `getHeader(opts?): Promise<string>`
 
