@@ -20,8 +20,8 @@ test('loads test.gff3.gz.csi', async () => {
   expect(blocks.length).toEqual(0)
   blocks = await ti.blocksForRange('1', 0, 2_000_046_092)
   expect(blocks.length).toEqual(1)
-  expect(blocks[0].minv.blockPosition).toEqual(0)
-  expect(blocks[0].minv.dataPosition).toEqual(130)
+  expect(blocks[0]!.minv.blockPosition).toEqual(0)
+  expect(blocks[0]!.minv.dataPosition).toEqual(130)
   // console.log( blocks );
 
   const metadata = await ti.getMetadata()
@@ -59,8 +59,8 @@ test('loads test.vcf.gz.csi', async () => {
   expect(blocks.length).toEqual(0)
   blocks = await ti.blocksForRange('1', 0, 2_000_046_092)
   expect(blocks.length).toEqual(1)
-  expect(blocks[0].minv.blockPosition).toEqual(0)
-  expect(blocks[0].minv.dataPosition).toEqual(2560)
+  expect(blocks[0]!.minv.blockPosition).toEqual(0)
+  expect(blocks[0]!.minv.dataPosition).toEqual(2560)
   // console.log( blocks );
 
   expect(await ti.lineCount('1')).toEqual(37)

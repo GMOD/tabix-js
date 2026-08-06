@@ -17,8 +17,8 @@ test('loads', async () => {
   // console.log( ti );
   const blocks = await ti.blocksForRange('contigA', 1, 4000)
   expect(blocks.length).toEqual(1)
-  expect(blocks[0].minv.blockPosition).toEqual(0)
-  expect(blocks[0].minv.dataPosition).toEqual(10_431)
+  expect(blocks[0]!.minv.blockPosition).toEqual(0)
+  expect(blocks[0]!.minv.dataPosition).toEqual(10_431)
   // console.log( blocks );
 
   const metadata = await ti.getMetadata()

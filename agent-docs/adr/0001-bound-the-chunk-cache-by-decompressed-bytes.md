@@ -20,8 +20,8 @@ keeps between `maxSize` and `2 × maxSize` items by design, so the real ceiling
 was 160 chunks of unbounded size.
 
 How badly that misses is easy to underestimate. On
-`test/data/1kg.chr1.subset.vcf.gz` — 213MB of samples packed into ~600kb of
-chr1 — panning 23 windows of 50kb peaked at **2027MB RSS**.
+`test/data/1kg.chr1.subset.vcf.gz` — 213MB of samples packed into ~600kb of chr1
+— panning 23 windows of 50kb peaked at **2027MB RSS**.
 
 ## Decision
 
@@ -78,10 +78,10 @@ It is tempting to blame `optimizeChunks`, which merges spans up to 5MB
 _compressed_ — at this file's 7–8× ratio that would be 40MB inflated. **That is
 not the cause.** The raw `.tbi` chunks for chr1 are already 17.65MB and 17.15MB
 compressed before `optimizeChunks` sees them, so the 5MB limit cannot reach
-them. A single finest-level bin covers 16kb of sequence, and in a file with 213MB
-across 600kb of coordinates that bin holds ~120MB decompressed. It is index
-granularity, not merge policy — bounding merges by estimated decompressed size
-would change nothing here.
+them. A single finest-level bin covers 16kb of sequence, and in a file with
+213MB across 600kb of coordinates that bin holds ~120MB decompressed. It is
+index granularity, not merge policy — bounding merges by estimated decompressed
+size would change nothing here.
 
 The only way to a smaller unit is to cache at BGZF block level rather than chunk
 level. `unzipChunkSlice` already computes the block boundaries (`cpositions` /

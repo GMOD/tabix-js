@@ -34,7 +34,12 @@ async function count(f: TabixIndexedFile, ref: string, s: number, e: number) {
   return lines
 }
 
-const MANY_CHUNKS = ['ncbi_human.sorted.gff.gz', 'NC_000001.11', 45e6, 46e6] as const
+const MANY_CHUNKS = [
+  'ncbi_human.sorted.gff.gz',
+  'NC_000001.11',
+  45e6,
+  46e6,
+] as const
 const ONE_CHUNK = ['chr22_nanopore_subset.bed.gz', '22', 16e6, 16.02e6] as const
 
 test('a budget that fits the query caches every chunk it read', async () => {

@@ -20,7 +20,7 @@ const SKIP = new Set([
 // deterministic LCG, so a failing query is reproducible
 let seed = 42
 const rand = () =>
-  ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+  (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
 
 function open(idx, chunkCacheSize) {
   const base = idx.replace(/\.(tbi|csi)$/, '')
@@ -62,7 +62,9 @@ for (const idx of indexes) {
   // htslib strips the CR of a CRLF header line; we keep it
   if (ours.replaceAll('\r\n', '\n') !== theirs) {
     bad++
-    console.log(`DIFF header ${base}: ours=${ours.length}b htslib=${theirs.length}b`)
+    console.log(
+      `DIFF header ${base}: ours=${ours.length}b htslib=${theirs.length}b`,
+    )
   }
 }
 console.log(`${headers} headers compared`)

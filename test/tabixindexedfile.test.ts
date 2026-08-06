@@ -160,7 +160,7 @@ test('can query volvox.sort.gff3.gz.1', async () => {
   await f.getLines('ctgB', 0, Infinity, lines.callback)
   lines.expectNoDuplicates()
   expect(lines.records.length).toEqual(4)
-  expect(lines.records[3].line).toEqual(
+  expect(lines.records[3]!.line).toEqual(
     'ctgB	example	remark	4715	5968	.	-	.	Name=f05;Note=ああ、この機能は、世界中を旅しています！',
   )
   lines.clear()
@@ -251,10 +251,10 @@ test('can query out.gff.gz with a TBI index', async () => {
     expect(fileOffset).toBeGreaterThanOrEqual(0)
   }
   expect(lineCount).toEqual(23)
-  expect(lines.records[0].line).toEqual(
+  expect(lines.records[0]!.line).toEqual(
     'NC_000001.11	RefSeq	region	1	248956422	.	+	.	Dbxref=taxon:9606;Name=1;chromosome=1;gbkey=Src;genome=chromosome;mol_type=genomic DNA',
   )
-  expect(lines.records[22].line).toEqual(
+  expect(lines.records[22]!.line).toEqual(
     'NC_000001.11	Gnomon	exon	53282	53959	.	+	.	Parent=lnc_RNA3;Dbxref=GeneID:105379212,Genbank:XR_948874.1;gbkey=ncRNA;gene=LOC105379212;product=uncharacterized LOC105379212;transcript_id=XR_948874.1',
   )
 })
@@ -292,7 +292,7 @@ test('can query test.vcf.gz with a CSI index', async () => {
   lines.clear()
   await f.getLines('1', 1_206_810_422, 1_206_810_423, lines.callback)
   expect(lines.records.length).toEqual(1)
-  expect(lines.records[0].line).toEqual(
+  expect(lines.records[0]!.line).toEqual(
     '1	1206810423	.	T	A	25	.	DP=19;VDB=0.0404;AF1=0.5;AC1=1;DP4=3,7,3,6;MQ=37;FQ=28;PV4=1,1,1,0.27	GT:PL:GQ	0/1:55,0,73:58',
   )
   lines.clear()
@@ -301,7 +301,7 @@ test('can query test.vcf.gz with a CSI index', async () => {
   await f.getLines('1', 1_206_810_423, 1_206_849_288, lines.callback)
   lines.expectNoDuplicates()
   expect(lines.records.length).toEqual(36)
-  expect(lines.records[35].line).toEqual(
+  expect(lines.records[35]!.line).toEqual(
     '1	1206849288	.	G	A	106	.	DP=23;VDB=0.0399;AF1=1;AC1=2;DP4=0,0,16,7;MQ=35;FQ=-96	GT:PL:GQ	1/1:139,69,0:99',
   )
   lines.clear()
@@ -471,7 +471,7 @@ test('start equal to end in tabix columns', async () => {
 
   const items = new RecordCollector()
   await ti.getLines('ctgA', 26_499, 26_625, items.callback)
-  expect(items.records[0].line).toBe('ctgA	26499	C	21	0	21	0	0	0:11:0:0')
+  expect(items.records[0]!.line).toBe('ctgA	26499	C	21	0	21	0	0	0:11:0:0')
 })
 
 test('reports download progress at block granularity', async () => {
@@ -484,7 +484,11 @@ test('reports download progress at block granularity', async () => {
   await f.getLines('contigA', 1000, 4000, {
     lineCallback: items.callback,
     onProgress: (downloaded, total) => {
-      ticks.push([downloaded, total])
+      // `totalBytes` is optional on the callback so an implementation that
+      // cannot know the size may omit it. getLines always can — it sums
+      // fetchedSize() over the chunks before reading any — and the assertions
+      // below are about the total it reports, so a missing one is a failure.
+      ticks.push([downloaded, total!])
     },
   })
 
