@@ -11,6 +11,9 @@ importers:
       '@gmod/bgzf-filehandle':
         specifier: ^6.3.2
         version: 6.3.2
+      '@gmod/shared-read-cache':
+        specifier: ^1.0.0
+        version: 1.0.0
       '@jbrowse/quick-lru':
         specifier: ^7.3.5
         version: 7.3.5
@@ -135,6 +138,9 @@ packages:
 
   '@gmod/bgzf-filehandle@6.3.2':
     resolution: {integrity: sha512-ZgVK7PGUMOByRQn5inARjcz2fSOH1hyIidPj1TBmPZVwVrIXeigHW6rAIs/U8UkxV0c8Xez2D14HGnF3uiq4UQ==}
+
+  '@gmod/shared-read-cache@1.0.0':
+    resolution: {integrity: sha512-fn5FaQdvcL9fpB77HDWLYeOqbaZFmmJzArq4SzUdQQP45rPMUY69diXucBAOp/aJJrSN+qxYvnd5tXbpG/gCRw==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1714,6 +1720,8 @@ snapshots:
     dependencies:
       generic-filehandle2: 2.2.0
       pako-esm2: 2.0.2
+
+  '@gmod/shared-read-cache@1.0.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

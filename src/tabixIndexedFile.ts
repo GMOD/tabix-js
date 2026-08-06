@@ -1,4 +1,5 @@
 import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
+import { SharedReadCache } from '@gmod/shared-read-cache'
 import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
@@ -29,219 +30,6 @@ const MAX_READ_AHEAD_CHUNKS = 6
 // has single index bins of 17MB compressed, 120MB decompressed. Panning it
 // under the old 80-entry cache peaked at 2GB RSS.
 const DEFAULT_CHUNK_CACHE_BYTES = 100 * 2 ** 20
-
-interface ChunkCacheEntry {
-  promise: Promise<ReadChunk>
-  /**
-   * Signals of the callers still waiting on this read. The read is cancelled
-   * only once every one of them has given up.
-   */
-  signals: Set<AbortSignal>
-  /** true once a caller joins without a signal, which pins the read */
-  pinned: boolean
-  /** aborts when every caller has given up; what the read actually runs under */
-  controller: AbortController
-  /** aborted to take this read's listeners back off its callers' signals */
-  dispose: AbortController
-  settled: boolean
-  /** 0 until the read settles and the decompressed size is known */
-  bytes: number
-}
-
-/**
- * One read per chunk, shared by every caller that asks for it while it is in
- * flight, bounded by the decompressed size of what it holds rather than by
- * entry count.
- *
- * This replaces `@gmod/abortable-promise-cache`. That package supplied the
- * dedup and the aggregate abort but needed a byte-bounded backing store bolted
- * underneath it, and the two halves only make sense together: an entry's size
- * is not known until its read settles, so the store had to reach into the
- * promise the cache above it owned. One class is both smaller and honest about
- * that coupling.
- *
- * The cancellation rule is the reference count its `AggregateAbortController`
- * implemented, minus the leak — that one never took a listener back off a
- * caller's signal, so a long-lived signal accumulated one per chunk it ever
- * touched. `dispose` is what bounds that here.
- *
- * SYNC: ~/src/gmod/bam-js/src/bamFile.ts ChunkFeatureCache and joinChunkRead —
- * same reference-counted cancellation for the same reason (ADR 0007).
- */
-class ChunkCache {
-  private entries = new Map<string, ChunkCacheEntry>()
-  private bytes = 0
-  private maxBytes: number
-  private fill: (chunk: Chunk, signal: AbortSignal) => Promise<ReadChunk>
-
-  constructor(
-    maxBytes: number,
-    fill: (chunk: Chunk, signal: AbortSignal) => Promise<ReadChunk>,
-  ) {
-    this.maxBytes = maxBytes
-    this.fill = fill
-  }
-
-  get byteSize() {
-    return this.bytes
-  }
-
-  get size() {
-    return this.entries.size
-  }
-
-  async get(key: string, chunk: Chunk, signal?: AbortSignal) {
-    // Before anything else, including the cache hit. A caller reaches here with
-    // a signal that has already fired on the ordinary pan — the abort lands
-    // while blocksForRange is still reading the index, and nothing between
-    // there and here looks at it. Such a caller must not start a read it has no
-    // interest in, and must not be registered as a waiter on someone else's:
-    // see join().
-    throwIfAborted(signal)
-
-    let entry = this.entries.get(key)
-    if (entry) {
-      // re-insert so Map iteration order stays least-recently-used first
-      this.entries.delete(key)
-      this.entries.set(key, entry)
-      // A read every caller has abandoned is on its way out but may not have
-      // noticed yet. Start a fresh one rather than join one already doomed —
-      // joining it means inheriting a cancellation nothing to do with us.
-      if (!entry.settled && entry.controller.signal.aborted) {
-        this.delete(key)
-        entry = undefined
-      }
-    }
-    entry ??= this.start(key, chunk)
-    // Only a read still running has anything to cancel. Joining a settled one
-    // would add this caller to a set nothing will ever take it out of, since
-    // the entry drops its abort listeners when it settles.
-    if (!entry.settled) {
-      this.join(entry, signal)
-    }
-
-    try {
-      const read = await entry.promise
-      // the read finished, but this caller gave up while waiting for it
-      throwIfAborted(signal)
-      return read
-    } catch (e) {
-      // Prefer this caller's own cancellation to whatever the shared read
-      // reported. If we asked to stop, that is the answer we want — and when
-      // the read itself was cancelled it is because we, and everyone else,
-      // asked it to.
-      throwIfAborted(signal)
-      throw e
-    }
-  }
-
-  // The read runs under the entry's own controller rather than any one caller's
-  // signal, because the read is shared: it must survive until every caller
-  // waiting on it has given up. join() is what registers them.
-  private start(key: string, chunk: Chunk) {
-    const controller = new AbortController()
-    const entry: ChunkCacheEntry = {
-      promise: this.fill(chunk, controller.signal),
-      signals: new Set(),
-      pinned: false,
-      controller,
-      dispose: new AbortController(),
-      settled: false,
-      bytes: 0,
-    }
-    this.entries.set(key, entry)
-    const settle = () => {
-      entry.settled = true
-      // nothing reads these once the read has settled, and holding them would
-      // pin each caller's AbortController behind this entry
-      entry.dispose.abort()
-      entry.signals.clear()
-    }
-    // `.then(f, g)` rather than `.finally(f)` so the handler's own promise never
-    // carries an unhandled rejection.
-    void entry.promise.then(
-      read => {
-        settle()
-        // a later read may have replaced this key while this one was in
-        // flight; charging these bytes to it would double-count
-        if (this.entries.get(key) === entry) {
-          entry.bytes = read.buffer.byteLength
-          this.bytes += entry.bytes
-          this.evict()
-        }
-      },
-      () => {
-        settle()
-        // a failed or aborted read caches nothing, so it is not kept: the next
-        // caller starts over rather than inheriting the failure
-        if (this.entries.get(key) === entry) {
-          this.entries.delete(key)
-        }
-      },
-    )
-    return entry
-  }
-
-  // Register a caller's interest, so the read survives until that caller has
-  // given up too.
-  //
-  // A caller with no signal cannot give up, so it pins the read: there is no
-  // longer any set of aborts that should stop it. That is the honest reading of
-  // a caller that never asked to be cancellable, and it means one signal-free
-  // query makes that chunk's read uncancellable for everyone joined to it.
-  private join(entry: ChunkCacheEntry, signal?: AbortSignal) {
-    if (signal === undefined) {
-      entry.pinned = true
-    } else if (signal.aborted) {
-      // A caller that has already given up is not a waiter, and must not be
-      // counted as one: an `abort` listener never fires on a signal that
-      // aborted before it was added, so nothing would ever take this signal
-      // back out of the set. The count would never reach zero and the read
-      // would be uncancellable for everyone joined to it, silently.
-      //
-      // get() rejects such a caller before it reaches here, with no `await` in
-      // between, so this is unreachable today. It is here because this is the
-      // bug that shipped in @gmod/bam, and an invariant that fails this quietly
-      // should not rest on a check twenty lines away.
-      if (!entry.pinned && entry.signals.size === 0) {
-        entry.controller.abort(signal.reason)
-      }
-    } else if (!entry.signals.has(signal)) {
-      // guarded so one signal joining the same chunk twice does not add two
-      // listeners
-      entry.signals.add(signal)
-      signal.addEventListener(
-        'abort',
-        () => {
-          entry.signals.delete(signal)
-          if (!entry.pinned && entry.signals.size === 0) {
-            entry.controller.abort(signal.reason)
-          }
-        },
-        // `once` covers the abort firing; `dispose` covers it never firing
-        { once: true, signal: entry.dispose.signal },
-      )
-    }
-  }
-
-  delete(key: string) {
-    const entry = this.entries.get(key)
-    if (entry) {
-      this.entries.delete(key)
-      this.bytes -= entry.bytes
-    }
-  }
-
-  // Evict from the least-recently-used end. The size > 1 guard means a single
-  // chunk larger than the whole budget is still kept: the caller needs it for
-  // the query in flight, and dropping it would only force a re-decompress.
-  private evict() {
-    const lru = this.entries.keys()
-    while (this.bytes > this.maxBytes && this.entries.size > 1) {
-      this.delete(lru.next().value!)
-    }
-  }
-}
 
 type GetLinesCallback = (
   line: string,
@@ -467,7 +255,7 @@ function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
-  private chunkCache: ChunkCache
+  private chunkCache: SharedReadCache<Chunk, ReadChunk>
   private headerP?: Promise<{ header: string; skippedLines: string[] }>
   /**
    * The signal `headerP` was started under, while it is still in flight. The
@@ -513,9 +301,14 @@ export default class TabixIndexedFile {
       url,
     })
 
-    this.chunkCache = new ChunkCache(chunkCacheSize, (chunk, signal) =>
-      this.readChunk(chunk, { signal }),
-    )
+    this.chunkCache = new SharedReadCache<Chunk, ReadChunk>({
+      maxSize: chunkCacheSize,
+      // decompressed bytes, not entry count: we fetch compressed and cache
+      // decompressed, and an entry is a whole chunk
+      sizeOf: read => read.buffer.byteLength,
+      cacheKey: chunk => chunk.toString(),
+      fill: (chunk, signal) => this.readChunk(chunk, { signal }),
+    })
   }
 
   /**
@@ -624,7 +417,7 @@ export default class TabixIndexedFile {
     const ensureReadsStarted = (count: number) => {
       while (reads.length < Math.min(count, chunks.length)) {
         const c = chunks[reads.length]!
-        const read = this.chunkCache.get(c.toString(), c, signal)
+        const read = this.chunkCache.get(c, signal)
         void read.catch(() => {
           // a prefetch the early return skips is never awaited, so swallow its
           // rejection here rather than let it surface unhandled
