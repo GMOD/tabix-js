@@ -158,6 +158,8 @@ export default abstract class IndexFile {
     return optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
   }
 
+  // SYNC: ~/src/gmod/bam-js/src/indexFile.ts parse — same owner-signal
+  // tracking and one-attempt retry, and the same reasoning below.
   /**
    * Parse the index, or join the parse already running.
    *
@@ -208,27 +210,22 @@ export default abstract class IndexFile {
     this.parseP = pending
     this.parseSignal = opts.signal
     // Drop a rejection rather than keeping it, so one transient failure does not
-    // poison the index for the lifetime of the file. Identity-checked so a retry
-    // started after this settles is not cleared by the attempt it replaced.
-    //
-    // Written as one try/catch rather than `.then(onFulfilled, onRejected)`
-    // because `unicorn/prefer-then-catch` rewrites the two-argument form to
-    // `.then(...).catch(...)`, which is not the same thing — that catch would
-    // also swallow anything the fulfilment handler threw.
-    void (async () => {
-      let failed = false
-      try {
-        await pending
-      } catch {
-        failed = true
-      }
-      if (this.parseP === pending) {
-        if (failed) {
-          this.parseP = undefined
+    // poison the index for the lifetime of the file. Both branches are
+    // identity-checked so a retry started after this settles is not cleared by
+    // the attempt it already replaced.
+    pending.then(
+      () => {
+        if (this.parseP === pending) {
+          this.parseSignal = undefined
         }
-        this.parseSignal = undefined
-      }
-    })()
+      },
+      () => {
+        if (this.parseP === pending) {
+          this.parseP = undefined
+          this.parseSignal = undefined
+        }
+      },
+    )
     return pending
   }
 

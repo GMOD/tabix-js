@@ -9,18 +9,19 @@ import VirtualOffset from './virtualOffset.ts'
  * `signal.throwIfAborted()`, without requiring either that method or `reason`.
  *
  * Two reasons not to call the built-in directly. It assumes a *real*
- * `AbortSignal`, and callers pass duck-typed ones, where calling a missing
- * method is a `TypeError` rather than the cancellation the caller asked for —
- * a strictly worse failure.
+ * `AbortSignal`, and callers pass duck-typed ones — `@gmod/bam`'s
+ * `test/csi.test.ts` casts a bare `{ aborted }` through `as AbortSignal`, which
+ * is a fair model of what consumers do. Calling a missing method there is a
+ * `TypeError` rather than the cancellation the caller asked for, which is a
+ * strictly worse failure.
  *
  * And it sets a browser floor. `AbortSignal.prototype.throwIfAborted` and
  * `AbortSignal.reason` are Safari 15.4 / Chrome 100 / Firefox 97 (March 2022),
- * higher than anything else here needs: this package otherwise touches only
- * `.aborted`, and `generic-filehandle2` only forwards a signal to `fetch`.
+ * higher than anything else in either dependency tree needs — both packages
+ * otherwise touch only `.aborted`, and `generic-filehandle2` only forwards a
+ * signal to `fetch`. A few lines here keep that floor where it was.
  *
- * Faithful to the spec otherwise: an aborted signal throws its `reason`
- * whatever that is, and only synthesizes an `AbortError` when there is none.
- * Kept in sync with the copy in `@gmod/bam`'s `src/util.ts`.
+ * SYNC: @gmod/bam and @gmod/tabix keep identical copies of this.
  */
 export function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {

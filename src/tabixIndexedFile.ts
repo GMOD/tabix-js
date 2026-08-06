@@ -689,6 +689,9 @@ export default class TabixIndexedFile {
    * aborted starts over rather than inheriting the failure — once, then
    * propagates. Same bounded retry, and the same reasoning, as
    * `IndexFile.parse`.
+   *
+   * SYNC: ~/src/gmod/bam-js/src/bamFile.ts getHeader — same shape for the same
+   * reason, on the header rather than the index.
    */
   private async getParsedHeader(
     opts: Options = {},
@@ -716,24 +719,23 @@ export default class TabixIndexedFile {
     const pending = this.parseHeader(opts)
     this.headerP = pending
     this.headerSignal = opts.signal
-    // Drop a rejection rather than keeping it, so one transient failure does
-    // not poison the header for the lifetime of the file. Identity-checked so a
-    // retry started after this settles is not cleared by the attempt it
-    // replaced.
-    void (async () => {
-      let failed = false
-      try {
-        await pending
-      } catch {
-        failed = true
-      }
-      if (this.headerP === pending) {
-        if (failed) {
-          this.headerP = undefined
+    // Drop a rejection rather than keeping it, so one transient failure does not
+    // poison the header for the lifetime of the file. Both branches are
+    // identity-checked so a retry started after this settles is not cleared by
+    // the attempt it already replaced.
+    pending.then(
+      () => {
+        if (this.headerP === pending) {
+          this.headerSignal = undefined
         }
-        this.headerSignal = undefined
-      }
-    })()
+      },
+      () => {
+        if (this.headerP === pending) {
+          this.headerP = undefined
+          this.headerSignal = undefined
+        }
+      },
+    )
     return pending
   }
 

@@ -10,15 +10,18 @@ import type {
   GenericFilehandle,
 } from 'generic-filehandle2'
 
-
 // A fixture that is TRACKED IN GIT. test/data/1kg.chr1.subset.vcf.gz* is
 // gitignored — it exists locally but not in CI, where the read is an ENOENT
 // rather than the parked read these tests are about.
 const TBI_PATH = 'test/data/CNVtest.vcf.gz.tbi'
 
 // A filehandle that honours the signal — LocalFile does not — and can park its
-// readFile, so the shared index parse can be caught mid-flight.
-class GatedIndexFile implements GenericFilehandle {
+// reads, so a shared parse can be caught mid-flight. Gates `read` as well as
+// `readFile`, since the header parse goes through the former and the index
+// parse through the latter.
+//
+// SYNC: ~/src/gmod/bam-js/test/cache.test.ts GatedFile — same harness.
+class GatedFile implements GenericFilehandle {
   reads = 0
   private inner: LocalFile
   private waiting: (() => void)[] = []
@@ -38,8 +41,9 @@ class GatedIndexFile implements GenericFilehandle {
   }
 
   // The overload pair rather than one signature, because GenericFilehandle's
-  // readFile is overloaded on `encoding`. tsconfig.json only includes src, so
-  // nothing type-checks test/ and a single signature would pass silently.
+  // readFile is overloaded on `encoding` and a single-signature override does
+  // not satisfy it. `pnpm typecheck` covers test/ where `pnpm build` does not,
+  // so this is caught here rather than in CI.
   readFile(
     options?: Omit<FilehandleOptions, 'encoding'>,
   ): Promise<Uint8Array<ArrayBuffer>>
@@ -52,7 +56,33 @@ class GatedIndexFile implements GenericFilehandle {
     options?: BufferEncoding | FilehandleOptions,
   ): Promise<Uint8Array<ArrayBuffer> | string> {
     this.reads++
-    const signal = typeof options === 'string' ? undefined : options?.signal
+    await this.gate(typeof options === 'string' ? undefined : options?.signal)
+    return this.inner.readFile()
+  }
+
+  async read(length: number, position: number, opts?: FilehandleOptions) {
+    this.reads++
+    await this.gate(opts?.signal)
+    return this.inner.read(length, position)
+  }
+
+  /**
+   * Resolves once at least `n` reads have been issued.
+   *
+   * The reason the header tests wait on this rather than on a `setTimeout(0)`:
+   * a read is only parked once the code under test reaches it, and getting
+   * there runs real `LocalFile` I/O for the index parse first. One macrotask is
+   * not a bound on that, so waiting a tick and hoping raced — with the index
+   * warm the whole header parse finished before the abort landed, and the
+   * assertion that the owner rejects failed.
+   */
+  async waitForReads(n: number) {
+    while (this.reads < n) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+  }
+
+  private async gate(signal?: AbortSignal) {
     if (this.held) {
       await new Promise<void>((resolve, reject) => {
         this.waiting.push(resolve)
@@ -61,11 +91,6 @@ class GatedIndexFile implements GenericFilehandle {
         })
       })
     }
-    return this.inner.readFile()
-  }
-
-  read(length: number, position: number) {
-    return this.inner.read(length, position)
   }
   stat() {
     return this.inner.stat()
@@ -75,6 +100,8 @@ class GatedIndexFile implements GenericFilehandle {
   }
 }
 
+// lets queued microtasks and timers run, so a joining caller reaches the
+// in-flight parse before we abort the owner
 function tick() {
   return new Promise(resolve => {
     setTimeout(resolve, 0)
@@ -84,7 +111,7 @@ function tick() {
 // The .tbi is parsed once and shared by every query against the file, so the
 // first caller to arrive owns a read all the others depend on.
 test('a bystander survives the index parse owner aborting', async () => {
-  const fh = new GatedIndexFile(TBI_PATH)
+  const fh = new GatedFile(TBI_PATH)
   const tbi = new TBI({ filehandle: fh })
 
   const starter = new AbortController()
@@ -113,7 +140,7 @@ test('a bystander survives the index parse owner aborting', async () => {
 // two, the retrying caller always starts its own parse and never re-enters the
 // join path at all.
 test('the index parse retry is bounded at one attempt', async () => {
-  const fh = new GatedIndexFile(TBI_PATH)
+  const fh = new GatedFile(TBI_PATH)
   const tbi = new TBI({ filehandle: fh })
 
   const a = new AbortController()
@@ -169,7 +196,7 @@ test('a signal without throwIfAborted still cancels', async () => {
 // shared read in this package after the index parse. parseHeader threads opts
 // into both getMetadata and the header read.
 test('a bystander survives the header parse owner aborting', async () => {
-  const fh = new GatedIndexFile('test/data/volvox.test.vcf.gz')
+  const fh = new GatedFile('test/data/volvox.test.vcf.gz')
   const tbi = new TabixIndexedFile({
     filehandle: fh,
     tbiFilehandle: new LocalFile('test/data/volvox.test.vcf.gz.tbi'),
@@ -181,7 +208,8 @@ test('a bystander survives the header parse owner aborting', async () => {
   const starterP = tbi.getHeader({ signal: starter.signal })
   const bystanderP = tbi.getHeader({ signal: bystander.signal })
   void Promise.allSettled([starterP, bystanderP])
-  await tick()
+  // the header read itself, parked — not a tick and a hope
+  await fh.waitForReads(1)
 
   starter.abort()
   fh.open()
