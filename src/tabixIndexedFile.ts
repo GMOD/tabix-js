@@ -59,9 +59,34 @@ type GetLinesCallback = (
   end: number,
 ) => void
 
-interface GetLinesOpts {
+/**
+ * The same line, handed over as bytes rather than a string: the decompressed
+ * buffer plus the line's `[lineStart, lineEnd)` range within it.
+ *
+ * Everything this reader does to find and filter a line is already byte-wise —
+ * the tab scan, the reference-name compare, both coordinate parses — and the
+ * decode at the end is the only place a string appears. A consumer that is
+ * going to re-split the line and parse numbers out of it can skip that decode
+ * entirely and read the bytes it wants, which for a dense format is most of the
+ * cost of a query.
+ *
+ * The buffer is this reader's own decompressed block, handed over without a
+ * copy, so **the bytes are only valid for the duration of the call**. Anything
+ * kept past returning must be copied out first (`buffer.slice(lineStart,
+ * lineEnd)`, or whatever the consumer's parse produces). The range excludes the
+ * newline, and a CRLF terminator, the same as the string form.
+ */
+type GetLinesBytesCallback = (
+  buffer: Uint8Array,
+  lineStart: number,
+  lineEnd: number,
+  fileOffset: number,
+  start: number,
+  end: number,
+) => void
+
+interface GetLinesOptsBase {
   signal?: AbortSignal
-  lineCallback: GetLinesCallback
   /**
    * Called as the compressed data blocks covering the query are fetched, with
    * cumulative downloaded bytes and the total bytes to fetch. Reported at block
@@ -71,6 +96,16 @@ interface GetLinesOpts {
    */
   onProgress?: (bytesDownloaded: number, totalBytes?: number) => void
 }
+
+/**
+ * Exactly one of the two callbacks, so a caller cannot pass both and wonder
+ * which one wins, or pass neither and get nothing.
+ */
+type GetLinesOpts = GetLinesOptsBase &
+  (
+    | { lineCallback: GetLinesCallback; lineBytesCallback?: undefined }
+    | { lineBytesCallback: GetLinesBytesCallback; lineCallback?: undefined }
+  )
 
 // The decompressed chunk plus its block offsets, as @gmod/bgzf-filehandle
 // returns them: cpositions/dpositions are Float64Arrays, which is what the
@@ -389,7 +424,7 @@ export default class TabixIndexedFile {
    * @param refName name of the reference sequence
    * @param s start of the region (0-based half-open)
    * @param e end of the region (0-based half-open)
-   * @param opts callback invoked for each line, or an options object with `lineCallback` and optional `signal`
+   * @param opts callback invoked for each line, or an options object with `lineCallback` (or `lineBytesCallback`) and optional `signal`
    */
   async getLines(
     refName: string,
@@ -399,16 +434,23 @@ export default class TabixIndexedFile {
   ) {
     let signal: AbortSignal | undefined
     let options: Options = {}
-    let callback: GetLinesCallback
-    let onProgress: GetLinesOpts['onProgress']
+    let callback: GetLinesCallback | undefined
+    let bytesCallback: GetLinesBytesCallback | undefined
+    let onProgress: GetLinesOptsBase['onProgress']
 
     if (typeof opts === 'function') {
       callback = opts
     } else {
       options = opts
       callback = opts.lineCallback
+      bytesCallback = opts.lineBytesCallback
       signal = opts.signal
       onProgress = opts.onProgress
+    }
+    if (!callback && !bytesCallback) {
+      throw new TypeError(
+        'getLines requires either a lineCallback or a lineBytesCallback',
+      )
     }
 
     const metadata = await this.index.getMetadata(options)
@@ -568,19 +610,30 @@ export default class TabixIndexedFile {
         if (endCoordinate > start) {
           // trim a CRLF terminator, matching htslib's line reader
           const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
-          const line = decoder.decode(buffer.subarray(blockStart, lineEnd))
-          callback(
-            line,
-            calculateFileOffset(
-              cpositions,
-              dpositions,
-              pos,
-              blockStart,
-              minvDataPosition,
-            ),
-            startCoordinate,
-            endCoordinate,
+          const fileOffset = calculateFileOffset(
+            cpositions,
+            dpositions,
+            pos,
+            blockStart,
+            minvDataPosition,
           )
+          if (bytesCallback) {
+            bytesCallback(
+              buffer,
+              blockStart,
+              lineEnd,
+              fileOffset,
+              startCoordinate,
+              endCoordinate,
+            )
+          } else if (callback) {
+            callback(
+              decoder.decode(buffer.subarray(blockStart, lineEnd)),
+              fileOffset,
+              startCoordinate,
+              endCoordinate,
+            )
+          }
         }
         blockStart = n + 1
       }
