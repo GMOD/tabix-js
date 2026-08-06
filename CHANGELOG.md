@@ -1,3 +1,26 @@
+## [3.6.0](https://github.com/GMOD/tabix-js/compare/v3.5.7...v3.6.0) (2026-08-06)
+
+### Bug Fixes
+
+- A bystander no longer inherits the header parse owner's abort
+
+### Chores
+
+- Type-check the tests and enforce prettier, as @gmod/bam does
+- Let npm publish stop auto-correcting repository.url
+- Bump pnpm/action-setup to v6.0.10
+- Run the test suite as `pnpm test --run`
+
+### Performance Improvements
+
+- Size the chunk cache above one query, and reclaim it when idle
+
+### Refactoring
+
+- Align the shared-read abort plumbing with @gmod/bam
+- **BREAKING** Drop @gmod/abortable-promise-cache for a local ChunkCache
+- Use @gmod/shared-read-cache for the chunk cache
+
 ## [3.5.7](https://github.com/GMOD/tabix-js/compare/v3.5.6...v3.5.7) (2026-08-05)
 
 ### Tests
