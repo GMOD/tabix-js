@@ -178,11 +178,11 @@ export default abstract class IndexFile {
    * duplicate parse rather than a recursion whose depth depends on how the
    * aborts interleave.
    *
-   * A retry rather than the reference count `chunkCache` gets from
-   * `@gmod/abortable-promise-cache`, because the index is parsed once for the
-   * life of the object: there is no repeated waste to recover, and this is a
-   * dozen lines against restructuring the memo. `@gmod/bam`'s `IndexFile` and
-   * `@gmod/cram`'s `CraiIndex` make the same split for the same reason.
+   * A retry rather than the reference count `ChunkCache` uses, because the
+   * index is parsed once for the life of the object: there is no repeated waste
+   * to recover, and this is a dozen lines against restructuring the memo.
+   * `@gmod/bam`'s `IndexFile` and `@gmod/cram`'s `CraiIndex` make the same
+   * split for the same reason.
    *
    * @internal
    */

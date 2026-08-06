@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@gmod/abortable-promise-cache':
-        specifier: ^3.0.4
-        version: 3.0.4
       '@gmod/bgzf-filehandle':
         specifier: ^6.3.2
         version: 6.3.2
@@ -135,9 +132,6 @@ packages:
   '@eslint/plugin-kit@0.7.2':
     resolution: {integrity: sha512-+CNAzxglkrpNf/kKywqQfk74QjtceuOE7Qm+AF8miRvPF/wmmK5+OJOgVh3AVTT3RP2mH3+FOaxlE5v72owk0A==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
-  '@gmod/abortable-promise-cache@3.0.4':
-    resolution: {integrity: sha512-kxRJj5fyRKFuZDp/YvnHeadYCV2EEUKyH2T4a2Iz9O7T/thOWWHUDiiD/Mg6WZP/RNNDIcfSHl/xVHHy/+j8qg==}
 
   '@gmod/bgzf-filehandle@6.3.2':
     resolution: {integrity: sha512-ZgVK7PGUMOByRQn5inARjcz2fSOH1hyIidPj1TBmPZVwVrIXeigHW6rAIs/U8UkxV0c8Xez2D14HGnF3uiq4UQ==}
@@ -1715,8 +1709,6 @@ snapshots:
     dependencies:
       '@eslint/core': 1.2.1
       levn: 0.4.1
-
-  '@gmod/abortable-promise-cache@3.0.4': {}
 
   '@gmod/bgzf-filehandle@6.3.2':
     dependencies:
