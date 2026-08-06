@@ -102,18 +102,19 @@ opening the file directly.
 
 ### `new TabixIndexedFile(args)`
 
-| Arg              | Type                 | Description                                                                                 |
-| ---------------- | -------------------- | ------------------------------------------------------------------------------------------- |
-| `path`           | `string?`            | Local file path                                                                             |
-| `url`            | `string?`            | Remote URL                                                                                  |
-| `filehandle`     | `GenericFilehandle?` | Custom filehandle (from [generic-filehandle2](https://github.com/GMOD/generic-filehandle2)) |
-| `tbiPath`        | `string?`            | TBI index path (defaults to `path + '.tbi'`)                                                |
-| `tbiUrl`         | `string?`            | TBI index URL                                                                               |
-| `tbiFilehandle`  | `GenericFilehandle?` | TBI index filehandle                                                                        |
-| `csiPath`        | `string?`            | CSI index path                                                                              |
-| `csiUrl`         | `string?`            | CSI index URL                                                                               |
-| `csiFilehandle`  | `GenericFilehandle?` | CSI index filehandle                                                                        |
-| `chunkCacheSize` | `number?`            | Chunk LRU cache budget, in _decompressed_ bytes (default 100 MiB)                           |
+| Arg                       | Type                 | Description                                                                                                                                                                                                                                   |
+| ------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`                    | `string?`            | Local file path                                                                                                                                                                                                                               |
+| `url`                     | `string?`            | Remote URL                                                                                                                                                                                                                                    |
+| `filehandle`              | `GenericFilehandle?` | Custom filehandle (from [generic-filehandle2](https://github.com/GMOD/generic-filehandle2))                                                                                                                                                   |
+| `tbiPath`                 | `string?`            | TBI index path (defaults to `path + '.tbi'`)                                                                                                                                                                                                  |
+| `tbiUrl`                  | `string?`            | TBI index URL                                                                                                                                                                                                                                 |
+| `tbiFilehandle`           | `GenericFilehandle?` | TBI index filehandle                                                                                                                                                                                                                          |
+| `csiPath`                 | `string?`            | CSI index path                                                                                                                                                                                                                                |
+| `csiUrl`                  | `string?`            | CSI index URL                                                                                                                                                                                                                                 |
+| `csiFilehandle`           | `GenericFilehandle?` | CSI index filehandle                                                                                                                                                                                                                          |
+| `chunkCacheSize`          | `number?`            | Chunk LRU cache budget, in _decompressed_ bytes (default 1 GiB). A retention bound, not a bound on peak memory. Size it to hold several queries: below one query's working set the hit rate drops to zero while the memory is retained anyway |
+| `chunkCacheIdleTimeoutMs` | `number?`            | Drop a cached chunk once nothing has read it for this long (default 3 minutes, `0` disables). The only thing that lowers the cache while nothing is happening, and what makes the budget above a peak rather than a resting level             |
 
 ### `getLines(refName, start, end, opts)`
 

@@ -1,5 +1,5 @@
 import { LocalFile } from 'generic-filehandle2'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import TabixIndexedFile from '../src/tabixIndexedFile.ts'
 
@@ -19,7 +19,11 @@ class CountingFile extends LocalFile {
   }
 }
 
-function open(file: string, chunkCacheSize?: number) {
+function open(
+  file: string,
+  chunkCacheSize?: number,
+  chunkCacheIdleTimeoutMs?: number,
+) {
   const dir = new URL('data/', import.meta.url).pathname
   const filehandle = new CountingFile(`${dir}${file}`)
   return {
@@ -28,6 +32,7 @@ function open(file: string, chunkCacheSize?: number) {
       filehandle,
       tbiFilehandle: new LocalFile(`${dir}${file}.tbi`),
       chunkCacheSize,
+      chunkCacheIdleTimeoutMs,
     }),
   }
 }
@@ -247,4 +252,84 @@ test('a query does not join a chunk read every waiter has abandoned', async () =
   // doomed — joining it means inheriting a cancellation that has nothing to do
   // with this query.
   await expect(lines(f, ONE_CHUNK)).resolves.toBeUndefined()
+})
+
+// The budget is applied when a read settles, so it does nothing for a consumer
+// sitting still, and a genome browser holds one of these per open track. These
+// go through the public constructor because that is the only way a consumer can
+// reach the option.
+test('a chunk nothing has read for the idle timeout is dropped', async () => {
+  vi.useFakeTimers()
+  try {
+    const [file, ref, st, e] = MANY_CHUNKS
+    const { f } = open(file, undefined, 60_000)
+    await count(f, ref, st, e)
+    const cache = f.chunkCache
+    expect(cache.size).toBeGreaterThan(0)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(cache.size).toBeGreaterThan(0)
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(cache.size).toBe(0)
+    expect(cache.totalSize).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// Timed from the last read, not the fetch: panning back and forth over one
+// region must not expire it mid-use.
+test('re-reading a chunk keeps it alive past the idle timeout', async () => {
+  vi.useFakeTimers()
+  try {
+    const [file, ref, st, e] = MANY_CHUNKS
+    const { filehandle, f } = open(file, undefined, 60_000)
+    await count(f, ref, st, e)
+    const cold = filehandle.reads
+    expect(cold).toBeGreaterThan(0)
+
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(40_000)
+      await count(f, ref, st, e)
+    }
+    // 160s elapsed against a 60s timeout, and not one re-read
+    expect(filehandle.reads).toBe(cold)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('chunkCacheIdleTimeoutMs: 0 keeps chunks until the budget evicts them', async () => {
+  vi.useFakeTimers()
+  try {
+    const [file, ref, st, e] = MANY_CHUNKS
+    const { f } = open(file, undefined, 0)
+    await count(f, ref, st, e)
+    const held = f.chunkCache.size
+    expect(held).toBeGreaterThan(0)
+
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000)
+    expect(f.chunkCache.size).toBe(held)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('clearChunkCache drops everything, and stops the sweep', async () => {
+  vi.useFakeTimers()
+  try {
+    const [file, ref, st, e] = MANY_CHUNKS
+    const { f } = open(file, undefined, 60_000)
+    await count(f, ref, st, e)
+    expect(f.chunkCache.size).toBeGreaterThan(0)
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+
+    f.clearChunkCache()
+    expect(f.chunkCache.size).toBe(0)
+    // an emptied cache must not leave a timer ticking over nothing
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })

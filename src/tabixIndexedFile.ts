@@ -29,7 +29,28 @@ const MAX_READ_AHEAD_CHUNKS = 6
 // a dense VCF (test/data/1kg.chr1.subset.vcf.gz — 213MB over 600kb of chr1)
 // has single index bins of 17MB compressed, 120MB decompressed. Panning it
 // under the old 80-entry cache peaked at 2GB RSS.
-const DEFAULT_CHUNK_CACHE_BYTES = 100 * 2 ** 20
+//
+// That 120MB figure is also why this is no longer 100MB. A budget below one
+// query's working set does not cache less, it caches NOTHING: each entry is
+// evicted before the next pan can reuse it, so the hit rate is zero and the
+// decompress is paid again every time. On that same fixture, a six-window 50kb
+// pan measured 17 refills out of 17 — a total miss — at 100MB, against 0 at
+// 800MB, and 2596ms against 600ms. The working set plateaus at 497MB held, so
+// 1GB clears it with headroom and nothing above 800MB buys anything.
+//
+// Affordable as a ceiling only because of the idle timeout below: it is a peak
+// under panning, not a level a parked consumer holds. A small file is
+// unaffected either way, this being a ceiling and not an allocation.
+const DEFAULT_CHUNK_CACHE_BYTES = 1024 * 2 ** 20
+
+// SYNC: ~/src/gmod/bam-js/src/bamFile.ts DEFAULT_CACHE_IDLE_TIMEOUT_MS
+//
+// Drop a chunk nothing has looked at for three minutes. The budget above is
+// only applied when a read settles, so it does nothing at all for a consumer
+// sitting still — and a genome browser holds one of these per track for as long
+// as the track is open. Timed from the last read, not the fetch, so panning
+// back and forth over one region never expires it.
+const DEFAULT_CHUNK_CACHE_IDLE_TIMEOUT_MS = 3 * 60 * 1000
 
 type GetLinesCallback = (
   line: string,
@@ -255,7 +276,7 @@ function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
 export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
-  private chunkCache: SharedReadCache<Chunk, ReadChunk>
+  public chunkCache: SharedReadCache<Chunk, ReadChunk>
   private headerP?: Promise<{ header: string; skippedLines: string[] }>
   /**
    * The signal `headerP` was started under, while it is still in flight. The
@@ -276,6 +297,7 @@ export default class TabixIndexedFile {
     csiUrl,
     csiFilehandle,
     chunkCacheSize = DEFAULT_CHUNK_CACHE_BYTES,
+    chunkCacheIdleTimeoutMs = DEFAULT_CHUNK_CACHE_IDLE_TIMEOUT_MS,
   }: {
     path?: string
     filehandle?: GenericFilehandle
@@ -286,8 +308,24 @@ export default class TabixIndexedFile {
     csiPath?: string
     csiUrl?: string
     csiFilehandle?: GenericFilehandle
-    /** budget for the decompressed chunk cache, in bytes */
+    /**
+     * Budget for the decompressed chunk cache, in bytes. Default 1GB.
+     *
+     * A retention bound, not a bound on peak memory: reads in flight are never
+     * evicted and the last settled entry is kept whatever the budget. Size it
+     * to hold several queries — below one query's working set the hit rate
+     * drops to zero while the memory is retained anyway, so a number between
+     * the two is the worst available choice.
+     */
     chunkCacheSize?: number
+    /**
+     * Drop a cached chunk once nothing has read it for this many milliseconds.
+     * Default 3 minutes; `0` keeps chunks until `chunkCacheSize` evicts them.
+     *
+     * The only thing that lowers the cache while nothing is happening, and what
+     * makes the budget above a peak rather than a resting level.
+     */
+    chunkCacheIdleTimeoutMs?: number
   }) {
     this.filehandle = resolveFilehandle(filehandle, path, url)
     this.index = resolveIndex({
@@ -307,8 +345,21 @@ export default class TabixIndexedFile {
       // decompressed, and an entry is a whole chunk
       sizeOf: read => read.buffer.byteLength,
       cacheKey: chunk => chunk.toString(),
+      idleTimeoutMs: chunkCacheIdleTimeoutMs,
       fill: (chunk, signal) => this.readChunk(chunk, { signal }),
     })
+  }
+
+  /**
+   * Drops every decompressed chunk held by the cache, and stops the idle sweep
+   * until something is cached again.
+   *
+   * `chunkCacheIdleTimeoutMs` reclaims a view the user has wandered away from;
+   * this is for a consumer that knows it is finished — a closed track, a
+   * changed assembly — and should not have to wait it out.
+   */
+  clearChunkCache() {
+    this.chunkCache.clear()
   }
 
   /**
