@@ -1,6 +1,7 @@
 import { LocalFile } from 'generic-filehandle2'
 import { expect, test } from 'vitest'
 
+import TabixIndexedFile from '../src/tabixIndexedFile.ts'
 import TBI from '../src/tbi.ts'
 
 import type {
@@ -162,4 +163,31 @@ test('a signal without throwIfAborted still cancels', async () => {
   // perfectly well, so a message check passes on the very bug it should catch.
   expect(e).toBeInstanceOf(DOMException)
   expect((e as DOMException).name).toBe('AbortError')
+})
+
+// The header is parsed once and shared by every caller, so it is the second
+// shared read in this package after the index parse. parseHeader threads opts
+// into both getMetadata and the header read.
+test('a bystander survives the header parse owner aborting', async () => {
+  const fh = new GatedIndexFile('test/data/volvox.test.vcf.gz')
+  const tbi = new TabixIndexedFile({
+    filehandle: fh,
+    tbiFilehandle: new LocalFile('test/data/volvox.test.vcf.gz.tbi'),
+  })
+
+  const starter = new AbortController()
+  const bystander = new AbortController()
+
+  const starterP = tbi.getHeader({ signal: starter.signal })
+  const bystanderP = tbi.getHeader({ signal: bystander.signal })
+  void Promise.allSettled([starterP, bystanderP])
+  await tick()
+
+  starter.abort()
+  fh.open()
+
+  await expect(starterP).rejects.toThrow(/abort/i)
+  // the bystander never asked to be cancelled
+  expect(bystander.signal.aborted).toBe(false)
+  expect(typeof (await bystanderP)).toBe('string')
 })

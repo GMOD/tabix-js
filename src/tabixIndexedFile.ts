@@ -4,7 +4,7 @@ import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
 import TBI from './tbi.ts'
-import { optimizeChunks } from './util.ts'
+import { optimizeChunks, throwIfAborted } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
@@ -355,6 +355,13 @@ export default class TabixIndexedFile {
   private index: IndexFile
   private chunkCache: AbortablePromiseCache<Chunk, ReadChunk>
   private headerP?: Promise<{ header: string; skippedLines: string[] }>
+  /**
+   * The signal `headerP` was started under, while it is still in flight. The
+   * header is parsed once and shared by every caller, so without this the first
+   * one to arrive would own a read all the others depend on — see
+   * {@link getParsedHeader}.
+   */
+  private headerSignal?: AbortSignal
 
   constructor({
     path,
@@ -670,12 +677,64 @@ export default class TabixIndexedFile {
     }
   }
 
-  private async getParsedHeader(opts: Options = {}) {
-    this.headerP ??= this.parseHeader(opts).catch((error: unknown) => {
-      this.headerP = undefined
-      throw error
-    })
-    return this.headerP
+  /**
+   * Parse the header, or join the parse already running.
+   *
+   * `parseHeader` threads `opts` into both `getMetadata` and the header read,
+   * so memoizing it on the first caller's opts put that caller's signal in
+   * charge of a read every later caller joins: when it aborted, they failed
+   * with its cancellation, their own signals untouched.
+   *
+   * A caller that joined someone else's parse and saw it fail because *they*
+   * aborted starts over rather than inheriting the failure — once, then
+   * propagates. Same bounded retry, and the same reasoning, as
+   * `IndexFile.parse`.
+   */
+  private async getParsedHeader(
+    opts: Options = {},
+    retried = false,
+  ): Promise<{ header: string; skippedLines: string[] }> {
+    throwIfAborted(opts.signal)
+    const pending = this.headerP
+    if (!pending) {
+      return this.startHeaderParse(opts)
+    }
+
+    // read before awaiting: the owner is forgotten as soon as the parse settles
+    const ownerSignal = this.headerSignal
+    try {
+      return await pending
+    } catch (e) {
+      if (retried || !ownerSignal?.aborted || opts.signal?.aborted) {
+        throw e
+      }
+      return this.getParsedHeader(opts, true)
+    }
+  }
+
+  private startHeaderParse(opts: Options) {
+    const pending = this.parseHeader(opts)
+    this.headerP = pending
+    this.headerSignal = opts.signal
+    // Drop a rejection rather than keeping it, so one transient failure does
+    // not poison the header for the lifetime of the file. Identity-checked so a
+    // retry started after this settles is not cleared by the attempt it
+    // replaced.
+    void (async () => {
+      let failed = false
+      try {
+        await pending
+      } catch {
+        failed = true
+      }
+      if (this.headerP === pending) {
+        if (failed) {
+          this.headerP = undefined
+        }
+        this.headerSignal = undefined
+      }
+    })()
+    return pending
   }
 
   /**
