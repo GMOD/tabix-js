@@ -4,7 +4,7 @@ import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
 import TBI from './tbi.ts'
-import { optimizeChunks, throwIfAborted } from './util.ts'
+import { optimizeChunks } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
@@ -277,14 +277,14 @@ export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   public chunkCache: SharedReadCache<Chunk, ReadChunk>
-  private headerP?: Promise<{ header: string; skippedLines: string[] }>
   /**
-   * The signal `headerP` was started under, while it is still in flight. The
-   * header is parsed once and shared by every caller, so without this the first
-   * one to arrive would own a read all the others depend on — see
-   * {@link getParsedHeader}.
+   * The parsed header, as a shared read — see {@link getParsedHeader}. One
+   * entry, never evicted, which is what a memo is.
    */
-  private headerSignal?: AbortSignal
+  private headerCache = new SharedReadCache<
+    string,
+    { header: string; skippedLines: string[] }
+  >({})
 
   constructor({
     path,
@@ -641,58 +641,24 @@ export default class TabixIndexedFile {
    * charge of a read every later caller joins: when it aborted, they failed
    * with its cancellation, their own signals untouched.
    *
-   * A caller that joined someone else's parse and saw it fail because *they*
-   * aborted starts over rather than inheriting the failure — once, then
-   * propagates. Same bounded retry, and the same reasoning, as
-   * `IndexFile.parse`.
+   * The same cache the chunk reads use, and the same rule: the parse runs under
+   * a signal of its own and is cancelled only once every caller waiting on it
+   * has given up, so one caller's abort is reported to that caller alone and a
+   * bystander gets the parse already in flight. There is no retry here because
+   * there is nothing to retry — the parse a bystander joined is not cancelled by
+   * someone else's abort. A rejection is dropped rather than cached, so a
+   * transient failure does not poison the header for the life of the file.
+   *
+   * The fill is per call rather than on the cache, so the caller that starts the
+   * parse has its `onProgress` reach the index download inside `getMetadata`.
    *
    * SYNC: ~/src/gmod/bam-js/src/bamFile.ts getHeader — same shape for the same
    * reason, on the header rather than the index.
    */
-  private async getParsedHeader(
-    opts: Options = {},
-    retried = false,
-  ): Promise<{ header: string; skippedLines: string[] }> {
-    throwIfAborted(opts.signal)
-    const pending = this.headerP
-    if (!pending) {
-      return this.startHeaderParse(opts)
-    }
-
-    // read before awaiting: the owner is forgotten as soon as the parse settles
-    const ownerSignal = this.headerSignal
-    try {
-      return await pending
-    } catch (e) {
-      if (retried || !ownerSignal?.aborted || opts.signal?.aborted) {
-        throw e
-      }
-      return this.getParsedHeader(opts, true)
-    }
-  }
-
-  private startHeaderParse(opts: Options) {
-    const pending = this.parseHeader(opts)
-    this.headerP = pending
-    this.headerSignal = opts.signal
-    // Drop a rejection rather than keeping it, so one transient failure does not
-    // poison the header for the lifetime of the file. Both branches are
-    // identity-checked so a retry started after this settles is not cleared by
-    // the attempt it already replaced.
-    pending.then(
-      () => {
-        if (this.headerP === pending) {
-          this.headerSignal = undefined
-        }
-      },
-      () => {
-        if (this.headerP === pending) {
-          this.headerP = undefined
-          this.headerSignal = undefined
-        }
-      },
+  private getParsedHeader(opts: Options = {}) {
+    return this.headerCache.get('header', opts.signal, signal =>
+      this.parseHeader({ ...opts, signal }),
     )
-    return pending
   }
 
   /**

@@ -131,45 +131,45 @@ test('a bystander survives the index parse owner aborting', async () => {
   // inherited the starter's abort, so one pan failed every concurrent query.
   expect(bystander.signal.aborted).toBe(false)
   expect((await bystanderP).refNameToId).toBeDefined()
-  // the retry is bounded at one attempt, so the parse ran exactly twice
-  expect(fh.reads).toBe(2)
+  // ONE read: the parse the bystander joined is not cancelled by the starter's
+  // abort, so there is nothing to start over. This used to be 2, because the
+  // parse ran under the starter's own signal and a bystander could only recover
+  // by re-reading the whole index.
+  expect(fh.reads).toBe(1)
 })
 
-// Takes three callers, because the bound only bites when a caller that has
-// already retried joins someone else's retry and *that* is abandoned too. With
-// two, the retrying caller always starts its own parse and never re-enters the
-// join path at all.
-test('the index parse retry is bounded at one attempt', async () => {
+// The other half of the rule: a parse nobody is waiting on any more IS
+// cancelled, rather than left running to fill a cache no caller will read.
+test('the index parse is cancelled once every caller has given up', async () => {
   const fh = new GatedFile(TBI_PATH)
   const tbi = new TBI({ filehandle: fh })
 
   const a = new AbortController()
   const b = new AbortController()
-  const c = new AbortController()
 
-  // a owns read 1; b and c join it, b's handler registered ahead of c's
   const aP = tbi.parse({ signal: a.signal })
   const bP = tbi.parse({ signal: b.signal })
-  const cP = tbi.parse({ signal: c.signal })
-  void Promise.allSettled([aP, bP, cP])
+  void Promise.allSettled([aP, bP])
   await tick()
   expect(fh.reads).toBe(1)
 
-  // a gives up: b retries first and becomes the owner of read 2, and c, running
-  // right behind it, joins that retry rather than starting a third
+  // a alone is not everyone: the read is neither cancelled nor restarted, and
+  // `aP` is still pending — a caller learns of its own abort when the read it
+  // was waiting on settles, not the moment it aborts
   a.abort()
   await tick()
-  expect(fh.reads).toBe(2)
+  expect(fh.reads).toBe(1)
 
-  // now b gives up too. c has already spent its one retry, so it propagates
-  // rather than going round again — a third round would be a recursion whose
-  // depth is set by how the aborts happen to interleave.
+  // ...and now it is. The read is never released — the abort is what unblocks
+  // it, so this test hanging is the failure mode.
   b.abort()
-  fh.open()
-
   await expect(aP).rejects.toThrow(/abort/i)
   await expect(bP).rejects.toThrow(/abort/i)
-  await expect(cP).rejects.toThrow(/abort/i)
+  expect(fh.reads).toBe(1)
+
+  // the rejection was dropped rather than cached, so a later caller starts over
+  fh.open()
+  expect((await tbi.parse()).refNameToId).toBeDefined()
   expect(fh.reads).toBe(2)
 })
 
@@ -218,4 +218,29 @@ test('a bystander survives the header parse owner aborting', async () => {
   // the bystander never asked to be cancelled
   expect(bystander.signal.aborted).toBe(false)
   expect(typeof (await bystanderP)).toBe('string')
+  // one read, not a re-parse: see the equivalent index-parse assertion
+  expect(fh.reads).toBe(1)
+})
+
+// The case 'a signal without throwIfAborted still cancels' above does not
+// cover, and the one that was broken until @gmod/shared-read-cache 1.4.3: a
+// duck-typed signal that has NOT aborted gets past every throwIfAborted and
+// reaches the point where the cache subscribes to it, which on a bare
+// `{ aborted }` was `signal.addEventListener is not a function`. Now that the
+// header and index parses go through the cache too, they need it as much as the
+// chunk reads do.
+test('a duck-typed signal that has not aborted still reads', async () => {
+  const tbi = new TabixIndexedFile({
+    filehandle: new LocalFile('test/data/volvox.test.vcf.gz'),
+    tbiFilehandle: new LocalFile('test/data/volvox.test.vcf.gz.tbi'),
+  })
+  const signal = { aborted: false } as AbortSignal
+
+  expect(typeof (await tbi.getHeader({ signal }))).toBe('string')
+  const lines: string[] = []
+  await tbi.getLines('contigA', 3000, 4000, {
+    signal,
+    lineCallback: l => lines.push(l),
+  })
+  expect(lines.length).toBeGreaterThan(0)
 })

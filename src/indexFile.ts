@@ -1,6 +1,7 @@
 import { unzip } from '@gmod/bgzf-filehandle'
+import { SharedReadCache } from '@gmod/shared-read-cache'
 
-import { optimizeChunks, throwIfAborted } from './util.ts'
+import { optimizeChunks } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type VirtualOffset from './virtualOffset.ts'
@@ -51,14 +52,11 @@ export interface IndexData {
 
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
-  private parseP?: Promise<IndexData>
   /**
-   * The signal `parseP` was started under, while it is still in flight. The
-   * index is parsed once and shared by every query against the file, so without
-   * this the first query to arrive would own a read all the others depend on —
-   * see {@link parse}.
+   * The parsed index, as a shared read — see {@link parse}. One entry, never
+   * evicted, which is what a memo is.
    */
-  private parseSignal?: AbortSignal
+  private parseCache = new SharedReadCache<string, IndexData>({})
 
   constructor({ filehandle }: { filehandle: GenericFilehandle }) {
     this.filehandle = filehandle
@@ -158,75 +156,38 @@ export default abstract class IndexFile {
     return optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
   }
 
-  // SYNC: ~/src/gmod/bam-js/src/indexFile.ts parse — same owner-signal
-  // tracking and one-attempt retry, and the same reasoning below.
+  // SYNC: ~/src/gmod/bam-js/src/indexFile.ts parse — same shape and the same
+  // reasoning below.
   /**
    * Parse the index, or join the parse already running.
    *
    * The index is downloaded and parsed once for the life of this object, so it
    * is the one read here that is shared between queries — and therefore the one
    * place a cancellation can leak from the query that asked for it to a query
-   * that did not. `_parse` hands `opts` straight to `readIndexBytes`, so
-   * without this the first query to arrive owns a read every other query
-   * depends on: when it pans away, every concurrent query fails with its abort.
+   * that did not. `_parse` hands `opts` straight to `readIndexBytes`, so a bare
+   * memoized promise makes the first query to arrive the owner of a read every
+   * other query depends on: when it pans away, every concurrent query fails
+   * with its abort.
    *
-   * A caller that joined someone else's parse and saw it fail because *they*
-   * aborted starts over rather than inheriting the failure — once, then
-   * propagates. Bounding it at one attempt is what jbrowse's
-   * `RemoteFileWithRangeCache.joinChunk` does with the same retry one layer
-   * down, and for the reason it gives: the pathological case becomes one
-   * duplicate parse rather than a recursion whose depth depends on how the
-   * aborts interleave.
+   * The same cache `ChunkCache` uses, for the same reason and with the same
+   * rule: the parse runs under a signal of its own and is cancelled only once
+   * every caller waiting on it has given up, so one query's abort is reported
+   * to that query alone and a bystander gets the parse already in flight rather
+   * than having to re-read the index. A rejection is dropped rather than
+   * cached, so a transient failure does not poison the index for the life of
+   * the file.
    *
-   * A retry rather than the reference count `ChunkCache` uses, because the
-   * index is parsed once for the life of the object: there is no repeated waste
-   * to recover, and this is a dozen lines against restructuring the memo.
-   * `@gmod/bam`'s `IndexFile` and `@gmod/cram`'s `CraiIndex` make the same
-   * split for the same reason.
+   * The fill is per call rather than on the cache so that the caller who starts
+   * the parse has its `onProgress` reach `readIndexBytes` — the index is a
+   * whole-file read, and a determinate "downloading index" bar is what that
+   * callback exists for.
    *
    * @internal
    */
-  async parse(opts: Options = {}, retried = false): Promise<IndexData> {
-    throwIfAborted(opts.signal)
-    const pending = this.parseP
-    if (!pending) {
-      return this.startParse(opts)
-    }
-
-    // read before awaiting: the owner is forgotten as soon as the parse settles
-    const ownerSignal = this.parseSignal
-    try {
-      return await pending
-    } catch (e) {
-      if (retried || !ownerSignal?.aborted || opts.signal?.aborted) {
-        throw e
-      }
-      return this.parse(opts, true)
-    }
-  }
-
-  private startParse(opts: Options) {
-    const pending = this._parse(opts)
-    this.parseP = pending
-    this.parseSignal = opts.signal
-    // Drop a rejection rather than keeping it, so one transient failure does not
-    // poison the index for the lifetime of the file. Both branches are
-    // identity-checked so a retry started after this settles is not cleared by
-    // the attempt it already replaced.
-    pending.then(
-      () => {
-        if (this.parseP === pending) {
-          this.parseSignal = undefined
-        }
-      },
-      () => {
-        if (this.parseP === pending) {
-          this.parseP = undefined
-          this.parseSignal = undefined
-        }
-      },
+  parse(opts: Options = {}): Promise<IndexData> {
+    return this.parseCache.get('index', opts.signal, signal =>
+      this._parse({ ...opts, signal }),
     )
-    return pending
   }
 
   /** @internal */
