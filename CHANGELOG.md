@@ -1,3 +1,17 @@
+## [3.6.1](https://github.com/GMOD/tabix-js/compare/v3.6.0...v3.6.1) (2026-08-09)
+
+### Bug Fixes
+
+- Bump @gmod/shared-read-cache to 1.4.4
+
+### Documentation
+
+- ADR 0002 — size the chunk cache above one query
+
+### Refactoring
+
+- The header and index parses are shared reads, not memos
+
 ## [3.6.0](https://github.com/GMOD/tabix-js/compare/v3.5.7...v3.6.0) (2026-08-06)
 
 ### Bug Fixes
