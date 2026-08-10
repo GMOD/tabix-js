@@ -30,9 +30,10 @@ parallel `reg2bins`/`DataView` implementation worth cross-checking against.
 ## Index parsing is not the bottleneck
 
 When ranking performance work, don't lead with `.tbi`/`.csi` parsing. Per-ref
-lazy parsing via `memoizeByRefId` already bounds index cost to five refs, so what
-remains is bounded and rarely dominates a query. The read path — chunk fetch,
-decompress, per-line scanning — and retained memory are where the cost is.
+lazy parsing via `memoizeByRefId` already bounds index cost to five refs, so
+what remains is bounded and rarely dominates a query. The read path — chunk
+fetch, decompress, per-line scanning — and retained memory are where the cost
+is.
 
 Cheap, safe index wins are still worth taking; just don't present one as the
 headline. Verify any index change with the htslib harness above rather than the
