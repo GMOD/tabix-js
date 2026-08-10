@@ -1,3 +1,9 @@
+## [3.7.1](https://github.com/GMOD/tabix-js/compare/v3.7.0...v3.7.1) (2026-08-10)
+
+### Chores
+
+- Prettier the docs added in 844872d
+
 ## [3.7.0](https://github.com/GMOD/tabix-js/compare/v3.6.1...v3.7.0) (2026-08-10)
 
 ### Documentation
