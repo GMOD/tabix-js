@@ -1,3 +1,13 @@
+## [3.7.0](https://github.com/GMOD/tabix-js/compare/v3.6.1...v3.7.0) (2026-08-10)
+
+### Documentation
+
+- Record the two rejected refactors and the htslib differential harness
+
+### Features
+
+- ChunkCacheBudget, so several files can share one ceiling
+
 ## [3.6.1](https://github.com/GMOD/tabix-js/compare/v3.6.0...v3.6.1) (2026-08-09)
 
 ### Bug Fixes
