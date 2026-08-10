@@ -1,3 +1,5 @@
+## [3.7.3](https://github.com/GMOD/tabix-js/compare/v3.7.2...v3.7.3) (2026-08-10)
+
 ## [3.7.2](https://github.com/GMOD/tabix-js/compare/v3.7.1...v3.7.2) (2026-08-10)
 
 ### Chores
