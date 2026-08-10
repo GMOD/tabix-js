@@ -10,6 +10,7 @@ import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
 import type { Options } from './indexFile.ts'
 import type { ChunkSlice } from '@gmod/bgzf-filehandle'
+import type { SharedBudget } from '@gmod/shared-read-cache'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 const TAB = 9
@@ -298,6 +299,7 @@ export default class TabixIndexedFile {
     csiFilehandle,
     chunkCacheSize = DEFAULT_CHUNK_CACHE_BYTES,
     chunkCacheIdleTimeoutMs = DEFAULT_CHUNK_CACHE_IDLE_TIMEOUT_MS,
+    chunkCacheBudget,
   }: {
     path?: string
     filehandle?: GenericFilehandle
@@ -310,6 +312,17 @@ export default class TabixIndexedFile {
     csiFilehandle?: GenericFilehandle
     /**
      * Budget for the decompressed chunk cache, in bytes. Default 1GB.
+     *
+     * **The unit changed in v3.5.2** (ADR 0001). Before that this was divided
+     * by 64KB to get an entry count, so a caller passing `50 * 2**20` was
+     * asking for 800 whole decompressed chunks — unbounded in practice. It now
+     * means 50MB, twenty times under the default, and the name did not change
+     * so nothing warns. jbrowse still passes exactly that in nine adapters:
+     * measured on `test/data/1kg.chr1.subset.vcf.gz` it is a **total miss**,
+     * 47 refills out of 47 on the warm pass against 0 at the default, holding
+     * 82.7MB in a single entry — over the budget it was given, because the last
+     * settled entry is kept whatever the budget. If you pinned a value here
+     * before v3.5.2, it does not mean what it did.
      *
      * A retention bound, not a bound on peak memory: reads in flight are never
      * evicted and the last settled entry is kept whatever the budget. Size it
@@ -326,6 +339,24 @@ export default class TabixIndexedFile {
      * makes the budget above a peak rather than a resting level.
      */
     chunkCacheIdleTimeoutMs?: number
+    /**
+     * A budget shared with other files — any `@gmod/shared-read-cache`
+     * consumer, so `@gmod/bam` and `@gmod/cram` can join the same one — so
+     * that the ceiling applies to their sum rather than to each of them.
+     *
+     * {@link chunkCacheSize} is per file, which is not a bound on a consumer
+     * that opens one file per track. @gmod/bam measured the shape: six tracks
+     * browsing six windows retained 1442 MB with every cache still under its
+     * own ceiling, so the ceiling was not holding the line and nothing else
+     * was. The idle timeout cannot help there — it does nothing while the
+     * reader is browsing, which is the whole case.
+     *
+     * Dividing {@link chunkCacheSize} by the track count instead reintroduces
+     * the cliff it exists to avoid. A shared budget does not, because a member
+     * yields only what is globally least-recently-used: files nobody is
+     * reading hand their space to the one being panned.
+     */
+    chunkCacheBudget?: SharedBudget
   }) {
     this.filehandle = resolveFilehandle(filehandle, path, url)
     this.index = resolveIndex({
@@ -346,6 +377,7 @@ export default class TabixIndexedFile {
       sizeOf: read => read.buffer.byteLength,
       cacheKey: chunk => chunk.toString(),
       idleTimeoutMs: chunkCacheIdleTimeoutMs,
+      budget: chunkCacheBudget,
       fill: (chunk, signal) => this.readChunk(chunk, { signal }),
     })
   }

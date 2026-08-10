@@ -1,3 +1,4 @@
+import { SharedBudget } from '@gmod/shared-read-cache'
 import { LocalFile } from 'generic-filehandle2'
 import { expect, test, vi } from 'vitest'
 
@@ -332,4 +333,39 @@ test('clearChunkCache drops everything, and stops the sweep', async () => {
   } finally {
     vi.useRealTimers()
   }
+})
+
+// chunkCacheSize is per file, which is no bound at all on a consumer that opens
+// one file per open track — jbrowse does. @gmod/bam measured the shape: six
+// tracks browsing six windows retained 1442MB with every cache still under its
+// own ceiling, so nothing was holding the line (its ADR 0018).
+test('two files can share one budget', async () => {
+  const [file, ref, st] = MANY_CHUNKS
+  const dir = new URL('data/', import.meta.url).pathname
+  const budget = new SharedBudget(2 * 1024 * 1024)
+  const open2 = () =>
+    new TabixIndexedFile({
+      filehandle: new LocalFile(`${dir}${file}`),
+      tbiFilehandle: new LocalFile(`${dir}${file}.tbi`),
+      chunkCacheIdleTimeoutMs: 0,
+      chunkCacheBudget: budget,
+    })
+
+  const a = open2()
+  const b = open2()
+  for (let i = 0; i < 4; i++) {
+    const s = st + i * 2e5
+    await count(a, ref, s, s + 1e6)
+    await count(b, ref, s, s + 1e6)
+  }
+
+  // each file still carries the full 1GB per-file ceiling and is nowhere near
+  // it, which is the point: their SUM is what the budget holds
+  expect(a.chunkCache.maxSize).toBe(1024 * 2 ** 20)
+  expect(b.chunkCache.maxSize).toBe(1024 * 2 ** 20)
+  const held = a.chunkCache.totalSize + b.chunkCache.totalSize
+  expect(held).toBe(budget.total)
+  expect(held).toBeLessThanOrEqual(budget.limit)
+  // really caching, not just holding the one entry a member keeps regardless
+  expect(a.chunkCache.size + b.chunkCache.size).toBeGreaterThan(2)
 })
