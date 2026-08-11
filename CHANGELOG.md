@@ -1,3 +1,13 @@
+## [3.8.0](https://github.com/GMOD/tabix-js/compare/v3.7.3...v3.8.0) (2026-08-11)
+
+### Chores
+
+- Render only the commit subject, and link the commit ([be16b37](https://github.com/GMOD/tabix-js/commit/be16b37aa4b5304a555365a638f78cfc4a900f52))
+
+### Features
+
+- Inflate chunks on an optional bgzf worker pool ([b890642](https://github.com/GMOD/tabix-js/commit/b89064251d11f1205cc3bcb76581c0eb15dc3d22))
+
 ## [3.7.3](https://github.com/GMOD/tabix-js/compare/v3.7.2...v3.7.3) (2026-08-10)
 
 ## [3.7.2](https://github.com/GMOD/tabix-js/compare/v3.7.1...v3.7.2) (2026-08-10)
