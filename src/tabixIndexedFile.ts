@@ -9,7 +9,7 @@ import { optimizeChunks } from './util.ts'
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
 import type { Options } from './indexFile.ts'
-import type { ChunkSlice } from '@gmod/bgzf-filehandle'
+import type { BgzfWorkerPool, ChunkSlice } from '@gmod/bgzf-filehandle'
 import type { SharedBudget } from '@gmod/shared-read-cache'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
@@ -287,6 +287,10 @@ export default class TabixIndexedFile {
     { header: string; skippedLines: string[] }
   >({})
 
+  /** see the constructor option of the same name */
+  private bgzfWorkerPool?:
+    BgzfWorkerPool | Promise<BgzfWorkerPool | undefined> | undefined
+
   constructor({
     path,
     filehandle,
@@ -300,6 +304,7 @@ export default class TabixIndexedFile {
     chunkCacheSize = DEFAULT_CHUNK_CACHE_BYTES,
     chunkCacheIdleTimeoutMs = DEFAULT_CHUNK_CACHE_IDLE_TIMEOUT_MS,
     chunkCacheBudget,
+    bgzfWorkerPool,
   }: {
     path?: string
     filehandle?: GenericFilehandle
@@ -357,7 +362,26 @@ export default class TabixIndexedFile {
      * reading hand their space to the one being panned.
      */
     chunkCacheBudget?: SharedBudget
+    /**
+     * A `@gmod/bgzf-filehandle` worker pool to inflate this file's chunks on,
+     * instead of inflating them on the calling thread.
+     *
+     * BGZF decompression dominates a cold query and BGZF blocks are
+     * independently inflatable, so this is the one remaining lever of that
+     * size. @gmod/bam measured 1.95x end to end wiring the same pool into a
+     * genome browser's read path.
+     *
+     * Accepts the promise `getSharedWorkerPool()` returns as well as a pool,
+     * so a caller whose own construction is synchronous can hand the pending
+     * pool straight over — it is awaited at the point of use, by which time it
+     * has long since resolved. `undefined` (which is what that helper gives
+     * back under node, or anywhere Workers cannot be created) keeps the
+     * in-process path, so this is safe to pass unconditionally.
+     */
+    bgzfWorkerPool?:
+      BgzfWorkerPool | Promise<BgzfWorkerPool | undefined> | undefined
   }) {
+    this.bgzfWorkerPool = bgzfWorkerPool
     this.filehandle = resolveFilehandle(filehandle, path, url)
     this.index = resolveIndex({
       tbiFilehandle,
@@ -767,6 +791,10 @@ export default class TabixIndexedFile {
       c.minv.blockPosition,
       opts,
     )
-    return unzipChunkSlice(ret, c)
+    // Awaited rather than stored resolved: the pool is commonly handed over as
+    // the pending promise from getSharedWorkerPool(), and awaiting an
+    // already-settled promise costs a microtask.
+    const pool = await this.bgzfWorkerPool
+    return unzipChunkSlice(ret, c, pool)
   }
 }
