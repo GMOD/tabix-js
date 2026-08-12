@@ -1,3 +1,14 @@
+## [3.8.1](https://github.com/GMOD/tabix-js/compare/v3.8.0...v3.8.1) (2026-08-12)
+
+### Chores
+
+- Create a GitHub release for each published tag ([e6d9f1d](https://github.com/GMOD/tabix-js/commit/e6d9f1d97f6ff50e5bfdb7ce1fc0452fcd047d64))
+- Enforce type strippability in tsconfig ([2e68e6c](https://github.com/GMOD/tabix-js/commit/2e68e6c34a96b6b33c83aed29f9a205ba8bc999c))
+
+### Other Changes
+
+- @gmod/bgzf-filehandle 6.6.0, and correct a stale note about jbrowse ([accaba2](https://github.com/GMOD/tabix-js/commit/accaba2062ad2bf50fd8640c6fe6486df891400e))
+
 ## [3.8.0](https://github.com/GMOD/tabix-js/compare/v3.7.3...v3.8.0) (2026-08-11)
 
 ### Chores
