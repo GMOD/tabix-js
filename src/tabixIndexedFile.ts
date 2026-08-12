@@ -322,12 +322,18 @@ export default class TabixIndexedFile {
      * by 64KB to get an entry count, so a caller passing `50 * 2**20` was
      * asking for 800 whole decompressed chunks — unbounded in practice. It now
      * means 50MB, twenty times under the default, and the name did not change
-     * so nothing warns. jbrowse still passes exactly that in nine adapters:
-     * measured on `test/data/1kg.chr1.subset.vcf.gz` it is a **total miss**,
-     * 47 refills out of 47 on the warm pass against 0 at the default, holding
-     * 82.7MB in a single entry — over the budget it was given, because the last
-     * settled entry is kept whatever the budget. If you pinned a value here
-     * before v3.5.2, it does not mean what it did.
+     * so nothing warns. If you pinned a value here before v3.5.2, it does not
+     * mean what it did.
+     *
+     * What that costs is worth keeping, because it is the reason to check a
+     * pinned value rather than assume it is harmless: jbrowse passed exactly
+     * `50 * 2**20` in nine adapters, and measured on
+     * `test/data/1kg.chr1.subset.vcf.gz` that was a **total miss** — 47 refills
+     * out of 47 on the warm pass against 0 at the default, holding 82.7MB in a
+     * single entry, over the budget it was given because the last settled entry
+     * is kept whatever the budget. Those nine adapters now pass
+     * `chunkCacheBudget` and no `chunkCacheSize` at all, so that particular
+     * instance is gone; the trap it demonstrates is not.
      *
      * A retention bound, not a bound on peak memory: reads in flight are never
      * evicted and the last settled entry is kept whatever the budget. Size it
