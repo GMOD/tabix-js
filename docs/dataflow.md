@@ -1,11 +1,11 @@
 # How a query flows
 
-<img src="dataflow.svg" alt="tabix-js data flow" width="700">
+<img src="img/dataflow.svg" alt="tabix-js data flow" width="700">
 
 `getLines` turns a region into a list of BGZF chunks through the index, reads
 each chunk through `chunkCache`, and scans the decompressed bytes for lines,
 handing the ones that overlap the region to your callback. The header path is
-separate — `getLines` never reads it. ([dataflow.dot](dataflow.dot) is the
+separate — `getLines` never reads it. ([dataflow.dot](img/dataflow.dot) is the
 source; see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to re-render it.)
 
 Everything orange is wasm, in
