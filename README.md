@@ -110,8 +110,8 @@ if they match.
 
 - [docs/api.md](docs/api.md) — every constructor arg and method
 - [docs/dataflow.md](docs/dataflow.md) — the diagram above, walked through
-- [OPTIMIZATIONS.md](OPTIMIZATIONS.md) — why each step of that path looks the
-  way it does, and what measured it
+- [docs/optimizations.md](docs/optimizations.md) — why each step of that path
+  looks the way it does, and what measured it
 - [agent-docs/adr/](agent-docs/adr/) — the measurements behind those decisions
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 

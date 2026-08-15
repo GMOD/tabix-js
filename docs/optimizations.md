@@ -1,7 +1,7 @@
 # Optimizations
 
 Why the query path looks the way it does. The path itself is drawn in
-[docs/dataflow.md](docs/dataflow.md).
+[dataflow.md](dataflow.md).
 
 Most of what follows exists because a query is dominated by two things: network
 round trips, and inflating more bytes than the answer needs.

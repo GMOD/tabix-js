@@ -17,5 +17,5 @@ it too.
 The diagram is the main path only. It leaves out the header reads, the
 read-ahead window that decides how far ahead of the scan chunks are fetched, and
 the plain-gzip fallback `unzip` takes for non-BGZF input. The first two are in
-[OPTIMIZATIONS.md](../OPTIMIZATIONS.md), which explains why each step of this
-path looks the way it does.
+[optimizations.md](optimizations.md), which explains why each step of this path
+looks the way it does.
