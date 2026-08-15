@@ -266,7 +266,7 @@ header that runs to megabytes. `getSkippedLines` decodes only as far as the
 count-th newline rather than splitting the whole buffer.
 
 **Inflate is in wasm because that is where the time is.** libdeflate-in-wasm
-beats a per-block JS inflate by 2.5-3.6x and sits at parity with native `zlib`,
+beats a per-block JS inflate by 2.6-3.5x and sits at parity with native `zlib`,
 so there is no faster codec to reach for; the remaining headroom is running
 blocks in parallel, which is `bgzfWorkerPool`. The full argument, and why the
 boundary is crossed once per chunk rather than per record, is in
