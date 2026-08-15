@@ -114,3 +114,59 @@ parallel, which is `bgzfWorkerPool`.
 The full argument, and why the boundary is crossed once per chunk rather than
 per record, is in
 [`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md).
+What that call does on the other side of the boundary — one wasm call per chunk,
+how a chunk's blocks are split across workers, and what was measured and
+rejected there — is
+[bgzf-filehandle's own optimizations doc](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/optimizations.md).
+
+## The byte estimate is honest about being an upper bound
+
+`bytesForRegions` sums every chunk `blocksForRange` offers, which is more than a
+sparse query reads — 3.6x on `ncbi_human.sorted.gff.gz`, 83x on one BED fixture,
+and 1.00x on a dense VCF.
+
+`@gmod/bam` narrows the same estimate by cutting the chunk list at the
+linear-index entry one window past the query, and that port was written,
+measured across every `.tbi` fixture here, and reverted. It is safe — it never
+forecast under what a query read — but on this corpus exactly one row moved. The
+two shapes where a consumer's byte gate actually fires are the two it cannot
+help with: a GFF whose first record spans the chromosome pins every linear-index
+entry to offset 0, so the bound orders nothing (every NCBI RefSeq GFF opens that
+way), and a dense VCF reads all of its few enormous chunks anyway. The premise
+the forecast needs — a long list of candidate chunks of which a short prefix is
+read — is a BAM property, not a tabix one
+([ADR 0005](../agent-docs/adr/0005-the-bam-chunk-forecast-does-not-transfer.md),
+which also records an earlier attempt that forecast _under_ the read, the
+dangerous direction for a gate).
+
+## What the consumer has to do
+
+Some of the biggest wins are not in this library, because they are decisions
+about the process rather than about the file. What
+[jbrowse-components](https://github.com/GMOD/jbrowse-components) does across its
+nine tabix-backed adapters, as the worked example:
+
+- **One `bgzfWorkerPool` per JS context**, passed to every adapter rather than
+  created per file — inflating is the largest cost in the path above, BGZF
+  blocks are independently inflatable, and the pool is the only lever that
+  attacks that rather than the remainder. One per RPC worker plus one on the
+  main thread, since that is the scope with spare cores.
+- **One `chunkCacheBudget` per JS context**, likewise. The per-file ceiling
+  bounds nothing for a consumer that opens one file per track: measured on the
+  BAM side, three deep tracks retained 1109MB with every cache well under its
+  own 1GB ceiling. A shared budget also lets tracks nobody is looking at yield
+  their space to the one being panned, where dividing the ceiling by the track
+  count walks into the cliff above.
+- **A coalescing range cache under the filehandle**, fetching in 256KB aligned
+  blocks and joining contiguous runs into one request. It composes with the
+  chunk merging above rather than replacing it — that layer dedups _bytes_ while
+  the chunk cache dedups _decompression_ — and it is not a reason to drop the
+  merge, since a consumer without such a layer has only the merge turning a
+  scattered bin set into a few requests
+  ([`@gmod/bam`'s ADR 0011](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0011-chunk-merging-stays-even-behind-a-range-cache.md)).
+- **Consuming lines through the callback**, not by collecting them. `getLines`
+  hands each line over as it is decoded; a caller that pushes them all into an
+  array to parse afterwards holds a copy of the whole region as strings for no
+  reason.
+- **Gating on `bytesForRegions`** before issuing a query at all — reading it as
+  the upper bound the section above says it is.
