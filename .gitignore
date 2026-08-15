@@ -10,3 +10,5 @@ esm
 test/data/1kg.chr1.subset.vcf.gz*
 esm_*/
 *.cpuprofile
+.claude/settings.local.json
+.claude/worktrees/
