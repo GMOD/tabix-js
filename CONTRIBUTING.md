@@ -11,9 +11,9 @@ pnpm build
 Use `pnpm version patch/minor/major` to release — it runs lint, tests, and
 build, then pushes the version tag which triggers the publish workflow.
 
-`docs/img/dataflow.svg` is generated from `docs/img/dataflow.dot` and
-committed, since GitHub does not render DOT. If you edit the `.dot`,
-re-render it in the same commit:
+`docs/img/dataflow.svg` is generated from `docs/img/dataflow.dot` and committed,
+since GitHub does not render DOT. If you edit the `.dot`, re-render it in the
+same commit:
 
 ```sh
 dot -Tsvg docs/img/dataflow.dot -o docs/img/dataflow.svg
@@ -38,6 +38,6 @@ This repo is already configured. To set up a new package:
 npm >=11.10.0 and 2FA).
 
 Once npm publish succeeds, the `release` job creates the GitHub release for the
-tag. Its notes are that version's CHANGELOG.md section, extracted by
-`scripts/release-notes.sh` — run that with a version to preview what a release
-will say.
+tag, taking its notes from that version's CHANGELOG.md section — which
+`scripts/release-notes.sh` extracts, so run that with a version to preview what
+a release will say.
