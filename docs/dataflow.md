@@ -9,10 +9,10 @@ separate — `getLines` never reads it. ([dataflow.dot](dataflow.dot) is the
 source; see [CONTRIBUTING.md](../CONTRIBUTING.md) for how to re-render it.)
 
 Everything orange is wasm, in
-[`@gmod/bgzf-filehandle`](https://github.com/GMOD/bgzf-filehandle). It does one
-thing — decompress BGZF blocks. Index parsing and line scanning are plain JS.
-Both `.tbi` and `.csi` are bgzip-compressed, so unlike `@gmod/bam` — where a
-`.bai` is raw bytes — every index read here goes through it too.
+[`@gmod/bgzf-filehandle`](https://github.com/GMOD/bgzf-filehandle), and all of
+it is decompressing BGZF blocks — parsing the index and scanning for lines both
+stay in JS. Both `.tbi` and `.csi` are bgzip-compressed, so unlike `@gmod/bam`,
+where a `.bai` is raw bytes, every index read here goes through it too.
 
 The diagram is the main path only. It leaves out the header reads, the
 read-ahead window that decides how far ahead of the scan chunks are fetched, and

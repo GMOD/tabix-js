@@ -102,9 +102,10 @@ opening the file directly.
 
 <img src="docs/dataflow.svg" alt="tabix-js data flow" width="700">
 
-Orange is wasm: BGZF decompression, every index read included, since `.tbi` and
-`.csi` are both bgzipped. Everything else is JS — lines are matched as bytes and
-decoded only if they match.
+The orange boxes are wasm, decompressing BGZF blocks — and since `.tbi` and
+`.csi` are bgzipped too, reading the index goes through it as well. The rest is
+ordinary JS, and lines are matched as bytes so only the ones you asked for get
+decoded.
 
 ## Docs
 
