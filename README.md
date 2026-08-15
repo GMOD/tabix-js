@@ -100,17 +100,16 @@ opening the file directly.
 
 ## How a query flows
 
-<img src="docs/dataflow.svg" alt="tabix-js data flow" width="700">
-
-The orange boxes are wasm, decompressing BGZF blocks — and since `.tbi` and
-`.csi` are bgzipped too, reading the index goes through it as well. The rest is
-ordinary JS, and lines are matched as bytes so only the ones you asked for get
-decoded.
+`getLines` turns a region into BGZF chunks through the index and decompresses
+each one in wasm — index reads included, since `.tbi` and `.csi` are bgzipped
+too. The rest is ordinary JS, and lines are matched as bytes so only the ones
+you asked for get decoded. [docs/dataflow.md](docs/dataflow.md) has the diagram
+and walks it through.
 
 ## Docs
 
 - [docs/api.md](docs/api.md) — every constructor arg and method
-- [docs/dataflow.md](docs/dataflow.md) — the diagram above, walked through
+- [docs/dataflow.md](docs/dataflow.md) — a query end to end, diagrammed
 - [docs/optimizations.md](docs/optimizations.md) — why each step of that path
   looks the way it does, and what measured it
 - [agent-docs/adr/](agent-docs/adr/) — the measurements behind those decisions
