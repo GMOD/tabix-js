@@ -14,6 +14,12 @@ it is decompressing BGZF blocks — parsing the index and scanning for lines bot
 stay in JS. Both `.tbi` and `.csi` are bgzip-compressed, so unlike `@gmod/bam`,
 where a `.bai` is raw bytes, every index read here goes through it too.
 
+The purple node is opt-in: pass a `bgzfWorkerPool` and chunk decompression moves
+off the main thread, and without one the same code runs in-process. Only the
+decompression moves, not the line scan, which is why it is one node on a dashed
+edge — the same pool, and the same `@gmod/bgzf-filehandle`, that
+[bam-js](https://github.com/GMOD/bam-js/blob/main/docs/dataflow.md) takes.
+
 The diagram is the main path only. It leaves out the header reads, the
 read-ahead window deciding how far ahead of the scan chunks are fetched, and the
 plain-gzip fallback `unzip` takes for non-BGZF input. The first two are in
