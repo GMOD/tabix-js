@@ -147,10 +147,11 @@ about the process rather than about the file. What
 nine tabix-backed adapters, as the worked example:
 
 - **One `bgzfWorkerPool` per JS context**, passed to every adapter rather than
-  created per file — inflating is the largest cost in the path above, BGZF
-  blocks are independently inflatable, and the pool is the only lever that
-  attacks that rather than the remainder. One per RPC worker plus one on the
-  main thread, since that is the scope with spare cores.
+  created per file — inflating is the largest cost in the path above, and the
+  pool is the only lever that attacks it rather than the remainder. One per RPC
+  worker plus one on the main thread, that being the scope with spare cores.
+  Blocks cross to the workers as transferables, so the fan-out costs one pass
+  over the compressed bytes and needs no cross-origin isolation.
 - **One `chunkCacheBudget` per JS context**, likewise. The per-file ceiling
   bounds nothing for a consumer that opens one file per track: measured on the
   BAM side, three deep tracks retained 1109MB with every cache well under its
