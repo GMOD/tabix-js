@@ -117,10 +117,9 @@ and walks it through.
 
 ## Academic Use
 
-This package was written with funding from the [NHGRI](http://genome.gov) as
-part of the [JBrowse](http://jbrowse.org) project. If you use it in an academic
-project that you publish, please cite the most recent JBrowse paper, which will
-be linked from [jbrowse.org](http://jbrowse.org).
+Written with [NHGRI](http://genome.gov) funding as part of
+[JBrowse](http://jbrowse.org). If you use this in a publication, please cite the
+most recent JBrowse paper at [jbrowse.org](http://jbrowse.org).
 
 ## License
 
