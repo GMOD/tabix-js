@@ -84,8 +84,8 @@ Notes:
 - Pass `undefined` for `end` to read to the end of the contig
 - A `refName` that is not in the index yields no lines and no error, so a
   `chr1`/`1` naming mismatch looks like an empty region. Check against
-  [`getReferenceSequenceNames`](#getreferencesequencenamesopts-promisestring) if
-  a query comes back unexpectedly empty
+  [`getReferenceSequenceNames`](docs/api.md#getreferencesequencenamesopts-promisestring)
+  if a query comes back unexpectedly empty
 - `start > end` throws a `TypeError`; `start === end` returns without reading
 
 ### Without NPM (CDN)
@@ -114,10 +114,6 @@ if they match.
   way it does, and what measured it
 - [agent-docs/adr/](agent-docs/adr/) — the measurements behind those decisions
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release steps.
 
 ## Academic Use
 
