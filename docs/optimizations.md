@@ -1,7 +1,7 @@
 # Optimizations
 
-Why the query path looks the way it does. The path itself is drawn in
-[dataflow.md](dataflow.md).
+Why the query path looks the way it does. [dataflow.md](dataflow.md) draws the
+path itself.
 
 Most of it exists because two things dominate a query: network round trips, and
 inflating more bytes than the answer needs.
@@ -10,10 +10,10 @@ inflating more bytes than the answer needs.
 
 ### Parsed once, shared across callers
 
-`.tbi`/`.csi` is a whole-file read, inflated and parsed on the first query and
-memoized for the life of the object.
+The first query reads the whole `.tbi`/`.csi`, inflates it, parses it, and
+memoizes the result for the life of the object.
 
-Shared, not merely memoized: the parse runs under a signal of its own, cancelled
+Shared, not merely memoized: the parse runs under a signal of its own and aborts
 only once every caller waiting on it has given up, so a query that pans away
 can't abort the index read concurrent queries depend on. `getIndices(refId)` is
 separately LRU-memoized so repeated lookups don't re-walk the parsed bytes.
@@ -35,7 +35,7 @@ than a query reads. Before any I/O, `optimizeChunks`:
 - drops chunks ending at or before the linear-index floor, _before_ sorting;
 - merges neighbours within 65KB (up to a 5MB span), so adjacent bins become one
   range request;
-- trims overlaps, so no byte is fetched twice.
+- trims overlaps, so no fetch covers the same byte twice.
 
 `clampChunkEnds` then pulls each chunk's end down to the next known BGZF block
 boundary rather than over-reading a full maximum-size block — smaller fetches
@@ -48,8 +48,8 @@ serially — 22 in a row for a 1Mb window on `1kg.chr1`. But a sparse file offer
 chunks the scan never reaches, and prefetching those multiplies the bytes for
 nothing.
 
-So the window starts at one and doubles each time a chunk is consumed without
-the scan ending. A query that stops inside its first chunk issues exactly the
+So the window starts at one and doubles each time the scan finishes a chunk
+without ending. A query that stops inside its first chunk issues exactly the
 reads a sequential scan would; a long one reaches the 6-chunk cap after three.
 Six is the HTTP/1.1 per-host connection limit browsers enforce.
 
@@ -60,35 +60,36 @@ Six is the HTTP/1.1 per-host connection limit browsers enforce.
 Lines are in coordinate order, so the first line with `start >= end` ends the
 whole query, not just the chunk.
 
-### Lines are matched as bytes, and decoded only if they match
+### The scan matches lines as bytes, and decodes only the ones that hit
 
-The reference name is compared byte-for-byte against the encoded query name and
-coordinates are parsed straight out of the buffer, so `TextDecoder` runs only on
+It compares the reference name byte-for-byte against the encoded query name and
+reads coordinates straight out of the buffer, so `TextDecoder` runs only on
 lines that survive the range test. Tab offsets go into one reused `Int32Array`.
 
-For VCF, `END=` and `SVTYPE=TRA` are found in a single pass over the INFO field
-rather than by repeated `indexOf` for bytes that produce many false positives.
+For VCF, a single pass over the INFO field finds `END=` and `SVTYPE=TRA`, rather
+than repeated `indexOf` for bytes that produce many false positives.
 
 ### `indexOf` beats a hand-written single pass
 
 The scanning itself deliberately uses `Uint8Array.indexOf` even though the scans
 overlap and a single pass would touch fewer bytes.
 
-Measured: `indexOf` is vectorized in V8, and the single-pass replacement was up
-to **2.96x slower** across nine real VCF/BED/GFF files (ADR 0003). The
-byte-count argument does not predict performance here.
+Measured: V8 vectorizes `indexOf`, and the single-pass replacement ran up to
+**2.96x slower** across nine real VCF/BED/GFF files (ADR 0003). The byte-count
+argument does not predict performance here.
 
 ## The chunk cache
 
-It is bounded by decompressed bytes, and sized above one query. We fetch
-compressed and cache decompressed, so entry count says nothing about memory — a
-single bin of `1kg.chr1.subset.vcf.gz` is 17MB compressed and 120MB inflated.
+The cache counts decompressed bytes rather than entries, and we size it above
+one query. We fetch compressed and cache decompressed, so entry count says
+nothing about memory — a single bin of `1kg.chr1.subset.vcf.gz` is 17MB
+compressed and 120MB inflated.
 
 Sizing it below one query's working set does not cache less, it caches
-_nothing_: each entry is evicted before the next pan can reuse it, so the hit
-rate is zero and the inflate is paid again every time. Measured on that fixture,
-a six-window pan took 17 refills out of 17 at 100MB against 0 at 800MB, and
-2596ms against 600ms (ADRs 0001 and 0002).
+_nothing_: each entry falls out before the next pan can reuse it, so the hit
+rate is zero and every pan pays the inflate again. Measured on that fixture, a
+six-window pan took 17 refills out of 17 at 100MB against 0 at 800MB, and 2596ms
+against 600ms (ADRs 0001 and 0002).
 
 The cache also shares reads already in flight, so concurrent queries hitting one
 chunk inflate it once. A three minute idle timeout makes the 1GB default a peak
@@ -98,10 +99,10 @@ files share one ceiling instead of each holding its own.
 ## The header
 
 `getHeader` and `getSkippedLines` answer different questions from the same
-leading blocks, so they are parsed together and memoized. Only the parsed
-results are kept, which matters for a VCF header running to megabytes.
-`getSkippedLines` decodes only as far as the count-th newline rather than
-splitting the whole buffer.
+leading blocks, so one memoized parse serves both. It keeps only the parsed
+results, which matters for a VCF header running to megabytes. `getSkippedLines`
+finds the N-th newline by scanning bytes and decodes only up to it, instead of
+decoding and splitting the whole buffer to keep its first N lines.
 
 ## Decompression
 
@@ -110,12 +111,11 @@ per-block JS inflate by 2.6-3.5x and sits at parity with native `zlib`, so there
 is no faster codec to reach for; the remaining headroom is running blocks in
 parallel, i.e. `bgzfWorkerPool`.
 
-The full argument, and why the boundary is crossed once per chunk rather than
-per record, is in
-[`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md).
-What that call does on the other side of the boundary — one wasm call per chunk,
-how a chunk's blocks are split across workers, and what was measured and
-rejected there — is
+[`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
+makes the full argument, and says why the call crosses the boundary once per
+chunk rather than per record. What happens on the other side — one wasm call per
+chunk, how the pool splits a chunk's blocks across workers, and what measuring
+there rejected — is
 [bgzf-filehandle's own optimizations doc](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/optimizations.md).
 
 ## The byte estimate is honest about being an upper bound
@@ -125,15 +125,15 @@ sparse query reads — 3.6x on `ncbi_human.sorted.gff.gz`, 83x on one BED fixtur
 and 1.00x on a dense VCF.
 
 `@gmod/bam` narrows the same estimate by cutting the chunk list at the
-linear-index entry one window past the query. That port was written, measured
-across every `.tbi` fixture here, and reverted: it is safe — it never forecast
-under what a query read — but exactly one row moved on this corpus. The two
-shapes where a consumer's byte gate actually fires are the two it cannot help
-with: a GFF whose first record spans the chromosome pins every linear-index
+linear-index entry one window past the query. We wrote that port, measured it
+across every `.tbi` fixture here, and reverted it: it is safe — it never
+forecast under what a query read — but exactly one row moved on this corpus. The
+two shapes where a consumer's byte gate actually fires are the two it cannot
+help with: a GFF whose first record spans the chromosome pins every linear-index
 entry to offset 0, so the bound orders nothing (every NCBI RefSeq GFF opens that
 way), and a dense VCF reads all of its few enormous chunks anyway. The premise
-the forecast needs — a long candidate chunk list of which a short prefix is read
-— is a BAM property, not a tabix one
+the forecast needs — a long candidate chunk list of which a query reads a short
+prefix — is a BAM property, not a tabix one
 ([ADR 0005](../agent-docs/adr/0005-the-bam-chunk-forecast-does-not-transfer.md),
 which also records an earlier attempt that forecast _under_ the read, the
 dangerous direction for a gate).
@@ -155,8 +155,8 @@ nine tabix-backed adapters:
   bounds nothing for a consumer that opens one file per track: measured on the
   BAM side, three deep tracks retained 1109MB with every cache well under its
   own 1GB ceiling. A shared budget also lets tracks nobody is looking at yield
-  their space to the one being panned, where dividing the ceiling by the track
-  count walks into the cliff above.
+  their space to the one the user is panning, where dividing the ceiling by the
+  track count walks into the cliff above.
 - **A coalescing range cache under the filehandle**, fetching in 256KB aligned
   blocks and joining contiguous runs into one request. It composes with the
   chunk merging above rather than replacing it — that layer dedups _bytes_ while
@@ -165,7 +165,7 @@ nine tabix-backed adapters:
   bin set into a few requests
   ([`@gmod/bam`'s ADR 0011](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0011-chunk-merging-stays-even-behind-a-range-cache.md)).
 - **Consuming lines through the callback**, not by collecting them. `getLines`
-  hands each line over as it is decoded; a caller that pushes them all into an
+  hands each line over as it decodes it; a caller that pushes them all into an
   array to parse afterwards holds a copy of the whole region as strings for no
   reason.
 - **Gating on `bytesForRegions`** before issuing a query at all — reading it as

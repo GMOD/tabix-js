@@ -21,7 +21,7 @@ edge — the same pool, and the same `@gmod/bgzf-filehandle`, that
 [bam-js](https://github.com/GMOD/bam-js/blob/main/docs/dataflow.md) takes.
 
 The diagram is the main path only. It leaves out the header reads, the
-read-ahead window deciding how far ahead of the scan chunks are fetched, and the
+read-ahead window that decides how far ahead of the scan to fetch, and the
 plain-gzip fallback `unzip` takes for non-BGZF input. The first two are in
 [optimizations.md](optimizations.md), which explains why each step of this path
 looks the way it does.

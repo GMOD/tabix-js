@@ -74,12 +74,12 @@ await file.getLines('chr1', 200, 300, {
 ```
 
 `onProgress` ticks once per compressed block, including instant ticks for cache
-hits, and `totalBytes` is known up front from the index — enough for a
-determinate progress bar.
+hits, and the index supplies `totalBytes` up front — enough for a determinate
+progress bar.
 
 Notes:
 
-- Meta/comment lines are skipped
+- The scan skips meta/comment lines
 - Line strings have no trailing whitespace
 - Pass `undefined` for `end` to read to the end of the contig
 - A `refName` that is not in the index yields no lines and no error, so a
@@ -102,9 +102,9 @@ opening the file directly.
 
 `getLines` turns a region into BGZF chunks through the index and decompresses
 each one in wasm — index reads included, since `.tbi` and `.csi` are bgzipped
-too. The rest is ordinary JS, and lines are matched as bytes so only the ones
-you asked for get decoded. [docs/dataflow.md](docs/dataflow.md) has the diagram
-and walks it through.
+too. The rest is ordinary JS: it matches lines as bytes and decodes only the
+ones you asked for. [docs/dataflow.md](docs/dataflow.md) has the diagram and
+walks it through.
 
 ## Docs
 
