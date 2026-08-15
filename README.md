@@ -104,14 +104,14 @@ opening the file directly.
 
 Orange is wasm, and it is only ever inflate — every index read included, since
 `.tbi` and `.csi` are both bgzipped. Lines are matched as bytes and decoded only
-if they match. See [docs/dataflow.md](docs/dataflow.md) for the walkthrough and
-what each step is optimized for.
+if they match.
 
 ## Docs
 
 - [docs/api.md](docs/api.md) — every constructor arg and method
-- [docs/dataflow.md](docs/dataflow.md) — how a query flows, where wasm sits, and
-  what the query path is optimized for
+- [docs/dataflow.md](docs/dataflow.md) — the diagram above, walked through
+- [OPTIMIZATIONS.md](OPTIMIZATIONS.md) — why each step of that path looks the
+  way it does, and what measured it
 - [agent-docs/adr/](agent-docs/adr/) — the measurements behind those decisions
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 

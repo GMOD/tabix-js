@@ -1,63 +1,58 @@
 // Source for docs/dataflow.svg, which README.md embeds.
 // Regenerate with: dot -Tsvg docs/dataflow.dot -o docs/dataflow.svg
 //
-// SYNC: ~/src/gmod/bam-js/docs/dataflow.dot — same palette and legend, and the
-// two graphs are deliberately readable side by side.
+// Deliberately the MAIN PATH only — the header reads, the read-ahead window and
+// the plain-gzip fallback are described in dataflow.md instead. A diagram that
+// shows every branch stops being the thing you look at first.
+//
+// SYNC: ~/src/gmod/bam-js/docs/dataflow.dot — same palette, legend and spine.
 digraph tabixjs {
   rankdir=TB
   bgcolor="white"
   nodesep=0.3
-  ranksep=0.34
+  ranksep=0.36
   node [shape=box style="filled,rounded" fillcolor="#f6f8fa" color="#57606a"
-        fontname="Helvetica" fontsize=10 margin="0.12,0.06"]
+        fontname="Helvetica" fontsize=10 margin="0.14,0.07"]
   edge [color="#57606a" fontname="Helvetica" fontsize=9]
 
-  query    [label="getLines(refName, start, end, cb)" fillcolor="#ddf4ff" color="#0969da"]
-  hdrq     [label="getHeader / getHeaderLines\ngetSkippedLines" fillcolor="#ddf4ff" color="#0969da"]
-  out      [label="lineCallback(line, fileOffset, start, end)" fillcolor="#ddf4ff" color="#0969da"]
-
-  readidx  [label="read .tbi / .csi\n(whole file)" fillcolor="#dafbe1" color="#1a7f37"]
-  readhdr  [label="read [0, firstDataLine + maxBlockSize)" fillcolor="#dafbe1" color="#1a7f37"]
-  readchk  [label="read chunk range" fillcolor="#dafbe1" color="#1a7f37"]
-
-  unzipidx [label="unzip" fillcolor="#ffd8b5" color="#bc4c00"]
-  unziphdr [label="unzip" fillcolor="#ffd8b5" color="#bc4c00"]
-  slice    [label="unzipChunkSlice\n→ buffer + c/dpositions" fillcolor="#ffd8b5" color="#bc4c00"]
-  pool     [label="bgzfWorkerPool\none block per worker" fillcolor="#ffd8b5" color="#bc4c00"]
-
-  index    [label="TBI / CSI\nrefNameToId, bins, linear index" fillcolor="#fff8c5" color="#9a6700"]
-  header   [label="header + skipped lines\nboth forms, one read" fillcolor="#fff8c5" color="#9a6700"]
-  cache    [label="chunkCache\nshares in-flight reads,\nLRU by decompressed bytes" fillcolor="#fff8c5" color="#9a6700"]
-
-  blocks   [label="blocksForRange\nreg2bins → prune by lowestOffset\n→ optimizeChunks → Chunk[]"]
-  ahead    [label="read-ahead window\n1, doubling per chunk consumed, ≤6"]
-  scan     [label="line scan\nindexOf(\\n), tab offsets,\nrefName compared as bytes,\nstop once start ≥ end"]
+  query   [label="getLines(refName, start, end, cb)" fillcolor="#ddf4ff" color="#0969da"]
+  readidx [label="read .tbi / .csi" fillcolor="#dafbe1" color="#1a7f37"]
+  unzip   [label="unzip" fillcolor="#ffd8b5" color="#bc4c00"]
+  index   [label="index" fillcolor="#fff8c5" color="#9a6700"]
+  blocks  [label="blocksForRange"]
+  cache   [label="chunkCache" fillcolor="#fff8c5" color="#9a6700"]
+  readchk [label="read chunk range" fillcolor="#dafbe1" color="#1a7f37"]
+  slice   [label="unzipChunkSlice" fillcolor="#ffd8b5" color="#bc4c00"]
+  pool    [label="worker pool" fillcolor="#ffd8b5" color="#bc4c00"]
+  scan    [label="scan lines"]
+  out     [label="lineCallback" fillcolor="#ddf4ff" color="#0969da"]
 
   query -> readidx
-  readidx -> unzipidx
-  unzipidx -> index
+  readidx -> unzip
+  unzip -> index
   index -> blocks
-  hdrq -> index [style=dashed label=" metaChar, skipLines "]
-  index -> readhdr [style=dashed label=" firstDataLine "]
-  readhdr -> unziphdr
-  unziphdr -> header
-  blocks -> ahead [label=" Chunk[] "]
-  ahead -> cache
+  blocks -> cache [label=" Chunk[] "]
   cache -> readchk [label=" miss "]
   readchk -> slice
-  slice -> pool [style=dashed label=" if passed "]
+  slice -> pool [style=dashed label=" optional "]
   slice -> scan
   pool -> scan
   cache -> scan [label=" hit "]
-  scan -> ahead [style=dashed label=" chunk consumed:\l widen the window \l" constraint=false]
-  scan -> out [label=" in range, decoded "]
+  scan -> out
 
   subgraph cluster_legend {
-    label="" color="white" margin=4
-    node [shape=box style="filled,rounded" fontsize=9 margin="0.08,0.03"]
+    label="Legend"
+    labelloc="t"
+    fontname="Helvetica"
+    fontsize=10
+    fontcolor="#57606a"
+    color="#d0d7de"
+    style="rounded"
+    margin=10
+    node [shape=box style="filled,rounded" fontsize=9 margin="0.1,0.04"]
     l1 [label="I/O" fillcolor="#dafbe1" color="#1a7f37"]
-    l2 [label="wasm — @gmod/bgzf-filehandle" fillcolor="#ffd8b5" color="#bc4c00"]
-    l3 [label="cached / shared between queries" fillcolor="#fff8c5" color="#9a6700"]
+    l2 [label="wasm" fillcolor="#ffd8b5" color="#bc4c00"]
+    l3 [label="cached / shared" fillcolor="#fff8c5" color="#9a6700"]
     l1 -> l2 -> l3 [style=invis]
   }
 }
