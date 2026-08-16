@@ -31,12 +31,12 @@ every arm verified to emit identical output before any timing was believed.
 | 20000 blocks × 8 columns  | 0.94x       | 1.00x       | **1.18x**                | 1.17x                 |
 | 1600 blocks × 250 columns | 0.92x       | 1.00x       | 0.97x                    | **1.17x**             |
 
-**The third column is what settles it.** A buffer valid only for the duration of
-the call means a consumer cannot hold lines and pack them later — it has to pack
-each one as it arrives. That restructure is not a side effect of the byte
-handoff, it is a consequence of it, and on the shape real files have it is the
-whole win: 1.18x, with peak RSS falling 491 MB → 263 MB. Adding the bytes on top
-of it measured 1.17x and 265 MB — nothing.
+**"Packed in the callback" is the column that settles it.** A buffer valid only
+for the duration of the call means a consumer cannot hold lines and pack them
+later — it has to pack each one as it arrives. That restructure is not a side
+effect of the byte handoff, it is a consequence of it, and on the shape real
+files have it is the whole win: 1.18x, with peak RSS falling 491 MB → 263 MB.
+Adding the bytes on top of it measured 1.17x and 265 MB — nothing.
 
 The bytes pay only where a line is wide, because that is what the decode scales
 with, while the restructure scales with rows. The 250-column fixture where they
