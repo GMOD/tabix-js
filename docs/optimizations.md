@@ -69,6 +69,13 @@ lines that survive the range test. Tab offsets go into one reused `Int32Array`.
 For VCF, a single pass over the INFO field finds `END=` and `SVTYPE=TRA`, rather
 than repeated `indexOf` for bytes that produce many false positives.
 
+The decode that survives is the one the caller asked for, and handing over the
+buffer range instead — so a caller that re-parses the line could skip even that
+— was measured in the consumer that wanted it and rejected
+([ADR 0006](../agent-docs/adr/0006-getlines-hands-over-strings-not-buffer-ranges.md)).
+The restructure a borrowed buffer forces on that caller turned out to be worth
+everything the bytes were credited with, and the caller can do it alone.
+
 ### `indexOf` beats a hand-written single pass
 
 The scanning itself deliberately uses `Uint8Array.indexOf` even though the scans
