@@ -40,6 +40,23 @@ const custom = new TabixIndexedFile({
 })
 ```
 
+Over HTTP, swapping in
+[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
+is usually worth it: a query reads the index and then a scattered set of BGZF
+blocks, and a byte-range cache coalesces those into one request per contiguous
+run and serves an overlapping query from memory.
+
+```typescript
+import { RemoteFileWithRangeCache } from '@gmod/range-cache-filehandle'
+
+const cached = new TabixIndexedFile({
+  filehandle: new RemoteFileWithRangeCache('https://example.com/file.vcf.gz'),
+  tbiFilehandle: new RemoteFileWithRangeCache(
+    'https://example.com/file.vcf.gz.tbi',
+  ),
+})
+```
+
 ### getLines
 
 Fetches lines overlapping a region. `start`/`end` are 0-based half-open
