@@ -100,8 +100,18 @@ none: their caches are internal and fixed (bbi's R-tree node cache is 1000
 entries, hic's block cache is a byte-bounded LRU behind two constants), so a
 consumer-facing caching doc there would have nothing to document.
 
-What that leaves, for whoever picks it up in those two repos, is a **code**
-question rather than a docs one: neither lets a consumer bound its caches, and
-bbi's node cache is bounded by entry count with entries of variable size. That
-is the shape [ADR 0001](adr/0001-bound-the-chunk-cache-by-decompressed-bytes.md)
-rejected here.
+What that leaves in those two repos is a **code** question rather than a docs
+one, and `@gmod/bbi` has already framed it: its `docs/optimizations.md` carries
+a "No block cache" entry saying a pan that re-visits a window re-fetches and
+re-inflates it, deliberately, because the filehandle layer above dedups the
+bytes — the expensive half remotely. So this is not unexamined, and re-deriving
+it from first principles is the mistake this directory exists to prevent.
+
+What has changed is the condition that entry names. It says a parsed-block cache
+"would need a byte-bounded budget shared across files, as bam-js's does, rather
+than an entry count" — and that budget now ships, in `@gmod/shared-read-cache`,
+which `@gmod/bbi` already depends on for its index caches. The prerequisite is
+met; what is not established is whether the inflate a pan repeats is worth it,
+which is bbi's measurement to make. One caveat travels with it: bbi weighs
+entries today, so a byte-weighed block cache has to be its own budget group
+rather than joining the one `@gmod/bam` and this library share.
