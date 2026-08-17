@@ -64,11 +64,12 @@ interface GetLinesOpts {
   signal?: AbortSignal
   lineCallback: GetLinesCallback
   /**
-   * Called as the compressed data blocks covering the query are fetched, with
-   * cumulative downloaded bytes and the total bytes to fetch. Reported at block
-   * granularity (one tick per chunk, including instant ticks for cache hits),
-   * which is the natural unit since chunk byte sizes are known up front from
-   * the index. Lets callers render a determinate download progress bar.
+   * Called as the chunks covering the query are fetched, with cumulative
+   * downloaded bytes and the total bytes to fetch. One tick per chunk — the run
+   * of BGZF blocks the index resolves a query to — including instant ticks for
+   * chunks already cached. That is the natural unit here, since chunk byte
+   * sizes are known up front from the index, which is what lets a caller render
+   * a determinate progress bar rather than a spinner.
    */
   onProgress?: (bytesDownloaded: number, totalBytes?: number) => void
 }

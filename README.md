@@ -73,9 +73,9 @@ await file.getLines('chr1', 200, 300, {
 })
 ```
 
-`onProgress` ticks once per compressed block, including instant ticks for cache
-hits, and the index supplies `totalBytes` up front — enough for a determinate
-progress bar.
+`onProgress` ticks once per chunk — the run of BGZF blocks the index resolves a
+query to — including instant ticks for chunks already cached, and the index
+supplies `totalBytes` up front, which is enough for a determinate progress bar.
 
 Notes:
 
@@ -106,12 +106,49 @@ too. The rest is ordinary JS: it matches lines as bytes and decodes only the
 ones you asked for. [docs/dataflow.md](docs/dataflow.md) has the diagram and
 walks it through.
 
+The file then holds on to those decompressed chunks, so overlapping and adjacent
+queries reuse them instead of inflating again — up to 1GB per file, dropped
+after three idle minutes. A consumer holding one file per track should bound
+them together with a shared `chunkCacheBudget` rather than shrinking each file's
+own ceiling: [docs/caching.md](docs/caching.md).
+
+## Decompressing on a worker pool
+
+BGZF blocks inflate independently, so that decompression can spread across
+threads.
+
+```typescript
+import { getSharedWorkerPool } from '@gmod/bgzf-filehandle'
+
+const file = new TabixIndexedFile({
+  url: 'https://example.com/yourfile.vcf.gz',
+  // the pending promise is fine — it is awaited at the point of use
+  bgzfWorkerPool: getSharedWorkerPool(),
+})
+```
+
+Safe to pass unconditionally: `getSharedWorkerPool()` returns `undefined` under
+node, or anywhere the host forbids Workers, which keeps the in-process path. No
+cross-origin isolation needed. tabix-js never creates a pool on its own — the
+thread budget belongs to the consumer.
+
+Expect a smaller multiple than a BAM reader reports. The blocks come back
+separately and are concatenated on the calling thread, which no worker count
+speeds up and which scales with the _decompressed_ size — and text compresses
+hard, so on a bgzipped GFF that concat is 58% of the call and the end-to-end
+figure is flat at ~1.0x while the inflate alone is 2.49x. Worth passing, since
+it costs nothing where it does not help; not worth planning around unmeasured.
+Worker counts, lifecycle and benchmarks:
+[bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md).
+
 ## Docs
 
 - [docs/api.md](docs/api.md) — every constructor arg and method
 - [docs/dataflow.md](docs/dataflow.md) — a query end to end, diagrammed
 - [docs/optimizations.md](docs/optimizations.md) — why each step of that path
   looks the way it does, and what measured it
+- [docs/caching.md](docs/caching.md) — sizing the decompressed-chunk cache, and
+  bounding many files together
 - [agent-docs/adr/](agent-docs/adr/) — the measurements behind those decisions
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 

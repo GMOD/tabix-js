@@ -118,6 +118,19 @@ per-block JS inflate by 2.6-3.5x and sits at parity with native `zlib`, so there
 is no faster codec to reach for; the remaining headroom is running blocks in
 parallel, i.e. `bgzfWorkerPool`.
 
+**A pool is worth less here than it is for BAM, and the reason is structural.**
+A pooled call gets one buffer per block back and concatenates them on the
+calling thread, work the sequential path does inside wasm as part of the same
+call. That memcpy runs at 0.7-1.2 GB/s, no worker count touches it, and it
+scales with the _decompressed_ size — so it is worst where compression is best.
+Tabix files are text: bgzf-filehandle measures a bgzipped GFF at 2.49x on the
+inflate itself and **flat at ~1.0x end to end**, reassembly being 58% of the
+four-worker call, where its BAM fixtures are 1.8-2.1x end to end.
+
+Note also that **node cannot measure any of this**: `getSharedWorkerPool()`
+resolves to `undefined` there, so both arms of a node benchmark run the
+in-process path and report parity forever. That question needs a browser.
+
 [`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
 makes the full argument, and says why the call crosses the boundary once per
 chunk rather than per record. What happens on the other side — one wasm call per
@@ -147,23 +160,26 @@ dangerous direction for a gate).
 
 ## What the consumer has to do
 
-Some of the biggest wins are not in this library, because they are decisions
-about the process rather than about the file. The worked example is
-[jbrowse-components](https://github.com/GMOD/jbrowse-components), across its
-nine tabix-backed adapters:
+Some of the biggest wins are not in this library at all, because they are
+decisions about the process rather than about the file. What
+[jbrowse-components](https://github.com/GMOD/jbrowse-components) does across its
+nine tabix-backed adapters, as the worked example:
 
 - **One `bgzfWorkerPool` per JS context**, passed to every adapter rather than
-  created per file — inflating is the largest cost in the path above, and the
-  pool is the only lever that attacks it rather than the remainder. One per RPC
+  created per file. Inflating is the largest cost in the path above and the pool
+  is the only lever that attacks it rather than the remainder. One per RPC
   worker plus one on the main thread, that being the scope with spare cores.
-  Blocks cross to the workers as transferables, so the fan-out costs one pass
-  over the compressed bytes and needs no cross-origin isolation.
-- **One `chunkCacheBudget` per JS context**, likewise. The per-file ceiling
-  bounds nothing for a consumer that opens one file per track: measured on the
-  BAM side, three deep tracks retained 1109MB with every cache well under its
-  own 1GB ceiling. A shared budget also lets tracks nobody is looking at yield
-  their space to the one the user is panning, where dividing the ceiling by the
-  track count walks into the cliff above.
+  Blocks cross as transferables, so the fan-out costs one pass over the
+  compressed bytes and needs no cross-origin isolation. Expect less than the
+  1.95x `@gmod/bam` measures, for the reason in [Decompression](#decompression)
+  above.
+- **One `chunkCacheBudget` per JS context**, likewise. `chunkCacheSize` is per
+  file, which bounds nothing for a consumer that opens one file per track:
+  measured on the BAM side, three deep tracks retained 1109MB with every cache
+  well under its own 1GB ceiling. A shared budget also lets tracks nobody is
+  looking at yield their space to the one the user is panning, where dividing
+  the ceiling by the track count walks into the cliff above.
+  [caching.md](caching.md) is the whole of it, with the code.
 - **A coalescing range cache under the filehandle**, fetching in 256KB aligned
   blocks and joining contiguous runs into one request. It composes with the
   chunk merging above rather than replacing it — that layer dedups _bytes_ while
