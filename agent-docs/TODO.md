@@ -79,6 +79,29 @@ are the kind that copy across repos:
   entirely — the two options that decide a genome browser's memory and its
   decompression throughput.
 
+A third was found by comparing against the siblings rather than inside this
+repo: both the API comment and `docs/caching.md` said `@gmod/cram` could join a
+`chunkCacheBudget`, and it cannot — cram weighs decoded _records_ where this
+library weighs bytes, so the sum bounds neither. Fixed here; `@gmod/bam` never
+made the claim.
+
 `vcf-js`, `gff-nostream`, `bed-js` and `twobit-js` wrap the same reader or the
 same filehandle and plausibly carry the same omissions. Check the option tables
 against the constructors rather than against each other.
+
+**The caching-doc side of that sweep is done, and the answer was "nothing to
+add"** (2026-08-16). Only three of these repos expose cache knobs at all:
+`@gmod/bam` and this one, which now carry matching `docs/caching.md`, and
+`@gmod/cram`, whose `cacheSize`/`cacheIdleTimeoutMs`/`cacheBudget` are covered
+completely by `docs/api.md` § "The cache options" and `docs/memory.md` § "The
+slice cache" — a different filename, not a gap, and moving them would break the
+cross-links those two docs already have. `@gmod/bbi` and `@gmod/hic` expose
+none: their caches are internal and fixed (bbi's R-tree node cache is 1000
+entries, hic's block cache is a byte-bounded LRU behind two constants), so a
+consumer-facing caching doc there would have nothing to document.
+
+What that leaves, for whoever picks it up in those two repos, is a **code**
+question rather than a docs one: neither lets a consumer bound its caches, and
+bbi's node cache is bounded by entry count with entries of variable size. That
+is the shape [ADR 0001](adr/0001-bound-the-chunk-cache-by-decompressed-bytes.md)
+rejected here.
