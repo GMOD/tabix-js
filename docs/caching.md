@@ -84,10 +84,18 @@ reading hand their space to the one being panned. Dividing `chunkCacheSize` by
 the track count instead walks straight into the cliff above.
 
 The budget is `@gmod/shared-read-cache`'s, not this library's, so `@gmod/bam`
-and `@gmod/cram` can join the same one — which is the point, since a genome
-browser's memory problem is the sum across formats rather than any one of them.
-The BAM side measured the shape: six tracks browsing six windows retained 1442MB
-with every cache still under its own ceiling.
+can join the same one — which is the point, since a genome browser's memory
+problem is the sum across formats rather than any one of them. The BAM side
+measured the shape: six tracks browsing six windows retained 1442MB with every
+cache still under its own ceiling.
+
+**Group members by unit, though.** A budget's total is a sum over its members,
+so it means nothing unless they all weigh the same thing. `@gmod/bam` and this
+library both weigh decompressed bytes and pool cleanly; `@gmod/cram` weighs
+decoded _records_ and `@gmod/bbi` weighs entries, so a budget holding a tabix
+cache and a cram cache is adding bytes to records and bounding neither. Nothing
+can check this for you — `sizeOf` is opaque by design — so give each unit its
+own budget.
 
 ## None of these bound peak memory
 

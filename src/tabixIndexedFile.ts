@@ -352,9 +352,12 @@ export default class TabixIndexedFile {
      */
     chunkCacheIdleTimeoutMs?: number
     /**
-     * A budget shared with other files — any `@gmod/shared-read-cache`
-     * consumer, so `@gmod/bam` and `@gmod/cram` can join the same one — so
-     * that the ceiling applies to their sum rather than to each of them.
+     * A budget shared with other files, so that the ceiling applies to their
+     * sum rather than to each of them. Any `@gmod/shared-read-cache` consumer
+     * that weighs in the same unit can join it: `@gmod/bam` also weighs
+     * decompressed bytes, while `@gmod/cram` weighs decoded records and
+     * `@gmod/bbi` weighs entries, and a budget mixing those adds bytes to
+     * records and bounds neither.
      *
      * {@link chunkCacheSize} is per file, which is not a bound on a consumer
      * that opens one file per track. @gmod/bam measured the shape: six tracks
