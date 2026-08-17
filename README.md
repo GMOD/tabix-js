@@ -160,6 +160,8 @@ production rather than quietly falling back, are in jbrowse-components'
 - [docs/caching.md](docs/caching.md) — sizing the decompressed-chunk cache, and
   bounding many files together
 - [agent-docs/adr/](agent-docs/adr/) — the measurements behind those decisions
+- [agent-docs/TODO.md](agent-docs/TODO.md) — what is worth doing next, and what
+  has to be measured before it
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 
 ## Academic Use
