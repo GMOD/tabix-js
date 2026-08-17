@@ -118,18 +118,26 @@ per-block JS inflate by 2.6-3.5x and sits at parity with native `zlib`, so there
 is no faster codec to reach for; the remaining headroom is running blocks in
 parallel, i.e. `bgzfWorkerPool`.
 
-**A pool is worth less here than it is for BAM, and the reason is structural.**
-A pooled call gets one buffer per block back and concatenates them on the
-calling thread, work the sequential path does inside wasm as part of the same
-call. That memcpy runs at 0.7-1.2 GB/s, no worker count touches it, and it
-scales with the _decompressed_ size — so it is worst where compression is best.
-Tabix files are text: bgzf-filehandle measures a bgzipped GFF at 2.49x on the
-inflate itself and **flat at ~1.0x end to end**, reassembly being 58% of the
-four-worker call, where its BAM fixtures are 1.8-2.1x end to end.
+**A pool is worth less here than it is for BAM — 1.34-1.46x against 1.95x — and
+the gap is a serial fraction rather than a worse pool.** On a 213MB multi-sample
+VCF the decompression moves 1.83x, and a warm-cache pass isolates what is left:
+28% of that query is per-line byte scanning and string decoding, which the pool
+cannot reach. Amdahl on those two numbers predicts 1.49x against 1.45x measured.
+The floor is largest exactly where the lines are widest, so a 1000-Genomes VCF
+is the bad case and a narrow-line BED is not (jbrowse-components'
+[BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md)).
+
+A second serial term sits inside the pooled call itself: the blocks come back
+separately and are concatenated on the calling thread, a memcpy at 0.7-1.2 GB/s
+that scales with the _decompressed_ size, so it is worst where compression is
+best. bgzf-filehandle's most compressible fixture — a bgzipped GFF that inflates
+18.6x — spends 58% of its four-worker call there. That term is a reason the
+1.83x is not higher; it is not the reason the end-to-end figure is 1.4x.
 
 Note also that **node cannot measure any of this**: `getSharedWorkerPool()`
 resolves to `undefined` there, so both arms of a node benchmark run the
-in-process path and report parity forever. That question needs a browser.
+in-process path and report parity forever. That question needs a browser, which
+is where every number above comes from.
 
 [`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
 makes the full argument, and says why the call crosses the boundary once per

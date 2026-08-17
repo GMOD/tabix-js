@@ -132,14 +132,24 @@ node, or anywhere the host forbids Workers, which keeps the in-process path. No
 cross-origin isolation needed. tabix-js never creates a pool on its own — the
 thread budget belongs to the consumer.
 
-Expect a smaller multiple than a BAM reader reports. The blocks come back
-separately and are concatenated on the calling thread, which no worker count
-speeds up and which scales with the _decompressed_ size — and text compresses
-hard, so on a bgzipped GFF that concat is 58% of the call and the end-to-end
-figure is flat at ~1.0x while the inflate alone is 2.49x. Worth passing, since
-it costs nothing where it does not help; not worth planning around unmeasured.
+**Worth about 1.4x here, against the 1.95x a BAM reader reports.** Measured in
+jbrowse-components on `test/data/1kg.chr1.subset.vcf.gz` — 213MB of 1000
+Genomes, headless Chrome, real HTTP, four workers, arms interleaved, both
+returning the same record count: **1.34-1.46x** across five window sizes and a
+twelve-step pan.
+
+The decompression itself moves **1.83x**. What holds the end-to-end figure below
+that is a **28% floor of per-line byte scanning and string decoding**, which no
+worker count reaches — and that floor is at its worst on multi-sample VCF, whose
+records carry a genotype field per sample and run to ~60KB a line. A format with
+narrower lines sits closer to BAM. If you want more than ~1.5x on a multi-sample
+VCF, the scan is what is left to attack, not the decompression.
+
 Worker counts, lifecycle and benchmarks:
-[bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md).
+[bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md);
+the end-to-end numbers above, and how to confirm a pool is really engaging in
+production rather than quietly falling back, are in jbrowse-components'
+[BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md).
 
 ## Docs
 
