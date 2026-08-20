@@ -163,6 +163,10 @@
 
 * satisfy eslint-plugin-unicorn 72 ([fd12751](https://github.com/GMOD/tabix-js/commit/fd127514cb685238f8b2de4640a4103ad37c0cee)), closes [#private](https://github.com/GMOD/tabix-js/issues/private)
 
+### Chores
+
+* share one eslint-plugin-unicorn opt-out list across the repos ([9400217](https://github.com/GMOD/tabix-js/commit/9400217525ca2c29c4adfec20825d56598e9ca87))
+
 ### Performance Improvements
 
 * read a query's chunks ahead, as far as the scan earns ([8340c33](https://github.com/GMOD/tabix-js/commit/8340c33a95929402fc49c87a12ea34f714ec21a0))
@@ -181,6 +185,16 @@
 - match htslib query semantics for TBI indexes
   ([c8c8e4c](https://github.com/GMOD/tabix-js/commit/c8c8e4cf261253304ce25f071f6da512c28f043d))
 
+### Chores
+
+- mark package as side-effect free, enabling bundler tree-shaking
+  ([e49f17c](https://github.com/GMOD/tabix-js/commit/e49f17c0049702632c1a78c8436cf38acf441cb0))
+
+### Refactoring
+
+- correct DataView byte offsets and drop dead code
+  ([b2c380d](https://github.com/GMOD/tabix-js/commit/b2c380d42fdf9e86d4202c4556f86921144ec3e1))
+
 ## [3.4.2](https://github.com/GMOD/tabix-js/compare/v3.4.1...v3.4.2) (2026-06-25)
 
 ### Features
@@ -196,6 +210,13 @@
   ([23de497](https://github.com/GMOD/tabix-js/commit/23de497ee9fb2936154100f1667e940d6cbba095))
 
 # [3.4.0](https://github.com/GMOD/tabix-js/compare/v3.3.9...v3.4.0) (2026-06-18)
+
+### Documentation
+
+- add typedoc for auto-generated API reference in README
+  ([3272468](https://github.com/GMOD/tabix-js/commit/3272468d9bb8c8679f4a0e72319163d3fce48a9a))
+- rewrite README with hand-crafted API reference
+  ([9637af0](https://github.com/GMOD/tabix-js/commit/9637af0e101cd22ad340d8e96cf6d2f6c3466f4e))
 
 ### Features
 
@@ -238,12 +259,30 @@
 - use Array.from({length}) to satisfy unicorn/no-new-array lint rule
   ([9f6294e](https://github.com/GMOD/tabix-js/commit/9f6294e04ad9425b852fde6d672a425bd8859628))
 
+### Documentation
+
+- update README: pnpm version and main-branch codecov badge
+  ([5387fed](https://github.com/GMOD/tabix-js/commit/5387fed065f8f5e8580710a1aa14d7d1e00c0250))
+- drop docstring entries for unimplemented constructor options
+  ([85c5fad](https://github.com/GMOD/tabix-js/commit/85c5fad3a67fc82f7b94aa336a490eab9ac097ce))
+
 ### Performance Improvements
 
 - avoid per-query Chunk clones and tighten getLines hot loop
   ([2e4488b](https://github.com/GMOD/tabix-js/commit/2e4488bffaf51de85804260b45bede8ab81e1369))
 - reduce allocations and move TextDecoder/TextEncoder to function scope
   ([3abb846](https://github.com/GMOD/tabix-js/commit/3abb846a9f0c5b6c5cbf4a73a13f9e84bf780922))
+
+### Refactoring
+
+- extract shared tabix header parser and minor cleanups
+  ([a4c02e5](https://github.com/GMOD/tabix-js/commit/a4c02e59aaab0c0ebcda7f821d9d3c61056979f8))
+- convert IndexFile helpers to free functions in util.ts
+  ([d579953](https://github.com/GMOD/tabix-js/commit/d5799537277ee19256c8b6f3c8b78c38d95bf4a0))
+- lazy per-refId index parsing aligned with bam-js CSI implementation
+  ([9a0e895](https://github.com/GMOD/tabix-js/commit/9a0e8952cb6f144914e49da4fbcd89b4482f2034))
+- extract parseAuxData free function, simplify parseNameBytes
+  ([27a6eac](https://github.com/GMOD/tabix-js/commit/27a6eacb39d18a465cebdc8fb72ee36ce76d3536))
 
 ### Reverts
 
@@ -264,11 +303,23 @@
 - add non-null assertions for noUncheckedIndexedAccess compliance
   ([645a56c](https://github.com/GMOD/tabix-js/commit/645a56c1b911704c6d0cb2f7b6f6bca651f278f9))
 
+### Chores
+
+- enable `noUncheckedIndexedAccess` in tsconfig for stricter array/object
+  access ([973a07d](https://github.com/GMOD/tabix-js/commit/973a07d5a7097add09259e7c7527c778ce38ffa3))
+- replace eslint-plugin-import with eslint-plugin-import-x
+  ([3a87572](https://github.com/GMOD/tabix-js/commit/3a875726d6befa6bee2bc2aa44ac645b263eb622))
+- standardize package.json, tsconfig, and the build pipeline
+  ([8d970b5](https://github.com/GMOD/tabix-js/commit/8d970b5a3c61e5d0d596dd9638618a2c1d583b44))
+
 ## [3.3.2](https://github.com/GMOD/tabix-js/compare/v3.3.1...v3.3.2) (2026-04-27)
 
 - Multiple README clarity and doc-error fixes; correct the `lineCount`
   docs (count is exact, not approximate); add JSDoc so auto-generated API
   docs pick it up
+- Simplify package.json's `exports` map (drop redundant nested
+  import/require conditions), and switch build/version scripts from yarn
+  to pnpm
 - Routine dependency bumps
 
 ## [3.3.1](https://github.com/GMOD/tabix-js/compare/v3.3.0...v3.3.1) (2026-03-28)
@@ -386,6 +437,11 @@
   examples
 
 ## [1.5.14](https://github.com/GMOD/tabix-js/compare/v1.5.13...v1.5.14) (2024-07-23)
+
+### Chores
+
+- Change `abortable-promise-cache` to `@gmod/abortable-promise-cache`
+  ([fa6151b](https://github.com/GMOD/tabix-js/commit/fa6151b1a3f98e35f1eab575f99f6292d489d793))
 
 ### Reverts
 
@@ -530,6 +586,7 @@
 # [1.3.0](https://github.com/GMOD/tabix-js/compare/v1.2.0...v1.3.0) (2019-08-08)
 
 - Add ability to pass an AbortSignal from an AbortController to `getLines()`
+- Re-instate merging of adjacent index chunks within the same bgzip block, significantly improving performance for queries spanning many blocks
 
 <a name="1.2.0"></a>
 
@@ -554,6 +611,7 @@
 
 - Fix issue with headerless files returning data lines in header
 - Use generic-filehandle for localFile
+- Fix crash when querying outside of the possible tabix range (avoid calling into a null `minOffset`)
 
 ## [1.1.5](https://github.com/GMOD/tabix-js/compare/v1.1.4...v1.1.5) (2019-03-05)
 
