@@ -1,3 +1,53 @@
+## [3.8.2](https://github.com/GMOD/tabix-js/compare/v3.8.1...v3.8.2) (2026-08-21)
+
+### Bug Fixes
+
+- Take the shared-read-cache release that fixes abort, eviction and weighing ([ba0f198](https://github.com/GMOD/tabix-js/commit/ba0f19854f4edc3e267102e3a4a92baacdd9921f))
+
+### Chores
+
+- Keep agent worktrees out of the toolchain's way ([cd2ffab](https://github.com/GMOD/tabix-js/commit/cd2ffab0a4aa749d1797153db5d47a28b156fddf))
+- Build each ref in a worktree, with pnpm ([19e3961](https://github.com/GMOD/tabix-js/commit/19e39616e271899b4406fd585741c5661930b01a))
+- Install each ref with --frozen-lockfile ([068572c](https://github.com/GMOD/tabix-js/commit/068572c878940ad9b16b1911edd3cadce0dfab27))
+
+### Documentation
+
+- The bam chunk forecast is safe here now, and still does not pay ([ee8caff](https://github.com/GMOD/tabix-js/commit/ee8caff271a4c6062f77f0d48047f7b55e7abb7a))
+- A data-flow diagram, and what the query path is optimized for ([8600a0e](https://github.com/GMOD/tabix-js/commit/8600a0ef9d374d110f3e01290844f72caaa8e840))
+- Match the inflate figure to the benchmark that now prints it ([e7afb09](https://github.com/GMOD/tabix-js/commit/e7afb09aa08482534a42a422765ba6128da6cb95))
+- Trim the README, moving the API and dataflow into docs/ ([73a72c7](https://github.com/GMOD/tabix-js/commit/73a72c7bc5c29a6b413c87bc0ff7611da1a884a5))
+- Simplify the diagram, label the legend, split out OPTIMIZATIONS.md ([28a5de0](https://github.com/GMOD/tabix-js/commit/28a5de03bf4fef40df2ef513288951e08ca4db6f))
+- Drop the duplicated Contributing section, fix a moved anchor ([1de6a9f](https://github.com/GMOD/tabix-js/commit/1de6a9f418f2975b5777ee3958449f447ee46dad))
+- OPTIMIZATIONS.md -> docs/optimizations.md ([d590338](https://github.com/GMOD/tabix-js/commit/d59033875c99186a6d6281db13e772d1d899b491))
+- Say what the wasm actually does instead of 'only ever inflate' ([d0817b7](https://github.com/GMOD/tabix-js/commit/d0817b713bbd3cb507386984581ea3587b680ff4))
+- Let the wasm paragraph read as prose ([80d093f](https://github.com/GMOD/tabix-js/commit/80d093f5def2deebb34f42e55f6bbb04b18af37f))
+- Keep the dataflow diagram in docs/, not the README ([5bae6bf](https://github.com/GMOD/tabix-js/commit/5bae6bf48528329b9ad09a4c0f66b90971266617))
+- README title, citation and section order match the sibling repos ([894715f](https://github.com/GMOD/tabix-js/commit/894715fc31000ac953bf2b68b02e9304cd666e6d))
+- Say what the byte estimate is worth, and what the consumer has to do ([8eb7d65](https://github.com/GMOD/tabix-js/commit/8eb7d658cc46f404d78a021584aa8655739ada2b))
+- Name transferables where the pool is described, and tighten ([bbef9af](https://github.com/GMOD/tabix-js/commit/bbef9afa1927d2f61b939b092ab23dfb3e8fedb0))
+- Trim wordiness across the docs/ folder ([280e516](https://github.com/GMOD/tabix-js/commit/280e5161813f81dc43b0539aeff3041765244087))
+- Fix stale paths in the dataflow.dot header ([487b848](https://github.com/GMOD/tabix-js/commit/487b8485a58d4a342530a255fe585b50d34b14e3))
+- Give the worker pool its own legend color, and describe it ([7a74839](https://github.com/GMOD/tabix-js/commit/7a7483996901915def94da890dc229d6056d8783))
+- Put the prose in the active voice ([5d44829](https://github.com/GMOD/tabix-js/commit/5d448293761ecd652781006a2cd3e0bd639c90cf))
+- Correct the release command in CONTRIBUTING, and its voice ([c18fc5e](https://github.com/GMOD/tabix-js/commit/c18fc5ead2c89b47858a0e19a0bf64f323fb51fe))
+- Describe the release gate CONTRIBUTING actually runs ([4a2940e](https://github.com/GMOD/tabix-js/commit/4a2940e810c87922a502135aa83cef9c92d85828))
+- Record why getLines keeps handing over strings (ADR 0006) ([091fdb5](https://github.com/GMOD/tabix-js/commit/091fdb52135c893a9876aaa053ec31c27ab17d1b))
+- Point CLAUDE.md's ADR note at the getLines callback contract ([692151d](https://github.com/GMOD/tabix-js/commit/692151d298153b8789115c3ffbaafd546ab5aa38))
+- Document the knobs a consumer turns, in @gmod/bam's shape ([af8d557](https://github.com/GMOD/tabix-js/commit/af8d557e1801e543727e1e3f6d2c69796cbab299))
+- The worker pool is worth ~1.4x here, not ~1.0x ([7f9c82c](https://github.com/GMOD/tabix-js/commit/7f9c82c0f4e0974ba92f406fd1d1a6d77a94a2df))
+- Start a backlog, with what each item needs measured first ([2b05b5d](https://github.com/GMOD/tabix-js/commit/2b05b5d7c96a123a0ddad149b8d995558c17b58d))
+- A shared budget only pools members that weigh the same unit ([e04823b](https://github.com/GMOD/tabix-js/commit/e04823bd70e58c3dc9bd6a95ee26cace2383d0e5))
+- Record the caching-doc survey, which came back empty ([28e936c](https://github.com/GMOD/tabix-js/commit/28e936cd07a499593d0cd1401b1da1e2a32f333a))
+- Name hic in the dataflow diagram's SYNC header ([05231c8](https://github.com/GMOD/tabix-js/commit/05231c80f2e9e1bbecb00ab31153059daa9871e3))
+- Bbi has already reasoned about its missing block cache, and the blocker lifted ([1fa56de](https://github.com/GMOD/tabix-js/commit/1fa56de9685e381fd9a0640b2461329eecba9371))
+- Suggest @gmod/range-cache-filehandle for remote files ([ad53040](https://github.com/GMOD/tabix-js/commit/ad530402b0ae14c8c72db9cf326afa697764f76d))
+
+### Other Changes
+
+- Restructure doc ([e8013c1](https://github.com/GMOD/tabix-js/commit/e8013c1d85c2d04a37ff2c539096ca9ed2f2b84a))
+- Move graphviz dataflow diagram into docs/img/ ([4589451](https://github.com/GMOD/tabix-js/commit/4589451f52658905e7b06900472b9c42b04e4245))
+- Backfill CHANGELOG.md gaps found across v1.1.6 through v3.5.1 ([e7b41b9](https://github.com/GMOD/tabix-js/commit/e7b41b935a661298ceb837f458953b0c22b8ffc4))
+
 ## [3.8.1](https://github.com/GMOD/tabix-js/compare/v3.8.0...v3.8.1) (2026-08-12)
 
 ### Chores
