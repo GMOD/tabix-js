@@ -40,11 +40,13 @@ const custom = new TabixIndexedFile({
 })
 ```
 
-Over HTTP, swapping in
-[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
-is usually worth it: a query reads the index and then a scattered set of BGZF
-blocks, and a byte-range cache coalesces those into one request per contiguous
-run and serves an overlapping query from memory.
+Over HTTP it is worth swapping in
+[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle).
+A query fetches the index once, then reads the BGZF blocks it points at as byte
+ranges spread through the file. Overlapping queries re-read the same blocks:
+panning twenty half-overlapping windows across the 3.4 MB test BED file reads 11
+MB. The cache serves those reads out of 256 KiB chunks, so neighboring blocks
+share a request and each byte is fetched once.
 
 ```typescript
 import { RemoteFileWithRangeCache } from '@gmod/range-cache-filehandle'
