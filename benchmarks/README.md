@@ -1,6 +1,6 @@
-# Tabix Benchmarks
+# Tabix benchmarks
 
-## Running Benchmarks
+## Running benchmarks
 
 To compare your HEAD against `origin/main`:
 
@@ -20,7 +20,7 @@ Or build them yourself, then run the benchmarks as often as you like:
 ./scripts/build-both-branches.sh origin/main my-feature-branch && pnpm benchonly
 ```
 
-## How it Works
+## How it works
 
 1. `scripts/build-both-branches.sh` builds each ref in a throwaway git worktree,
    so your own checkout is never switched — but each ref is built as committed,
@@ -32,7 +32,7 @@ Or build them yourself, then run the benchmarks as often as you like:
 The two directories stick around afterwards, so a bare `pnpm benchonly` will
 compare whatever was built there last.
 
-## Benchmark Files
+## Benchmark files
 
 - `tabix.bench.ts` — reading performance across file sizes, comparing the two
   builds above
@@ -40,5 +40,4 @@ compare whatever was built there last.
   other, not two branches
 - `profile-cpu.mjs` — CPU profiling for detailed analysis
 
-The files range from 2KB to 213MB and cover VCF, BED and GFF, so the results
-show performance across different workloads.
+The files range from 2KB to 213MB and cover VCF, BED and GFF.

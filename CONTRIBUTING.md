@@ -20,9 +20,9 @@ same commit:
 dot -Tsvg docs/img/dataflow.dot -o docs/img/dataflow.svg
 ```
 
-Nothing checks this — graphviz is not a dependency and different versions emit
-different SVG bytes, so a staleness check would fail on toolchain drift rather
-than on a stale diagram.
+No automated check catches this — graphviz is not a dependency and different
+versions emit different SVG bytes, so a staleness check would fail on toolchain
+drift rather than on a stale diagram.
 
 ## Publishing
 

@@ -34,11 +34,11 @@ divided by 64KB to get an entry count, so `50 * 2**20` used to ask for 800 whole
 chunks — effectively unbounded — and now asks for 50MB, twenty times under the
 default. The name did not change, so nothing warns.
 
-That is not hypothetical: jbrowse passed exactly that value in nine adapters,
-and on `1kg.chr1.subset.vcf.gz` it was a **total miss** — 47 refills out of 47
-on the warm pass against 0 at the default, while holding 82.7MB in a single
-entry, over the budget it had been given. If you pinned a number here before
-v3.5.2, re-read it.
+The mismatch actually happened: jbrowse passed exactly that value in nine
+adapters, and on `1kg.chr1.subset.vcf.gz` it was a **total miss** — 47 refills
+out of 47 on the warm pass against 0 at the default, while holding 82.7MB in a
+single entry, over the budget it had been given. If you pinned a number here
+before v3.5.2, re-read it.
 ([ADR 0001](../agent-docs/adr/0001-bound-the-chunk-cache-by-decompressed-bytes.md))
 
 ## Don't pick a number between one query and several
@@ -57,14 +57,14 @@ Entry count is a bad proxy for that size, which is why the option counts bytes:
 we fetch compressed and cache decompressed, and one bin of that same VCF is 17MB
 compressed against 120MB inflated.
 
-## `chunkCacheIdleTimeoutMs` is what gives memory back
+## `chunkCacheIdleTimeoutMs` gives memory back
 
 The cache checks its ceiling when a read settles, so an idle one sits at
-whatever level it reached. The idle sweep is what makes a 1GB default a peak
-reached while panning rather than a level a parked tab holds forever. Pass `0`
-to disable it.
+whatever level it reached. The idle sweep makes a 1GB default a peak reached
+while panning rather than a level a parked tab holds forever. Pass `0` to
+disable it.
 
-## `chunkCacheBudget` is what bounds a consumer with many files
+## `chunkCacheBudget` bounds a consumer with many files
 
 `chunkCacheSize` is per file, which bounds nothing for a consumer that opens one
 file per track. Pass one `SharedBudget` per JS context and hand it to every

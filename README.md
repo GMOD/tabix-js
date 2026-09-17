@@ -157,12 +157,12 @@ Genomes, headless Chrome, real HTTP, four workers, arms interleaved, both
 returning the same record count: **1.34-1.46x** across five window sizes and a
 twelve-step pan.
 
-The decompression itself moves **1.83x**. What holds the end-to-end figure below
-that is a **28% floor of per-line byte scanning and string decoding**, which no
-worker count reaches — and that floor is at its worst on multi-sample VCF, whose
+The decompression itself moves **1.83x**. A **28% floor of per-line byte
+scanning and string decoding** holds the end-to-end figure below that; no worker
+count reaches it, and the floor is at its worst on multi-sample VCF, whose
 records carry a genotype field per sample and run to ~60KB a line. A format with
-narrower lines sits closer to BAM. If you want more than ~1.5x on a multi-sample
-VCF, the scan is what is left to attack, not the decompression.
+narrower lines sits closer to BAM. Getting more than ~1.5x on a multi-sample VCF
+means attacking the scan, not the decompression.
 
 Worker counts, lifecycle and benchmarks:
 [bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md);

@@ -15,12 +15,12 @@
 | `csiFilehandle`           | `GenericFilehandle?` | CSI index filehandle                                                                                                                                                                                                                              |
 | `chunkCacheSize`          | `number?`            | Chunk LRU cache budget, in _decompressed_ bytes (default 1 GiB). A retention bound, not a bound on peak memory. Size it to hold several queries: below one query's working set the hit rate drops to zero while the cache holds the memory anyway |
 | `chunkCacheIdleTimeoutMs` | `number?`            | Drop a cached chunk once nothing has read it for this long (default 3 minutes, `0` disables). The only thing that lowers the cache while nothing is happening, making the budget above a peak rather than a resting level                         |
-| `chunkCacheBudget`        | `SharedBudget?`      | A `@gmod/shared-read-cache` budget shared with other files, so the ceiling applies to their sum rather than to each — see [caching.md](caching.md#chunkcachebudget-is-what-bounds-a-consumer-with-many-files)                                     |
+| `chunkCacheBudget`        | `SharedBudget?`      | A `@gmod/shared-read-cache` budget shared with other files, so the ceiling applies to their sum rather than to each — see [caching.md](caching.md#chunkcachebudget-bounds-a-consumer-with-many-files)                                             |
 | `bgzfWorkerPool`          | `BgzfWorkerPool?`    | A `@gmod/bgzf-filehandle` pool to inflate this file's chunks on. Accepts the promise `getSharedWorkerPool()` returns, and `undefined` keeps the in-process path — see [the README](../README.md#decompressing-on-a-worker-pool)                   |
 
 Every method taking `opts?` takes `signal` and `onProgress`, the latter
-reporting the `.tbi`/`.csi` download when that call is what triggers it — a
-whole-file read, so it streams real byte progress rather than chunk steps.
+reporting the `.tbi`/`.csi` download when that call triggers it — a whole-file
+read, so it streams real byte progress rather than chunk steps.
 
 ## `clearChunkCache()`
 

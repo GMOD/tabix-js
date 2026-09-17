@@ -175,7 +175,7 @@ nine tabix-backed adapters, as the worked example:
 
 - **One `bgzfWorkerPool` per JS context**, passed to every adapter rather than
   created per file. Inflating is the largest cost in the path above and the pool
-  is the only lever that attacks it rather than the remainder. One per RPC
+  is the only thing that attacks it rather than the remainder. One per RPC
   worker plus one on the main thread, that being the scope with spare cores.
   Blocks cross as transferables, so the fan-out costs one pass over the
   compressed bytes and needs no cross-origin isolation. Expect less than the
