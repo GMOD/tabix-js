@@ -41,10 +41,10 @@ than a query reads. Before any I/O, `optimizeChunks`:
 boundary rather than over-reading a full maximum-size block — smaller fetches
 and a smaller `bytesForRegions` estimate, with no extra I/O.
 
-### Read-ahead is earned, not fixed
+### Read-ahead is adaptive, not fixed
 
 Every chunk is its own range request, so a long scan pays a round trip per chunk
-serially — 22 in a row for a 1Mb window on `1kg.chr1`. But a sparse file offers
+serially — 22 in a row for a 1Mb window on `1kg.chr1`. But a sparse file has
 chunks the scan never reaches, and prefetching those multiplies the bytes for
 nothing.
 
@@ -73,8 +73,9 @@ The decode that survives is the one the caller asked for, and handing over the
 buffer range instead — so a caller that re-parses the line could skip even that
 — was measured in the consumer that wanted it and rejected
 ([ADR 0006](../agent-docs/adr/0006-getlines-hands-over-strings-not-buffer-ranges.md)).
-The restructure a borrowed buffer forces on that caller turned out to be worth
-everything the bytes were credited with, and the caller can do it alone.
+The restructure a borrowed buffer would require from that caller turned out to
+be worth everything the bytes were credited with, and the caller can do it
+alone.
 
 ### `indexOf` beats a hand-written single pass
 
@@ -88,8 +89,8 @@ argument does not predict performance here.
 ## The chunk cache
 
 The cache counts decompressed bytes rather than entries, and we size it above
-one query. We fetch compressed and cache decompressed, so entry count says
-nothing about memory — a single bin of `1kg.chr1.subset.vcf.gz` is 17MB
+one query. We fetch compressed and cache decompressed, so entry count carries no
+information about memory — a single bin of `1kg.chr1.subset.vcf.gz` is 17MB
 compressed and 120MB inflated.
 
 Sizing it below one query's working set does not cache less, it caches
@@ -127,11 +128,11 @@ The floor is largest exactly where the lines are widest, so a 1000-Genomes VCF
 is the bad case and a narrow-line BED is not (jbrowse-components'
 [BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md)).
 
-A second serial term sits inside the pooled call itself: the blocks come back
+A second serial cost applies inside the pooled call itself: the blocks come back
 separately and are concatenated on the calling thread, a memcpy at 0.7-1.2 GB/s
 that scales with the _decompressed_ size, so it is worst where compression is
 best. bgzf-filehandle's most compressible fixture — a bgzipped GFF that inflates
-18.6x — spends 58% of its four-worker call there. That term is a reason the
+18.6x — spends 58% of its four-worker call there. That cost is a reason the
 1.83x is not higher; it is not the reason the end-to-end figure is 1.4x.
 
 Note also that **node cannot measure any of this**: `getSharedWorkerPool()`
@@ -140,13 +141,13 @@ in-process path and report parity forever. That question needs a browser, which
 is where every number above comes from.
 
 [`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
-makes the full argument, and says why the call crosses the boundary once per
-chunk rather than per record. What happens on the other side — one wasm call per
+makes the full argument for why the call crosses the boundary once per chunk
+rather than per record. What happens on the other side — one wasm call per
 chunk, how the pool splits a chunk's blocks across workers, and what measuring
 there rejected — is
 [bgzf-filehandle's own optimizations doc](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/optimizations.md).
 
-## The byte estimate is honest about being an upper bound
+## The byte estimate stays an upper bound
 
 `bytesForRegions` sums every chunk `blocksForRange` offers, which is more than a
 sparse query reads — 3.6x on `ncbi_human.sorted.gff.gz`, 83x on one BED fixture,
@@ -200,4 +201,4 @@ nine tabix-backed adapters, as the worked example:
   array to parse afterwards holds a copy of the whole region as strings for no
   reason.
 - **Gating on `bytesForRegions`** before issuing a query at all — reading it as
-  the upper bound the section above says it is.
+  the upper bound the section above describes.

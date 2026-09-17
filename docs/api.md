@@ -53,9 +53,9 @@ The header as raw bytes.
 
 ## `getSkippedLines(opts?): Promise<string[]>`
 
-The leading lines the index says to skip (`tabix -S N`), or `[]` when it records
-none. This is where a file with an uncommented header row keeps it, as PLINK
-`.ld`, bedGraph and BED deflines routinely do.
+The leading lines the index's skip count covers (`tabix -S N`), or `[]` when it
+records none. This is where a file with an uncommented header row keeps it, as
+PLINK `.ld`, bedGraph and BED deflines routinely do.
 
 Separate from `getHeader` because htslib treats the two differently: a line is
 not data when the index's skip count covers it **or** it starts with the meta

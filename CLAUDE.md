@@ -3,7 +3,7 @@
 `agent-docs/adr/` holds the decisions where the obvious change is wrong for a
 measured reason. Read them before proposing a parser or cache optimization —
 0003, 0004 and 0006 all exist because the idea was proposed from first
-principles and lost to a benchmark. 0006 is also the one to read before adding
+principles and failed its benchmark. 0006 is also the one to read before adding
 anything to the `getLines` callback contract.
 
 ## Validate index and query changes against htslib, not the unit tests

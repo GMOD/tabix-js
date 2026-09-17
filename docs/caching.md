@@ -17,7 +17,7 @@ where the idle timeout is for one the user has wandered away from.
 
 ## `chunkCacheSize` never refuses a read
 
-The cache never turns a chunk away for being too large, eviction never touches a
+The cache never rejects a chunk for being too large, eviction never touches a
 read in flight, and it only ever drops a value it has already handed back. So
 the worst a budget can cost you is a re-read: it can make a query slower, never
 make one fail or come back short.

@@ -149,7 +149,7 @@ const file = new TabixIndexedFile({
 Safe to pass unconditionally: `getSharedWorkerPool()` returns `undefined` under
 node, or anywhere the host forbids Workers, which keeps the in-process path. No
 cross-origin isolation needed. tabix-js never creates a pool on its own — the
-thread budget belongs to the consumer.
+consumer controls the thread budget.
 
 **Worth about 1.4x here, against the 1.95x a BAM reader reports.** Measured in
 jbrowse-components on `test/data/1kg.chr1.subset.vcf.gz` — 213MB of 1000
