@@ -1,7 +1,10 @@
 import { LocalFile } from 'generic-filehandle2'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import TabixIndexedFile from '../src/tabixIndexedFile.ts'
+import { optimizeChunks } from '../src/util.ts'
+
+import type IndexFile from '../src/indexFile.ts'
 
 // counts range requests, and makes each one settle a tick late so a read-ahead
 // window has to be genuinely concurrent to overlap with anything
@@ -44,14 +47,18 @@ async function count(f: TabixIndexedFile, ref: string, s: number, e: number) {
   return lines
 }
 
-// blocksForRange offers a chunk per overlapping bin across every level, and on
-// a sparse file the scan stops inside the first one. Reading ahead must not
-// turn those untouched chunks into range requests.
+// The scan can stop inside the first chunk it is offered, and reading ahead
+// must not turn the chunks after it into range requests. max_off now drops
+// those before the scan sees them, so this offers them anyway: all of bin 88,
+// which is what blocksForRange returned for this window before it.
 test('a query that stops in its first chunk reads only that chunk', async () => {
   const { f, filehandle } = open('chr22_nanopore_subset.bed.gz')
-  // @ts-expect-error reaching into the index to see what was on offer
-  const chunks = await f.index.blocksForRange('22', 16e6, 16.02e6, {})
-  expect(chunks.length).toBe(7)
+  // @ts-expect-error reaching into the index to offer it chunks
+  const index: IndexFile = f.index
+  const { refNameToId, indices } = await index.parse()
+  const offered = optimizeChunks(indices(refNameToId['22']!)!.binIndex[88]!)
+  expect(offered).toHaveLength(7)
+  vi.spyOn(index, 'blocksForRange').mockResolvedValue(offered)
   await count(f, '22', 16e6, 16.02e6)
   expect(filehandle.reads).toBe(1)
 })
@@ -62,8 +69,8 @@ test('a query that consumes many chunks overlaps their reads', async () => {
   const { f, filehandle } = open('ncbi_human.sorted.gff.gz')
   const lines = await count(f, 'NC_000001.11', 45e6, 46e6)
   expect(lines).toBe(2785)
-  // five chunks hold the query; the window overshoots by the three it had
-  // speculatively started when the scan ended
-  expect(filehandle.reads).toBe(8)
+  // five chunks hold the query, and max_off leaves none past it to overshoot
+  // into
+  expect(filehandle.reads).toBe(5)
   expect(filehandle.maxConcurrent).toBeGreaterThan(1)
 })

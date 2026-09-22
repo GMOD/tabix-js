@@ -41,6 +41,23 @@ than a query reads. Before any I/O, `optimizeChunks`:
 boundary rather than over-reading a full maximum-size block — smaller fetches
 and a smaller `bytesForRegions` estimate, with no extra I/O.
 
+### Drop merged chunks that start past the query
+
+The linear index bounds a query from below only. `blocksForRange` also bounds it
+from above, the way htslib's `hts_itr_query` does: the first chunk of the first
+bin right of the query is a record past its end, and in a sorted file so is
+everything after, so every merged chunk starting at or past that offset
+(`max_off`) goes. The bound comes from the bins alone, so unlike the linear
+index it still works on a GFF whose first record spans the chromosome.
+
+Over 3,283 cold windows across every fixture, as TBI and as CSI, requests fall
+17% and every window returns the same lines at the same offsets. The GFF
+fixtures gain most: a third fewer requests and 13% fewer bytes. `@gmod/bam`'s
+[ADR 0023](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0023-drop-merged-chunks-past-max-off.md)
+measured why it drops whole chunks after the merge rather than trimming them or
+dropping before it: the merged chunk is the cache key, and cutting it at a point
+that moves with the query end made pans read up to 79% more.
+
 ### Read-ahead is adaptive, not fixed
 
 Every chunk is its own range request, so a long scan pays a round trip per chunk

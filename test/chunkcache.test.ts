@@ -342,7 +342,10 @@ test('clearChunkCache drops everything, and stops the sweep', async () => {
 test('two files can share one budget', async () => {
   const [file, ref, st] = MANY_CHUNKS
   const dir = new URL('data/', import.meta.url).pathname
-  const budget = new SharedBudget(2 * 1024 * 1024)
+  // Every window here opens on a chunk that decompresses to 3.2MB, and each
+  // member keeps its newest entry whatever the budget, so it must hold two of
+  // those. Unbounded, the two files would retain 7.7MB.
+  const budget = new SharedBudget(7 * 1024 * 1024)
   const open2 = () =>
     new TabixIndexedFile({
       filehandle: new LocalFile(`${dir}${file}`),

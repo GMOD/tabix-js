@@ -521,8 +521,9 @@ export default class TabixIndexedFile {
     //
     // A fixed window would be wrong, though: blocksForRange offers a chunk per
     // overlapping bin across every level, and on a sparse file the early return
-    // below stops the scan inside the first one, leaving the rest untouched
-    // (chr22_nanopore_subset offers 7 chunks and reads 1). Prefetching those
+    // below can stop the scan inside the first one, leaving the rest untouched.
+    // max_off drops only the chunks it can prove lie past the query, so the
+    // scan can still end before the last one it is offered. Prefetching those
     // would multiply the bytes such a query fetches for no gain.
     //
     // Finishing a chunk without hitting the early return proves the next chunk

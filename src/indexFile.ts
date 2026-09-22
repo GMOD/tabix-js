@@ -7,6 +7,56 @@ import type Chunk from './chunk.ts'
 import type VirtualOffset from './virtualOffset.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
+/**
+ * The virtual offset past which a coordinate-sorted file holds nothing
+ * overlapping `[.., end)`, from the binning index alone: htslib's `max_off`
+ * (`hts_itr_query` in hts.c).
+ *
+ * Walk right from the finest bin after the one holding `end - 1`, stepping up
+ * to the parent at every first child, so each bin visited begins at or past
+ * `end` and never overlaps the query. Every record in such a bin starts at or
+ * past `end`, so the first chunk of the first bin that exists is a record past
+ * the query, and in a sorted file so is every record after it.
+ *
+ * SYNC: ~/src/gmod/bam-js/src/indexFile.ts maxOffset, and see bam-js ADR 0023
+ * for why the caller drops whole merged chunks with it rather than trimming.
+ */
+export function maxOffset(
+  binIndex: Record<number, Chunk[]>,
+  end: number,
+  minShift: number,
+  depth: number,
+) {
+  if (end > 2 ** (minShift + depth * 3)) {
+    return undefined
+  }
+  const binCount = (8 ** (depth + 1) - 1) / 7
+  let bin = (8 ** depth - 1) / 7 + Math.floor((end - 1) / 2 ** minShift) + 1
+  if (bin >= binCount) {
+    bin = 0
+  }
+  for (;;) {
+    while (bin % 8 === 1) {
+      bin = (bin - 1) / 8
+    }
+    if (bin === 0) {
+      return undefined
+    }
+    const chunks = binIndex[bin]
+    if (chunks?.length) {
+      let lowest = chunks[0]!.minv
+      for (let i = 1; i < chunks.length; i++) {
+        const minv = chunks[i]!.minv
+        if (minv.compareTo(lowest) < 0) {
+          lowest = minv
+        }
+      }
+      return lowest
+    }
+    bin++
+  }
+}
+
 export interface Options {
   signal?: AbortSignal
   /**
@@ -121,6 +171,7 @@ export default abstract class IndexFile {
    * The chunks of the data file that may hold records overlapping the region.
    * The two index formats differ only in their binning scheme and in where
    * they keep the pruning floor, which is what the two hooks above supply.
+   * The ceiling, `maxOffset`, needs only the bins, so it serves both.
    *
    * @internal
    */
@@ -153,7 +204,21 @@ export default abstract class IndexFile {
       }
     }
 
-    return optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
+    const merged = optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
+    const past = maxOffset(
+      ba.binIndex,
+      max,
+      indexData.minShift,
+      indexData.depth,
+    )
+    if (past) {
+      let n = merged.length
+      while (n > 0 && merged[n - 1]!.minv.compareTo(past) >= 0) {
+        n--
+      }
+      merged.length = n
+    }
+    return merged
   }
 
   // SYNC: ~/src/gmod/bam-js/src/indexFile.ts parse — same shape and the same
