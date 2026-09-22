@@ -1,3 +1,27 @@
+## [3.8.3](https://github.com/GMOD/tabix-js/compare/v3.8.2...v3.8.3) (2026-09-22)
+
+### Bug Fixes
+
+- Compute CSI maxBinNumber with 8 ** rather than 1 << ([9d64e9f](https://github.com/GMOD/tabix-js/commit/9d64e9f58d46a07b69abdc45fa8c8cded3d1f685))
+
+### Documentation
+
+- Say what the read pattern actually is before recommending the range cache ([b7761be](https://github.com/GMOD/tabix-js/commit/b7761be11332a0021ae6883abbf313f5ec6ad992))
+- Fix anti-AI-writing tropes in prose ([7e42faf](https://github.com/GMOD/tabix-js/commit/7e42fafaae8aa28cc2d792897cbf6c226aa0794d))
+- Fix agency and figures of speech ([32d0b22](https://github.com/GMOD/tabix-js/commit/32d0b22b17c23a159de06297cc511ab9a94a546a))
+
+### Other Changes
+
+- Point the dataflow SYNC note at gbz-base-js ([8ef67ca](https://github.com/GMOD/tabix-js/commit/8ef67ca4207d1c68f3921878ded8c152cbf2acc9))
+
+### Performance Improvements
+
+- Drop chunks that start past htslib's max_off ([021e27c](https://github.com/GMOD/tabix-js/commit/021e27c49f45135a45d211bddaae26e88b635ae7))
+
+### Tests
+
+- Assert the read pattern the README describes ([1f51acf](https://github.com/GMOD/tabix-js/commit/1f51acf5be6ca836b3c577cae8a6fffc93e7c22e))
+
 ## [3.8.2](https://github.com/GMOD/tabix-js/compare/v3.8.1...v3.8.2) (2026-08-21)
 
 ### Bug Fixes
