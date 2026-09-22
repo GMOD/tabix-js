@@ -41,7 +41,7 @@ export default class CSI extends IndexFile {
 
     const minShift = dataView.getInt32(4, true)
     const depth = dataView.getInt32(8, true)
-    const maxBinNumber = ((1 << ((depth + 1) * 3)) - 1) / 7
+    const maxBinNumber = (8 ** (depth + 1) - 1) / 7
     const maxRefLength = 2 ** (minShift + depth * 3)
     const auxLength = dataView.getInt32(12, true)
     const aux =
