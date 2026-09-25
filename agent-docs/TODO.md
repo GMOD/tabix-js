@@ -7,34 +7,11 @@ because most of these are blocked on a measurement rather than on typing —
 Decisions that are settled, including the ones that reject an optimization, live
 in [adr/](adr/) rather than here.
 
-| Item                                                                                                                    | First move                                                                |
-| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [The per-line scan is the last large movable thing](#the-per-line-scan-is-the-last-large-movable-thing-in-a-query)      | profile the scan on a wide-line VCF; the pool has taken what it can reach |
-| [A cache hit needs the same merged span](#a-cache-hit-needs-the-same-merged-chunk-span-and-nobody-has-priced-that-here) | count distinct cache keys over a pan, before designing anything           |
-| [`onProgress` is coarse on a one-chunk query](#onprogress-is-all-or-nothing-on-a-query-that-resolves-to-one-chunk)      | decide whether per-block ticks are worth the callback volume              |
-| [Sweep the sibling parsers' docs](#sweep-the-sibling-parsers-for-the-doc-gaps-found-here)                               | grep the four wrapper repos for the same two errors                       |
-
-## The per-line scan is the last large movable thing in a query
-
-The worker pool takes a tabix query 1.34-1.46x end to end, and a warm-cache
-split puts the decompression it reaches at 1.83x — leaving **28% of a cold query
-in per-line byte scanning and string decoding**, which no worker count touches
-(jbrowse-components'
-[BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md)).
-Amdahl on those two figures predicts 1.49x against 1.45x measured, so the
-accounting is closed: the scan is what is left.
-
-It is worst exactly where it was measured — 1000 Genomes records carry a
-genotype field per sample and run to ~60KB a line — and a narrow-line BED sits
-closer to BAM's 1.95x. So **profile a wide-line VCF specifically**, and expect
-the answer to be about `TextDecoder` volume rather than about the tab scan:
-[ADR 0003](adr/0003-keep-indexof-based-byte-scans.md) already rejected
-hand-rolling the byte walk, and it lost to `indexOf` by up to 2.96x.
-
-The one thing this rules out is handing the caller bytes instead of a string —
-that was proposed, measured in the consumer that wanted it, and rejected in
-[ADR 0006](adr/0006-getlines-hands-over-strings-not-buffer-ranges.md). Anything
-here has to make the decode cheaper, not move it to the caller.
+| Item                                                                                                                    | First move                                                      |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [A cache hit needs the same merged span](#a-cache-hit-needs-the-same-merged-chunk-span-and-nobody-has-priced-that-here) | count distinct cache keys over a pan, before designing anything |
+| [`onProgress` is coarse on a one-chunk query](#onprogress-is-all-or-nothing-on-a-query-that-resolves-to-one-chunk)      | decide whether per-block ticks are worth the callback volume    |
+| [Sweep the sibling parsers' docs](#sweep-the-sibling-parsers-for-the-doc-gaps-found-here)                               | grep the four wrapper repos for the same two errors             |
 
 ## A cache hit needs the same merged chunk span, and nobody has priced that here
 
