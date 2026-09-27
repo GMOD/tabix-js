@@ -1,3 +1,13 @@
+## [3.9.0](https://github.com/GMOD/tabix-js/compare/v3.8.3...v3.9.0) (2026-09-27)
+
+### Documentation
+
+- ADR 0007, the per-line scan has no cheaper primitive ([8ac0cc8](https://github.com/GMOD/tabix-js/commit/8ac0cc8e4d876e374634d93f5b086d67a7b23c90))
+
+### Features
+
+- Read GAF tabix indexes (htslib preset 3) ([c0556b9](https://github.com/GMOD/tabix-js/commit/c0556b906d7d8c228f9f7ac57e8fc1aa4a2e5564))
+
 ## [3.8.3](https://github.com/GMOD/tabix-js/compare/v3.8.2...v3.8.3) (2026-09-22)
 
 ### Bug Fixes
