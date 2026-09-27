@@ -227,6 +227,7 @@ const tabixFormats: Record<number, string> = {
   0: 'generic',
   1: 'SAM',
   2: 'VCF',
+  3: 'GAF',
 }
 
 export function parseAuxData(bytes: Uint8Array, offset: number) {

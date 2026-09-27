@@ -100,6 +100,11 @@ export interface IndexData {
   maxBinNumber: number
 }
 
+// htslib files every GAF record under ref 0 and ignores a query's name
+function refIdFor(indexData: IndexData, refName: string) {
+  return indexData.format === 'GAF' ? 0 : indexData.refNameToId[refName]
+}
+
 export default abstract class IndexFile {
   public filehandle: GenericFilehandle
   /**
@@ -154,7 +159,7 @@ export default abstract class IndexFile {
   /** @internal */
   public async lineCount(refName: string, opts: Options = {}) {
     const indexData = await this.parse(opts)
-    const refId = indexData.refNameToId[refName]
+    const refId = refIdFor(indexData, refName)
     if (refId === undefined) {
       return -1
     }
@@ -182,13 +187,19 @@ export default abstract class IndexFile {
     opts: Options = {},
   ) {
     const indexData = await this.parse(opts)
-    const refId = indexData.refNameToId[refName]
+    const refId = refIdFor(indexData, refName)
     if (refId === undefined) {
       return []
     }
     const ba = indexData.indices(refId)
     if (!ba) {
       return []
+    }
+    // htslib indexes a GAF read as [minNode, maxNode), one short of the
+    // [minNode, maxNode] that getLines matches, so look one node lower, as
+    // `tabix` does for a region's 1-based start
+    if (indexData.format === 'GAF') {
+      min = Math.max(min - 1, 0)
     }
 
     // Find chunks in overlapping bins. Leaf bins are not pruned.

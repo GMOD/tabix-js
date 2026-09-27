@@ -17,6 +17,8 @@ const TAB = 9
 const NEWLINE = 10
 const CARRIAGE_RETURN = 13
 const SEMICOLON = 59
+const LESS_THAN = 60
+const GREATER_THAN = 62
 
 // Ceiling on how many chunk reads getLines keeps in flight ahead of the one it
 // is parsing. Six is the HTTP/1.1 per-host connection cap browsers enforce, so
@@ -272,6 +274,111 @@ function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
   return val
 }
 
+interface GafQuery {
+  start: number
+  end: number
+  pathCol: number
+  metaCharCode: number | undefined
+  decoder: TextDecoder
+  callback: GetLinesCallback
+}
+
+/**
+ * The GAF scan of one chunk. A read spans the lowest to the highest node id on
+ * its path, which htslib's tbx_parse1 reads the same way. Returns true once a
+ * read starts at or past `end`: records are sorted by their lowest node.
+ */
+function scanGafChunk(
+  buffer: Uint8Array,
+  cpositions: ArrayLike<number>,
+  dpositions: ArrayLike<number>,
+  minvDataPosition: number,
+  { start, end, pathCol, metaCharCode, decoder, callback }: GafQuery,
+) {
+  let blockStart = 0
+  let pos = 0
+  while (blockStart < buffer.length) {
+    const n = buffer.indexOf(NEWLINE, blockStart)
+    if (n === -1) {
+      break
+    }
+    const lineStart = blockStart
+    blockStart = n + 1
+
+    const target = lineStart + minvDataPosition
+    while (pos < dpositions.length && target >= dpositions[pos]!) {
+      pos++
+    }
+    if (buffer[lineStart] === metaCharCode) {
+      continue
+    }
+
+    let pathStart = lineStart
+    for (let i = 1; i < pathCol; i++) {
+      const t = buffer.indexOf(TAB, pathStart)
+      if (t === -1 || t >= n) {
+        pathStart = n
+        break
+      }
+      pathStart = t + 1
+    }
+    // A path without a leading step is a stable sequence name (or `*`), which
+    // carries no node ids. htslib parses one anyway and indexes garbage
+    // (`GRCh38#0#chr1` as nodes 0..38), so skip it rather than match that.
+    const first = buffer[pathStart]
+    if (first !== GREATER_THAN && first !== LESS_THAN) {
+      continue
+    }
+    let pathEnd = buffer.indexOf(TAB, pathStart)
+    if (pathEnd === -1 || pathEnd > n) {
+      pathEnd = n
+    }
+
+    // like htslib, skip one byte (the orientation) before each node id
+    let min = Infinity
+    let max = -1
+    let i = pathStart
+    while (i < pathEnd) {
+      let id = 0
+      let j = i + 1
+      for (; j < pathEnd; j++) {
+        const digit = buffer[j]! - 48
+        if (digit < 0 || digit > 9) {
+          break
+        }
+        id = id * 10 + digit
+      }
+      if (id < min) {
+        min = id
+      }
+      if (id > max) {
+        max = id
+      }
+      i = j
+    }
+
+    if (min >= end) {
+      return true
+    }
+    if (max >= start) {
+      const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
+      callback(
+        decoder.decode(buffer.subarray(lineStart, lineEnd)),
+        calculateFileOffset(
+          cpositions,
+          dpositions,
+          pos,
+          lineStart,
+          minvDataPosition,
+        ),
+        min,
+        max + 1,
+      )
+    }
+  }
+  return false
+}
+
 /**
  * Reads Tabix-indexed files (bgzipped), supporting both .tbi and .csi index formats.
  */
@@ -506,6 +613,10 @@ export default class TabixIndexedFile {
     // tabs[N] holds the byte offset of the N-th tab on the current line; with
     // the sentinel tabs[0] = blockStart - 1, column N spans tabs[N-1]+1..tabs[N]
     const tabs = new Int32Array(maxColumn + 1)
+    const gaf: GafQuery | undefined =
+      metadata.format === 'GAF'
+        ? { start, end, pathCol: startCol, metaCharCode, decoder, callback }
+        : undefined
 
     let totalBytes = 0
     for (const c of chunks) {
@@ -552,104 +663,118 @@ export default class TabixIndexedFile {
       onProgress?.(downloadedBytes, totalBytes)
       const minvDataPosition = c.minv.dataPosition
 
-      let blockStart = 0
-      let pos = 0
-
-      while (blockStart < buffer.length) {
-        const n = buffer.indexOf(NEWLINE, blockStart)
-        if (n === -1) {
-          break
-        }
-
-        const target = blockStart + minvDataPosition
-        while (pos < dpositions.length && target >= dpositions[pos]!) {
-          pos++
-        }
-
-        // skip meta lines
-        if (metaCharCode !== undefined && buffer[blockStart] === metaCharCode) {
-          blockStart = n + 1
-          continue
-        }
-
-        // find tab positions. Columns past the end of the line all get `n`
-        // rather than breaking out, which would leave stale offsets from the
-        // previous line in the tail of the array.
-        tabs[0] = blockStart - 1
-        for (let i = 0; i < maxColumn; i++) {
-          const prev = tabs[i]!
-          const tabPos = prev < n ? buffer.indexOf(TAB, prev + 1) : -1
-          tabs[i + 1] = tabPos === -1 || tabPos >= n ? n : tabPos
-        }
-
-        // compare ref name bytes directly
-        const refStart = tabs[refCol - 1]! + 1
-        const refEnd = tabs[refCol]!
-        const refLen = refEnd - refStart
-        if (refLen !== regionRefNameBytes.length) {
-          blockStart = n + 1
-          continue
-        }
-        let isRefMatch = true
-        for (let i = 0; i < refLen; i++) {
-          if (buffer[refStart + i] !== regionRefNameBytes[i]) {
-            isRefMatch = false
-            break
-          }
-        }
-        if (!isRefMatch) {
-          blockStart = n + 1
-          continue
-        }
-
-        // parse start coordinate
-        const startCoordinate =
-          parseIntFromBytes(buffer, tabs[startCol - 1]! + 1, tabs[startCol]!) +
-          coordinateOffset
-
-        if (startCoordinate >= end) {
+      if (gaf) {
+        if (
+          scanGafChunk(buffer, cpositions, dpositions, minvDataPosition, gaf)
+        ) {
           return
         }
+      } else {
+        let blockStart = 0
+        let pos = 0
 
-        // parse end coordinate
-        let endCoordinate: number
-        if (endCol === 0 || endCol === startCol) {
-          endCoordinate = startCoordinate + 1
-        } else if (isVCF) {
-          endCoordinate = getVcfEnd(
-            buffer,
-            startCoordinate,
-            tabs[3]! + 1,
-            tabs[4]!,
-            tabs[endCol - 1]! + 1,
-            tabs[endCol]!,
-          )
-        } else {
-          endCoordinate = parseIntFromBytes(
-            buffer,
-            tabs[endCol - 1]! + 1,
-            tabs[endCol]!,
-          )
-        }
+        while (blockStart < buffer.length) {
+          const n = buffer.indexOf(NEWLINE, blockStart)
+          if (n === -1) {
+            break
+          }
 
-        if (endCoordinate > start) {
-          // trim a CRLF terminator, matching htslib's line reader
-          const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
-          const line = decoder.decode(buffer.subarray(blockStart, lineEnd))
-          callback(
-            line,
-            calculateFileOffset(
-              cpositions,
-              dpositions,
-              pos,
-              blockStart,
-              minvDataPosition,
-            ),
-            startCoordinate,
-            endCoordinate,
-          )
+          const target = blockStart + minvDataPosition
+          while (pos < dpositions.length && target >= dpositions[pos]!) {
+            pos++
+          }
+
+          // skip meta lines
+          if (
+            metaCharCode !== undefined &&
+            buffer[blockStart] === metaCharCode
+          ) {
+            blockStart = n + 1
+            continue
+          }
+
+          // find tab positions. Columns past the end of the line all get `n`
+          // rather than breaking out, which would leave stale offsets from the
+          // previous line in the tail of the array.
+          tabs[0] = blockStart - 1
+          for (let i = 0; i < maxColumn; i++) {
+            const prev = tabs[i]!
+            const tabPos = prev < n ? buffer.indexOf(TAB, prev + 1) : -1
+            tabs[i + 1] = tabPos === -1 || tabPos >= n ? n : tabPos
+          }
+
+          // compare ref name bytes directly
+          const refStart = tabs[refCol - 1]! + 1
+          const refEnd = tabs[refCol]!
+          const refLen = refEnd - refStart
+          if (refLen !== regionRefNameBytes.length) {
+            blockStart = n + 1
+            continue
+          }
+          let isRefMatch = true
+          for (let i = 0; i < refLen; i++) {
+            if (buffer[refStart + i] !== regionRefNameBytes[i]) {
+              isRefMatch = false
+              break
+            }
+          }
+          if (!isRefMatch) {
+            blockStart = n + 1
+            continue
+          }
+
+          // parse start coordinate
+          const startCoordinate =
+            parseIntFromBytes(
+              buffer,
+              tabs[startCol - 1]! + 1,
+              tabs[startCol]!,
+            ) + coordinateOffset
+
+          if (startCoordinate >= end) {
+            return
+          }
+
+          // parse end coordinate
+          let endCoordinate: number
+          if (endCol === 0 || endCol === startCol) {
+            endCoordinate = startCoordinate + 1
+          } else if (isVCF) {
+            endCoordinate = getVcfEnd(
+              buffer,
+              startCoordinate,
+              tabs[3]! + 1,
+              tabs[4]!,
+              tabs[endCol - 1]! + 1,
+              tabs[endCol]!,
+            )
+          } else {
+            endCoordinate = parseIntFromBytes(
+              buffer,
+              tabs[endCol - 1]! + 1,
+              tabs[endCol]!,
+            )
+          }
+
+          if (endCoordinate > start) {
+            // trim a CRLF terminator, matching htslib's line reader
+            const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
+            const line = decoder.decode(buffer.subarray(blockStart, lineEnd))
+            callback(
+              line,
+              calculateFileOffset(
+                cpositions,
+                dpositions,
+                pos,
+                blockStart,
+                minvDataPosition,
+              ),
+              startCoordinate,
+              endCoordinate,
+            )
+          }
+          blockStart = n + 1
         }
-        blockStart = n + 1
       }
 
       // every line in this chunk was still inside the query, so the next chunk

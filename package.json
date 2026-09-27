@@ -39,7 +39,7 @@
     "preversion": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test --run && pnpm build",
     "postversion": "git push --follow-tags",
     "build": "pnpm build:esm && pnpm build:es5",
-    "differential": "vite-node scripts/differential.mjs",
+    "differential": "node scripts/differential.mjs",
     "benchonly": "vitest bench",
     "bench": "./scripts/build-both-branches.sh \"$BRANCH1\" \"$BRANCH2\" && vitest bench",
     "postbuild": "webpack",

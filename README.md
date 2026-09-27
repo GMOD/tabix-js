@@ -107,6 +107,17 @@ Notes:
   if a query comes back unexpectedly empty
 - `start > end` throws a `TypeError`; `start === end` returns without reading
 
+### GAF
+
+Reads `tabix -p gaf` indexes of sorted GAF (e.g. from `vg gamsort`):
+
+- `refName` is ignored; `getReferenceSequenceNames()` returns `[]`
+- `start`/`end` are node ids: a read matches when its lowest-to-highest node
+  range `[min, max]` touches any of `start..end-1`, the same reads as
+  `tabix file.gaf.gz "{x}:start-end"` (no `+1`)
+- The callback gets `min` and `max + 1`
+- Reads whose path is a stable sequence name (no `>`/`<`) are skipped
+
 ### Without NPM (CDN)
 
 ```html

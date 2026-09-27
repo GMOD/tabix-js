@@ -44,8 +44,11 @@ export default class CSI extends IndexFile {
     const maxBinNumber = (8 ** (depth + 1) - 1) / 7
     const maxRefLength = 2 ** (minShift + depth * 3)
     const auxLength = dataView.getInt32(12, true)
+    // htslib names no references in a GAF index, so its aux is the bare
+    // 28-byte header block
+    const isGaf = auxLength >= 28 && (dataView.getInt32(16, true) & 0xf) === 3
     const aux =
-      auxLength >= 30
+      auxLength >= 30 || isGaf
         ? parseAuxData(bytes, 16)
         : {
             refIdToName: [] as string[],

@@ -2,8 +2,9 @@
 // test/data: headers, then randomized region queries. Catches the class of bug
 // the unit tests miss, where our answer is self-consistent but not htslib's.
 //
-// Run with `pnpm differential` (needs tabix on PATH).
+// Run with `pnpm differential` (needs tabix and bgzip on PATH).
 import { execFileSync } from 'child_process'
+import { createHash } from 'crypto'
 import { readdirSync } from 'fs'
 
 import TabixIndexedFile from '../src/tabixIndexedFile.ts'
@@ -102,6 +103,107 @@ for (const idx of indexes) {
   }
 }
 console.log(`${queries} queries compared`)
+
+// GAF: htslib ignores the region's name and indexes a read as
+// [minNode, maxNode), then shifts a region's start down by one, so region
+// `s-e` asks for the same reads as getLines(_, s, e) — no +1. Starts stay
+// >= 1 because htslib clamps 0-e to 1-e, and node ids start at 1.
+function hash(lines) {
+  const h = createHash('sha1')
+  for (const l of lines) {
+    h.update(l)
+    h.update('\n')
+  }
+  return h.digest('hex')
+}
+
+function gafNodes(base) {
+  const text = execFileSync('bgzip', ['-dc', `${dir}${base}`], {
+    encoding: 'utf8',
+    maxBuffer: 1 << 28,
+  })
+  const nodes = []
+  for (const line of text.split('\n')) {
+    for (const m of line.split('\t')[5]?.matchAll(/[<>](\d+)/g) ?? []) {
+      nodes.push(+m[1])
+    }
+  }
+  return nodes
+}
+
+const pick = arr => arr[Math.floor(rand() * arr.length)]
+
+let gafQueries = 0
+let gafHits = 0
+let stableNamesDropped = 0
+for (const idx of indexes) {
+  const base = idx.replace(/\.(tbi|csi)$/, '')
+  const f = open(idx, 1 << 16)
+  if ((await f.getMetadata()).format !== 'GAF') {
+    continue
+  }
+  const nodes = gafNodes(base)
+  const maxNode = Math.max(...nodes)
+  // leaf-bin edges the reads actually straddle
+  const boundaries = []
+  for (let b = 16_384; b <= maxNode; b += 16_384) {
+    if (nodes.some(n => Math.abs(n - b) < 1000)) {
+      boundaries.push(b)
+    }
+  }
+  for (let i = 0; i < 1000; i++) {
+    const r = rand()
+    const anchor =
+      r < 0.4 && boundaries.length
+        ? pick(boundaries) + Math.floor(rand() * 7) - 3
+        : r < 0.8
+          ? pick(nodes) + Math.floor(rand() * 3) - 1
+          : Math.floor(rand() * (maxNode + 10))
+    const start = Math.max(anchor, 1)
+    const len =
+      rand() < 0.5
+        ? 1 + Math.floor(rand() * 2)
+        : 1 + Math.floor(rand() * (rand() < 0.2 ? maxNode * 2 : 64))
+    const end = start + len
+    const theirs = htslib([`${dir}${base}`, `{any}:${start}-${end}`])
+    if (theirs === undefined) {
+      continue
+    }
+    const want = []
+    for (const l of theirs.split('\n')) {
+      if (!l) {
+        continue
+      }
+      if (/^[<>]/.test(l.split('\t')[5] ?? '')) {
+        want.push(l)
+      } else {
+        stableNamesDropped++
+      }
+    }
+    let count = 0
+    const h = createHash('sha1')
+    await f.getLines('whatever', start, end, {
+      lineCallback: l => {
+        count++
+        h.update(l)
+        h.update('\n')
+      },
+    })
+    gafQueries++
+    if (want.length) {
+      gafHits++
+    }
+    if (count !== want.length || h.digest('hex') !== hash(want)) {
+      bad++
+      console.log(
+        `DIFF gaf ${idx} ${start}-${end} ours=${count} htslib=${want.length}`,
+      )
+    }
+  }
+}
+console.log(
+  `${gafQueries} GAF queries compared, ${gafHits} non-empty; skipped ${stableNamesDropped} stable-name lines htslib returned`,
+)
 
 console.log(bad === 0 ? '\nno differences from htslib' : `\n${bad} MISMATCHES`)
 process.exit(bad === 0 ? 0 : 1)
