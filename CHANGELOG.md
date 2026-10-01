@@ -1,3 +1,5 @@
+## [3.9.1](https://github.com/GMOD/tabix-js/compare/v3.9.0...v3.9.1) (2026-10-01)
+
 ## [3.9.0](https://github.com/GMOD/tabix-js/compare/v3.8.3...v3.9.0) (2026-09-27)
 
 ### Documentation
