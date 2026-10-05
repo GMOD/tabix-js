@@ -1,94 +1,28 @@
-# Backlog
+---
+name: todo
+description: Index of the open action items in todo/, grouped by what to do first. Read when picking up work, and before filing anything new here.
+---
 
-Work that is worth doing and is not done. Each entry says what to do **first**,
-because most of these are blocked on a measurement rather than on typing —
-`agent-docs/adr/` is full of changes that were obvious, unmeasured, and wrong.
+# Todo
 
-Decisions that are settled, including the ones that reject an optimization, live
-in [adr/](adr/) rather than here.
+One file per item under [todo/](todo/). Each carries its table row in its own
+frontmatter: `metadata.category` picks the table, `area` and `first_move` are
+the columns, `order` is where it sits. This index has no generator, so add or
+remove a row here when you add or remove an entry.
 
-| Item                                                                                                                    | First move                                                      |
-| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| [A cache hit needs the same merged span](#a-cache-hit-needs-the-same-merged-chunk-span-and-nobody-has-priced-that-here) | count distinct cache keys over a pan, before designing anything |
-| [`onProgress` is coarse on a one-chunk query](#onprogress-is-all-or-nothing-on-a-query-that-resolves-to-one-chunk)      | decide whether per-block ticks are worth the callback volume    |
-| [Sweep the sibling parsers' docs](#sweep-the-sibling-parsers-for-the-doc-gaps-found-here)                               | grep the four wrapper repos for the same two errors             |
+Most items are blocked on a measurement rather than on typing;
+[architecture-decision-records/](architecture-decision-records/) is full of
+changes that were obvious, unmeasured, and wrong.
 
-## A cache hit needs the same merged chunk span, and nobody has priced that here
+## Needs a visual call
 
-`blocksForRange` clamps to the linear index's lowest offset for the query start
-and then merges what is left, and the chunk cache keys on the merged span. So
-two overlapping pans can decode the same bytes under two keys and miss each
-other.
+| Item | Area | First move |
+| --- | --- | --- |
+| [onProgress is coarse on a one-chunk query](todo/onprogress-coarse-on-one-chunk.md) | progress | Decide whether per-block ticks are worth the callback volume. |
 
-`@gmod/bam` measured this on its side, found it costs short-read files real work
-and leaves deep long-read data untouched, and parked it. Nothing equivalent has
-been measured here, which makes a low hit rate ambiguous — it may be the cliff
-in [ADR 0002](adr/0002-size-the-chunk-cache-above-one-query.md) or it may be
-this.
+## Measure first
 
-**First move is a count, not a fix:** run a pan over a dense VCF and a sparse
-GFF, log the cache key per read, and see how many distinct keys cover the same
-bytes. If the answer is "almost none", this entry closes and
-[docs/caching.md](../docs/caching.md) loses a caveat.
-
-## `onProgress` is all-or-nothing on a query that resolves to one chunk
-
-`getLines` ticks once per chunk, and a chunk is a run of blocks — so a query
-that resolves to a single large chunk reports 0% and then 100%, which is the
-case a progress bar exists for. The block boundaries are already known:
-`cpositions`/`dpositions` come back from the decompressor with the buffer.
-
-What has to be decided first is whether that is worth the callback volume. A
-64KB-block file at 1MB of compressed chunk is 16 ticks where there is now 1, and
-a consumer that re-renders per tick pays for all of them. A cheaper shape is to
-tick per block only while a chunk exceeds some size, which keeps the common
-query at one tick apiece.
-
-## Sweep the sibling parsers for the doc gaps found here
-
-Two errors were found writing [docs/caching.md](../docs/caching.md), and both
-are the kind that copy across repos:
-
-- `onProgress` was documented as firing per **block** when it fires per
-  **chunk**, in the README, in `docs/api.md`, and in a source comment that
-  managed to claim both in one sentence.
-- `chunkCacheBudget` and `bgzfWorkerPool` were absent from the API table
-  entirely — the two options that decide a genome browser's memory and its
-  decompression throughput.
-
-A third was found by comparing against the siblings rather than inside this
-repo: both the API comment and `docs/caching.md` said `@gmod/cram` could join a
-`chunkCacheBudget`, and it cannot — cram weighs decoded _records_ where this
-library weighs bytes, so the sum bounds neither. Fixed here; `@gmod/bam` never
-made the claim.
-
-`vcf-js`, `gff-nostream`, `bed-js` and `twobit-js` wrap the same reader or the
-same filehandle and plausibly carry the same omissions. Check the option tables
-against the constructors rather than against each other.
-
-**The caching-doc side of that sweep is done, and the answer was "nothing to
-add"** (2026-08-16). Only three of these repos expose cache knobs at all:
-`@gmod/bam` and this one, which now carry matching `docs/caching.md`, and
-`@gmod/cram`, whose `cacheSize`/`cacheIdleTimeoutMs`/`cacheBudget` are covered
-completely by `docs/api.md` § "The cache options" and `docs/memory.md` § "The
-slice cache" — a different filename, not a gap, and moving them would break the
-cross-links those two docs already have. `@gmod/bbi` and `@gmod/hic` expose
-none: their caches are internal and fixed (bbi's R-tree node cache is 1000
-entries, hic's block cache is a byte-bounded LRU behind two constants), so a
-consumer-facing caching doc there would have nothing to document.
-
-What that leaves in those two repos is a **code** question rather than a docs
-one, and `@gmod/bbi` has already framed it: its `docs/optimizations.md` carries
-a "No block cache" entry saying a pan that re-visits a window re-fetches and
-re-inflates it, deliberately, because the filehandle layer above dedups the
-bytes — the expensive half remotely. So this is not unexamined, and re-deriving
-it from first principles is the mistake this directory exists to prevent.
-
-What has changed is the condition that entry names. It says a parsed-block cache
-"would need a byte-bounded budget shared across files, as bam-js's does, rather
-than an entry count" — and that budget now ships, in `@gmod/shared-read-cache`,
-which `@gmod/bbi` already depends on for its index caches. The prerequisite is
-met; what is not established is whether the inflate a pan repeats is worth it,
-which is bbi's measurement to make. One caveat travels with it: bbi weighs
-entries today, so a byte-weighed block cache has to be its own budget group
-rather than joining the one `@gmod/bam` and this library share.
+| Item | Area | First move |
+| --- | --- | --- |
+| [A cache hit needs the same merged span](todo/cache-hit-needs-same-merged-span.md) | cache | Count distinct cache keys over a pan, before designing anything. |
+| [Sweep the sibling parsers' docs](todo/sweep-sibling-parsers-docs.md) | docs | Grep the four wrapper repos for the same two errors. |

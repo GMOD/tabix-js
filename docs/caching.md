@@ -39,7 +39,7 @@ adapters, and on `1kg.chr1.subset.vcf.gz` it was a **total miss** — 47 refills
 out of 47 on the warm pass against 0 at the default, while holding 82.7MB in a
 single entry, over the budget it had been given. If you pinned a number here
 before v3.5.2, re-read it.
-([ADR 0001](../agent-docs/adr/0001-bound-the-chunk-cache-by-decompressed-bytes.md))
+([ADR 0001](../agent-docs/architecture-decision-records/0001-bound-the-chunk-cache-by-decompressed-bytes.md))
 
 ## Don't pick a number between one query and several
 
@@ -51,7 +51,7 @@ evicted, and the last settled entry is kept whatever the budget.
 Measured on `1kg.chr1.subset.vcf.gz`, a six-window pan took 17 refills out of 17
 at 100MB against 0 at 800MB, and **2596ms against 600ms**. Size above the
 working set, or leave the default alone.
-([ADR 0002](../agent-docs/adr/0002-size-the-chunk-cache-above-one-query.md))
+([ADR 0002](../agent-docs/architecture-decision-records/0002-size-the-chunk-cache-above-one-query.md))
 
 Entry count is a bad proxy for that size, which is why the option counts bytes:
 we fetch compressed and cache decompressed, and one bin of that same VCF is 17MB
@@ -126,4 +126,4 @@ spans matched.
 
 [optimizations.md](optimizations.md#the-chunk-cache) covers the same ground from
 the inside, and the ADRs behind it are in
-[`agent-docs/adr/`](../agent-docs/adr/).
+[`agent-docs/architecture-decision-records/`](../agent-docs/adr/).

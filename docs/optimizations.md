@@ -53,7 +53,7 @@ index it still works on a GFF whose first record spans the chromosome.
 Over 3,283 cold windows across every fixture, as TBI and as CSI, requests fall
 17% and every window returns the same lines at the same offsets. The GFF
 fixtures gain most: a third fewer requests and 13% fewer bytes. `@gmod/bam`'s
-[ADR 0023](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0023-drop-merged-chunks-past-max-off.md)
+[ADR 0023](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0023-drop-merged-chunks-past-max-off.md)
 measured why it drops whole chunks after the merge rather than trimming them or
 dropping before it: the merged chunk is the cache key, and cutting it at a point
 that moves with the query end made pans read up to 79% more.
@@ -89,7 +89,7 @@ than repeated `indexOf` for bytes that produce many false positives.
 The decode that survives is the one the caller asked for, and handing over the
 buffer range instead — so a caller that re-parses the line could skip even that
 — was measured in the consumer that wanted it and rejected
-([ADR 0006](../agent-docs/adr/0006-getlines-hands-over-strings-not-buffer-ranges.md)).
+([ADR 0006](../agent-docs/architecture-decision-records/0006-getlines-hands-over-strings-not-buffer-ranges.md)).
 The restructure a borrowed buffer would require from that caller turned out to
 be worth everything the bytes were credited with, and the caller can do it
 alone.
@@ -157,7 +157,7 @@ resolves to `undefined` there, so both arms of a node benchmark run the
 in-process path and report parity forever. That question needs a browser, which
 is where every number above comes from.
 
-[`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
+[`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
 makes the full argument for why the call crosses the boundary once per chunk
 rather than per record. What happens on the other side — one wasm call per
 chunk, how the pool splits a chunk's blocks across workers, and what measuring
@@ -180,7 +180,7 @@ entry to offset 0, so the bound orders nothing (every NCBI RefSeq GFF opens that
 way), and a dense VCF reads all of its few enormous chunks anyway. The premise
 the forecast needs — a long candidate chunk list of which a query reads a short
 prefix — is a BAM property, not a tabix one
-([ADR 0005](../agent-docs/adr/0005-the-bam-chunk-forecast-does-not-transfer.md),
+([ADR 0005](../agent-docs/architecture-decision-records/0005-the-bam-chunk-forecast-does-not-transfer.md),
 which also records an earlier attempt that forecast _under_ the read, the
 dangerous direction for a gate).
 
@@ -212,7 +212,7 @@ nine tabix-backed adapters, as the worked example:
   the chunk cache dedups _decompression_ — and is no reason to drop the merge,
   since a consumer without such a layer has only the merge turning a scattered
   bin set into a few requests
-  ([`@gmod/bam`'s ADR 0011](https://github.com/GMOD/bam-js/blob/main/agent-docs/adr/0011-chunk-merging-stays-even-behind-a-range-cache.md)).
+  ([`@gmod/bam`'s ADR 0011](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0011-chunk-merging-stays-even-behind-a-range-cache.md)).
 - **Consuming lines through the callback**, not by collecting them. `getLines`
   hands each line over as it decodes it; a caller that pushes them all into an
   array to parse afterwards holds a copy of the whole region as strings for no
