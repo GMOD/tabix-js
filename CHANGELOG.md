@@ -1,3 +1,12 @@
+## [3.10.0](https://github.com/GMOD/tabix-js/compare/v3.9.1...v3.10.0) (2026-10-08)
+
+### Other Changes
+
+- Reorganize agent-docs: ADRs folder, one todo file per item, CLAUDE.md ([7f47557](https://github.com/GMOD/tabix-js/commit/7f47557319dbfd29cb009267dda47ac70c28ed1e))
+- Point the README at architecture-decision-records ([86457cb](https://github.com/GMOD/tabix-js/commit/86457cbdca45ed5a2e98879d690870883b03e5e3))
+- Format the docs the agent-docs reorganization left unwrapped ([2d733c0](https://github.com/GMOD/tabix-js/commit/2d733c09e68a0a57fce42cb8ef28f686e7d30a91))
+- A VCF record spans its SVLEN, and an END at or before POS is ignored ([c28e4a0](https://github.com/GMOD/tabix-js/commit/c28e4a04d592c55efb3736af7a718dae9e801dca))
+
 ## [3.9.1](https://github.com/GMOD/tabix-js/compare/v3.9.0...v3.9.1) (2026-10-01)
 
 ## [3.9.0](https://github.com/GMOD/tabix-js/compare/v3.8.3...v3.9.0) (2026-09-27)
