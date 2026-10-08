@@ -171,9 +171,11 @@ function getVcfEnd(
   refEnd: number,
   infoStart: number,
   infoEnd: number,
+  altEnd: number,
 ) {
   const refLen = refEnd - refStart
   let endCoordinate = startCoordinate + refLen
+  let svlen = 0
 
   // INFO is '.', no fields to check
   if (buffer[infoStart] === 46) {
@@ -209,12 +211,90 @@ function getVcfEnd(
         buffer[fieldStart + 2] === 68 && // D
         buffer[fieldStart + 3] === 61 // =
       ) {
-        endCoordinate = parseIntFromBytes(buffer, fieldStart + 4, i)
+        // an END at or before POS describes no span; htslib ignores it too
+        const end = parseIntFromBytes(buffer, fieldStart + 4, i)
+        if (end > startCoordinate) {
+          endCoordinate = end
+        }
+      } else if (
+        fieldLen >= 6 &&
+        buffer[fieldStart] === 83 && // S
+        buffer[fieldStart + 1] === 86 && // V
+        buffer[fieldStart + 2] === 76 && // L
+        buffer[fieldStart + 3] === 69 && // E
+        buffer[fieldStart + 4] === 78 && // N
+        buffer[fieldStart + 5] === 61 // =
+      ) {
+        svlen = maxSvlenOnRef(buffer, fieldStart + 6, i, refEnd + 1, altEnd)
       }
       fieldStart = i + 1
     }
   }
-  return endCoordinate
+  return Math.max(endCoordinate, startCoordinate + svlen)
+}
+
+const COMMA = 44
+
+/**
+ * htslib's `svlen_on_ref_for_vcf_alt`: whether an ALT's SVLEN is a length on
+ * the reference, which it is for <CNV>, <DEL>, <DUP>, <INV> and their subtypes.
+ */
+function svlenSpansRef(buffer: Uint8Array, start: number, end: number) {
+  if (end - start < 5 || buffer[start] !== 60 || buffer[end - 1] !== 62) {
+    return false
+  }
+  const after = buffer[start + 4]
+  if (after !== 62 && after !== 58) {
+    return false
+  }
+  const a = buffer[start + 1]
+  const b = buffer[start + 2]
+  const c = buffer[start + 3]
+  return (
+    (a === 67 && b === 78 && c === 86) || // CNV
+    (a === 68 && b === 69 && c === 76) || // DEL
+    (a === 68 && b === 85 && c === 80) || // DUP
+    (a === 73 && b === 78 && c === 86) // INV
+  )
+}
+
+/**
+ * The longest reference length the SVLEN values state, each read against the
+ * ALT it pairs with, as htslib's tbx_parse1 does.
+ */
+function maxSvlenOnRef(
+  buffer: Uint8Array,
+  valuesStart: number,
+  valuesEnd: number,
+  altStart: number,
+  altEnd: number,
+) {
+  let max = 0
+  let value = valuesStart
+  let alt = altStart
+  while (value < valuesEnd && alt < altEnd) {
+    let valueEnd = buffer.indexOf(COMMA, value)
+    if (valueEnd === -1 || valueEnd > valuesEnd) {
+      valueEnd = valuesEnd
+    }
+    let alleleEnd = buffer.indexOf(COMMA, alt)
+    if (alleleEnd === -1 || alleleEnd > altEnd) {
+      alleleEnd = altEnd
+    }
+    if (svlenSpansRef(buffer, alt, alleleEnd)) {
+      const len = parseIntFromBytes(
+        buffer,
+        buffer[value] === 45 ? value + 1 : value,
+        valueEnd,
+      )
+      if (len > max) {
+        max = len
+      }
+    }
+    value = valueEnd + 1
+    alt = alleleEnd + 1
+  }
+  return max
 }
 
 const textDecoder = new TextDecoder()
@@ -747,6 +827,7 @@ export default class TabixIndexedFile {
               tabs[4]!,
               tabs[endCol - 1]! + 1,
               tabs[endCol]!,
+              tabs[5]!,
             )
           } else {
             endCoordinate = parseIntFromBytes(
