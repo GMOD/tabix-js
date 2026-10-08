@@ -189,7 +189,8 @@ production rather than quietly falling back, are in jbrowse-components'
   looks the way it does, and what measured it
 - [docs/caching.md](docs/caching.md) — sizing the decompressed-chunk cache, and
   bounding many files together
-- [agent-docs/architecture-decision-records/](agent-docs/architecture-decision-records/) — the measurements behind those decisions
+- [agent-docs/architecture-decision-records/](agent-docs/architecture-decision-records/)
+  — the measurements behind those decisions
 - [agent-docs/TODO.md](agent-docs/TODO.md) — what is worth doing next, and what
   has to be measured before it
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps

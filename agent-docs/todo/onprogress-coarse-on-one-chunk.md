@@ -1,10 +1,11 @@
 ---
 name: onprogress-coarse-on-one-chunk
-description: A one-chunk query reports 0% then 100%; per-block ticks cost callback volume.
+description:
+  A one-chunk query reports 0% then 100%; per-block ticks cost callback volume.
 metadata:
   category: visual-call
   area: progress
-  first_move: "Decide whether per-block ticks are worth the callback volume."
+  first_move: 'Decide whether per-block ticks are worth the callback volume.'
   order: 1
 ---
 

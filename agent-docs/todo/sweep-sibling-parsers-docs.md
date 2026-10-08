@@ -1,10 +1,12 @@
 ---
 name: sweep-sibling-parsers-docs
-description: Check vcf-js, gff-nostream, bed-js and twobit-js option tables against their constructors; bbi block-cache question remains.
+description:
+  Check vcf-js, gff-nostream, bed-js and twobit-js option tables against their
+  constructors; bbi block-cache question remains.
 metadata:
   category: measure
   area: docs
-  first_move: "Grep the four wrapper repos for the same two errors."
+  first_move: 'Grep the four wrapper repos for the same two errors.'
   order: 2
 ---
 
