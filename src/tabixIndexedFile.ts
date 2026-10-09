@@ -10,7 +10,7 @@ import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
 import type { Options } from './indexFile.ts'
 import type { BgzfWorkerPool, ChunkSlice } from '@gmod/bgzf-filehandle'
-import type { SharedBudget } from '@gmod/shared-read-cache'
+import type { Budget } from '@gmod/shared-read-cache'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
 const TAB = 9
@@ -558,7 +558,7 @@ export default class TabixIndexedFile {
      * yields only what is globally least-recently-used: files nobody is
      * reading hand their space to the one being panned.
      */
-    chunkCacheBudget?: SharedBudget
+    chunkCacheBudget?: Budget
     /**
      * A `@gmod/bgzf-filehandle` worker pool to inflate this file's chunks on,
      * instead of inflating them on the calling thread.
