@@ -1,3 +1,9 @@
+## [3.10.1](https://github.com/GMOD/tabix-js/compare/v3.10.0...v3.10.1) (2026-10-09)
+
+### Chores
+
+- Bump @gmod/shared-read-cache to 2.0.0 ([d1a36dd](https://github.com/GMOD/tabix-js/commit/d1a36dd7d07b9ec94ffc80d19a78a1250ac81d0e))
+
 ## [3.10.0](https://github.com/GMOD/tabix-js/compare/v3.9.1...v3.10.0) (2026-10-08)
 
 ### Other Changes
