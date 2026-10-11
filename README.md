@@ -40,13 +40,15 @@ const custom = new TabixIndexedFile({
 })
 ```
 
-Over HTTP it is worth swapping in
+Over HTTP, swap in
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle).
-A query fetches the index once, then reads the BGZF blocks it points at as byte
-ranges spread through the file. Overlapping queries re-read the same blocks:
-panning twenty half-overlapping windows across the 3.4 MB test BED file reads 11
-MB. The cache serves those reads out of 256 KiB chunks, so neighboring blocks
-share a request and each byte is fetched once.
+
+- A query fetches the index once, then reads the BGZF blocks it points at as
+  byte ranges spread through the file.
+- Overlapping queries re-read the same blocks. Panning twenty half-overlapping
+  windows across the 3.4 MB test BED file reads 11 MB.
+- The cache serves those reads out of 256 KiB chunks, so neighboring blocks
+  share a request and each byte is fetched once.
 
 ```typescript
 import { RemoteFileWithRangeCache } from '@gmod/range-cache-filehandle'
@@ -92,9 +94,12 @@ await file.getLines('chr1', 200, 300, {
 })
 ```
 
-`onProgress` ticks once per chunk — the run of BGZF blocks the index resolves a
-query to — including instant ticks for chunks already cached, and the index
-supplies `totalBytes` up front, which is enough for a determinate progress bar.
+`onProgress` ticks once per chunk, the run of BGZF blocks the index resolves a
+query to.
+
+- Chunks already cached tick instantly.
+- The index supplies `totalBytes` up front, enough for a determinate progress
+  bar.
 
 Notes:
 
@@ -131,16 +136,17 @@ opening the file directly.
 ## How a query flows
 
 `getLines` turns a region into BGZF chunks through the index and decompresses
-each one in wasm — index reads included, since `.tbi` and `.csi` are bgzipped
+each one in wasm, index reads included, since `.tbi` and `.csi` are bgzipped
 too. The rest is ordinary JS: it matches lines as bytes and decodes only the
-ones you asked for. [docs/dataflow.md](docs/dataflow.md) has the diagram and
-walks it through.
+ones you asked for. [docs/dataflow.md](docs/dataflow.md) has the diagram.
 
-The file then holds on to those decompressed chunks, so overlapping and adjacent
-queries reuse them instead of inflating again — up to 1GB per file, dropped
-after three idle minutes. A consumer holding one file per track should bound
-them together with a shared `chunkCacheBudget` rather than shrinking each file's
-own ceiling: [docs/caching.md](docs/caching.md).
+The file holds on to decompressed chunks, so overlapping and adjacent queries
+skip inflating again.
+
+- The cache holds up to 1GB per file and drops chunks after three idle minutes.
+- A consumer holding one file per track should bound them together with a shared
+  `chunkCacheBudget` rather than shrinking each file's ceiling. See
+  [docs/caching.md](docs/caching.md).
 
 ## Decompressing on a worker pool
 
@@ -157,28 +163,21 @@ const file = new TabixIndexedFile({
 })
 ```
 
-Safe to pass unconditionally: `getSharedWorkerPool()` returns `undefined` under
-node, or anywhere the host forbids Workers, which keeps the in-process path. No
-cross-origin isolation needed. tabix-js never creates a pool on its own — the
-consumer controls the thread budget.
+Safe to pass unconditionally:
 
-**Worth about 1.4x here, against the 1.95x a BAM reader reports.** Measured in
-jbrowse-components on `test/data/1kg.chr1.subset.vcf.gz` — 213MB of 1000
-Genomes, headless Chrome, real HTTP, four workers, arms interleaved, both
-returning the same record count: **1.34-1.46x** across five window sizes and a
-twelve-step pan.
+- `getSharedWorkerPool()` returns `undefined` under node, or anywhere the host
+  forbids Workers, which keeps the in-process path.
+- No cross-origin isolation is needed.
+- tabix-js never creates a pool on its own, so the consumer controls the thread
+  budget.
 
-The decompression itself moves **1.83x**. A **28% floor of per-line byte
-scanning and string decoding** holds the end-to-end figure below that; no worker
-count reaches it, and the floor is at its worst on multi-sample VCF, whose
-records have a genotype field per sample and run to ~60KB a line. A format with
-narrower lines sits closer to BAM. Getting more than ~1.5x on a multi-sample VCF
-means attacking the scan, not the decompression.
+On a multi-sample VCF the pool speeds up end-to-end queries by about 1.4x.
+Per-line byte scanning and string decoding set that ceiling, not decompression.
 
-Worker counts, lifecycle and benchmarks:
-[bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md);
-the end-to-end numbers above, and how to confirm a pool is really engaging in
-production rather than falling back unnoticed, are in jbrowse-components'
+Worker counts, lifecycle and benchmarks are in
+[bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md).
+The end-to-end numbers, and how to confirm a pool engages in production, are in
+jbrowse-components'
 [BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md).
 
 ## Docs
