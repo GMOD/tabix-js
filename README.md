@@ -25,32 +25,13 @@ const csi = new TabixIndexedFile({
   csiPath: 'file.vcf.gz.csi',
 })
 
-// Remote files
+// Remote files: one HTTP request per read
 const remote = new TabixIndexedFile({
   url: 'https://example.com/file.vcf.gz',
   tbiUrl: 'https://example.com/file.vcf.gz.tbi',
 })
 
-// Or with a filehandle from generic-filehandle2
-import { RemoteFile } from 'generic-filehandle2'
-
-const custom = new TabixIndexedFile({
-  filehandle: new RemoteFile('https://example.com/file.vcf.gz'),
-  tbiFilehandle: new RemoteFile('https://example.com/file.vcf.gz.tbi'),
-})
-```
-
-Over HTTP, swap in
-[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle).
-
-- A query fetches the index once, then reads the BGZF blocks it points at as
-  byte ranges spread through the file.
-- Overlapping queries re-read the same blocks. Panning twenty half-overlapping
-  windows across the 3.4 MB test BED file reads 11 MB.
-- The cache serves those reads out of 256 KiB chunks, so neighboring blocks
-  share a request and each byte is fetched once.
-
-```typescript
+// Remote files through a range cache (recommended)
 import { RemoteFileWithRangeCache } from '@gmod/range-cache-filehandle'
 
 const cached = new TabixIndexedFile({
@@ -60,6 +41,20 @@ const cached = new TabixIndexedFile({
   ),
 })
 ```
+
+Over HTTP, pass a filehandle from
+[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle).
+It turns the scattered block reads of a query into a few requests:
+
+- A query fetches the index once, then reads each BGZF block it points at as a
+  separate byte range. The cache reads in 256 KiB chunks, so neighboring blocks
+  share one request.
+- Overlapping queries re-read the same blocks. Panning twenty half-overlapping
+  windows across the 3.4 MB test BED file reads 11 MB without the cache. With
+  it, each byte is fetched once.
+
+A bare `url` uses `RemoteFile` from generic-filehandle2, which sends one request
+per read and caches nothing.
 
 ### getLines
 
@@ -202,4 +197,4 @@ most recent JBrowse paper at [jbrowse.org](http://jbrowse.org).
 
 ## License
 
-MIT © [Robert Buels](https://github.com/rbuels)
+MIT
