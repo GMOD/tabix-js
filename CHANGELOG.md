@@ -1,3 +1,18 @@
+## [3.10.2](https://github.com/GMOD/tabix-js/compare/v3.10.1...v3.10.2) (2026-10-11)
+
+### Bug Fixes
+
+- Reject a CSI index that has no tabix header ([a0c2495](https://github.com/GMOD/tabix-js/commit/a0c24958ccab23b3a4ffbabb1e87c105285ecabf))
+
+### Documentation
+
+- Plainer README wording ([7b1f913](https://github.com/GMOD/tabix-js/commit/7b1f913d22d16f172e2cb0e95a7dd338d91cdeb3))
+- Break up README walls of text ([811614d](https://github.com/GMOD/tabix-js/commit/811614dbc33f2d013a935ad8a2de15c3830598ed))
+
+### Tests
+
+- Fail when docs/api.md misses a public member or export ([59a85b2](https://github.com/GMOD/tabix-js/commit/59a85b2ad89a9d0e98c5b2417bf9b338217885a4))
+
 ## [3.10.1](https://github.com/GMOD/tabix-js/compare/v3.10.0...v3.10.1) (2026-10-09)
 
 ### Chores
