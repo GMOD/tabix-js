@@ -865,7 +865,6 @@ export default class TabixIndexedFile {
     }
   }
 
-  /** @internal */
   async getMetadata(opts: Options = {}) {
     return this.index.getMetadata(opts)
   }

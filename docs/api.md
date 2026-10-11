@@ -84,3 +84,37 @@ Number of data lines on the given reference, or `-1` if it is not in the index.
 
 Estimated compressed size of the index chunks covering the given regions — an
 upper bound, for gating a request before calling `getLines`.
+
+## `getMetadata(opts?)`
+
+The index's header fields. The first call downloads and parses the index, and
+later calls reuse that parse.
+
+| Field            | Type                     | Description                                |
+| ---------------- | ------------------------ | ------------------------------------------ |
+| `columnNumbers`  | `{ ref, start, end }`    | the 1-based columns the index records      |
+| `metaChar`       | `string?`                | Comment character, e.g. `#`                |
+| `skipLines`      | `number?`                | Leading lines to skip, from `tabix -S`     |
+| `format`         | `string`                 | `generic`, `SAM`, `VCF` or `GAF`           |
+| `coordinateType` | `string`                 | `1-based-closed` or `zero-based-half-open` |
+| `refIdToName`    | `string[]`               | Reference names in index order             |
+| `refNameToId`    | `Record<string, number>` | Reference name to index id                 |
+| `firstDataLine`  | `VirtualOffset?`         | Lowest virtual offset the index records    |
+
+The other fields describe the index format and its binning scheme.
+
+## Exports
+
+`TabixIndexedFile` is the reader this page describes. `TBI` and `CSI` parse a
+`.tbi` or `.csi` index, each built as `new TBI({ filehandle })`.
+`TabixIndexedFile` builds one from its index options, so a consumer rarely
+constructs either.
+
+`VirtualOffset` is a BGZF virtual offset, the type of `firstDataLine` above:
+
+| Member             | Type     | Description                               |
+| ------------------ | -------- | ----------------------------------------- |
+| `blockPosition`    | `number` | File offset of the compressed block       |
+| `dataPosition`     | `number` | Offset into the block's decompressed data |
+| `toString()`       | `string` | `blockPosition:dataPosition`              |
+| `compareTo(other)` | `number` | Below `0` when this offset comes first    |

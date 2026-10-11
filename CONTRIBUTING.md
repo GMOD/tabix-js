@@ -12,6 +12,11 @@ Use `pnpm version patch/minor/major` to release — it runs lint, format, types,
 tests and build, regenerates CHANGELOG.md with git-cliff, then pushes the
 version tag which triggers the publish workflow.
 
+[docs/api.md](docs/api.md) is written by hand, and `test/apiDocs.test.ts` fails
+when a public member of `TabixIndexedFile`, `TBI`, `CSI`, `VirtualOffset`, or an
+export, is missing from it. Document the new member, or add it to the test's
+`undocumented` list with the reason it is internal.
+
 `docs/img/dataflow.svg` is generated from `docs/img/dataflow.dot` and committed,
 since GitHub does not render DOT. If you edit the `.dot`, re-render it in the
 same commit:
