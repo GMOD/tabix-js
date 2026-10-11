@@ -110,6 +110,10 @@ The other fields describe the index format and its binning scheme.
 `TabixIndexedFile` builds one from its index options, so a consumer rarely
 constructs either.
 
+A `.csi` index must have the tabix header that `tabix --csi` writes, because the
+header lists the reference names. `CSI` throws on an index without one, such as
+the `.csi` that `samtools index -c` writes for a BAM.
+
 `VirtualOffset` is a BGZF virtual offset, the type of `firstDataLine` above:
 
 | Member             | Type     | Description                               |

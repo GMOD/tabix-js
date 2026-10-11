@@ -47,17 +47,12 @@ export default class CSI extends IndexFile {
     // htslib names no references in a GAF index, so its aux is the bare
     // 28-byte header block
     const isGaf = auxLength >= 28 && (dataView.getInt32(16, true) & 0xf) === 3
-    const aux =
-      auxLength >= 30 || isGaf
-        ? parseAuxData(bytes, 16)
-        : {
-            refIdToName: [] as string[],
-            refNameToId: {} as Record<string, number>,
-            metaChar: undefined,
-            columnNumbers: { ref: 0, start: 1, end: 2 },
-            coordinateType: 'zero-based-half-open',
-            format: 'generic',
-          }
+    if (auxLength < 30 && !isGaf) {
+      throw new Error(
+        'CSI index has no tabix header, so it names no references; it may be a BAM or BCF index',
+      )
+    }
+    const aux = parseAuxData(bytes, 16)
     const refCount = dataView.getInt32(16 + auxLength, true)
 
     // SYNC: ~/src/gmod/bam-js/src/csi.ts _parse — two-pass structure
