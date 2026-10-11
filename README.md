@@ -171,14 +171,14 @@ twelve-step pan.
 The decompression itself moves **1.83x**. A **28% floor of per-line byte
 scanning and string decoding** holds the end-to-end figure below that; no worker
 count reaches it, and the floor is at its worst on multi-sample VCF, whose
-records carry a genotype field per sample and run to ~60KB a line. A format with
+records have a genotype field per sample and run to ~60KB a line. A format with
 narrower lines sits closer to BAM. Getting more than ~1.5x on a multi-sample VCF
 means attacking the scan, not the decompression.
 
 Worker counts, lifecycle and benchmarks:
 [bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md);
 the end-to-end numbers above, and how to confirm a pool is really engaging in
-production rather than quietly falling back, are in jbrowse-components'
+production rather than falling back unnoticed, are in jbrowse-components'
 [BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md).
 
 ## Docs
