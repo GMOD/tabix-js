@@ -18,7 +18,7 @@
 | `chunkCacheBudget`        | `SharedBudget?`      | A `@gmod/shared-read-cache` budget shared with other files, so the ceiling applies to their sum rather than to each — see [caching.md](caching.md#chunkcachebudget-bounds-a-consumer-with-many-files)                                             |
 | `bgzfWorkerPool`          | `BgzfWorkerPool?`    | A `@gmod/bgzf-filehandle` pool to inflate this file's chunks on. Accepts the promise `getSharedWorkerPool()` returns; with `undefined`, decompression runs in-process. See [the README](../README.md#decompressing-on-a-worker-pool)              |
 
-Every method that takes `opts?` accepts `signal` and `onProgress`. `onProgress`
+Every method taking `opts?` takes `signal` and `onProgress`. `onProgress`
 reports the `.tbi`/`.csi` download when that call triggers it, and the index
 download is a whole-file read, so it reports byte-level progress rather than one
 step per chunk.
@@ -64,15 +64,14 @@ starts with the meta character, but `tabix -H` prints only the latter.
 
 ## `getHeaderLines(opts?): Promise<string[]>`
 
-The file's header lines in whichever form the file stores them: the commented
-block when there is one, otherwise the rows the index counted, dropping empty
-lines.
+The file's header lines however the file keeps them: the commented block when
+there is one, otherwise the rows the index counted, dropping empty lines.
 
 Use this method in most cases. `getHeader` alone cannot tell a file that has no
 header from one whose header is not commented, because it returns the empty
 string for both, so callers fall back to an assumed column layout and mis-name
-columns with no error. A single read of the leading blocks gives both forms, and
-`getHeader` and `getSkippedLines` share that read.
+columns with no error. A single read of the leading blocks yields both forms,
+and `getHeader` and `getSkippedLines` share that read.
 
 ## `getReferenceSequenceNames(opts?): Promise<string[]>`
 

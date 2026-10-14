@@ -38,14 +38,14 @@ figure for it:
   parse of a GWAS line into a feature took ~490ns on the same machine, so the
   saving is a few percent of the time per line there, and the loop brings back
   ADR 0003's regression on wide INFO.
-- **The platform limits the newline search.** `Uint8Array.indexOf` ran 2.6-3.8
-  GB/s over a buffer with no match, where node's `Buffer.indexOf` (memchr) ran
-  8.6 GB/s. A browser exposes no memchr, and a JS loop is slower than `indexOf`
-  (ADR 0003).
+- **The newline search is bound by the platform.** `Uint8Array.indexOf` ran
+  2.6-3.8 GB/s over a buffer with no match, where node's `Buffer.indexOf`
+  (memchr) ran 8.6 GB/s. A browser exposes no memchr, and a JS loop is slower
+  than `indexOf` (ADR 0003).
 
 ## Consequences
 
-One route remains untried: decode a chunk in one batch and slice the lines out
-of the resulting string. Every line would then be a slice of one large string,
-so a caller that keeps any field of a line would keep the whole batch alive.
-Measure the retained memory in a consumer before measuring the speed.
+Batch-decoding a chunk and slicing lines out of it is the one untried route. It
+turns every line into a slice of one large string, and a caller that keeps any
+field of a line would then keep the whole batch alive. Measure the retained
+memory in a consumer before measuring the speed.

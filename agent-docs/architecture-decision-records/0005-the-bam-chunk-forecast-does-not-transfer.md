@@ -16,7 +16,7 @@ entry one window past the query, and its ADR 0017 measured the difference at
 **5.6x** — 43.5MB reported against the 7.8MB a 380bp window actually reads. The
 forecast matters because a consumer's "too much data" banner shows it, and a
 user cannot get under an inflated forecast by zooming in: every window narrower
-than a linear-index interval maps to the same chunks and the same number.
+than a linear-index interval resolves to the same chunks and the same number.
 
 tabix-js over-reports too. The table compares the forecast with the bytes
 actually read, on `tbi` fixtures, one region per row:
@@ -46,8 +46,8 @@ the over-report is worst.
 
 ## Why it cannot help where it is needed
 
-**A long feature pins the linear index, and that is the normal case for GFF.**
-`ncbi_human.sorted.gff.gz` opens with
+**The linear index is pinned by a long feature, and that is the normal case for
+GFF.** `ncbi_human.sorted.gff.gz` opens with
 
 ```
 NC_000001.11  RefSeq  region  1  248956422  ...
@@ -82,8 +82,8 @@ property of BAM files, not of tabix ones.
 
 The first port measured **wrong**, not merely useless. On the 1000 Genomes SV
 callset, whose 1.4Mb deletions pin the linear-index entry at the data start, it
-forecast 0.04MB against the 0.22MB the query read. An under-forecast is the
-dangerous direction, because a consumer gate that trusts it lets through a query
+forecast 0.04MB against the 0.22MB the query read. Under-forecasting is the
+dangerous direction, since a consumer gate that trusts it lets through a query
 it should have stopped.
 
 The under-forecast on the SV callset motivated the empty-prefix fallback now in

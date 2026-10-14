@@ -46,7 +46,7 @@ document.
 In bbi and hic the remaining question is about **code**, not docs, and
 `@gmod/bbi` has already written it down. Its `docs/optimizations.md` has a "No
 block cache" entry: a pan that revisits a window re-fetches and re-inflates it
-on purpose, because the filehandle layer above dedups the bytes, which are the
+deliberately, because the filehandle layer above dedups the bytes, which are the
 expensive half remotely. bbi has examined the question, and re-deriving it from
 first principles is the mistake the records in this directory warn against.
 

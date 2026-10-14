@@ -24,7 +24,7 @@ budget described in
 [ADR 0002](../architecture-decision-records/0002-size-the-chunk-cache-above-one-query.md)
 or it may be this key mismatch.
 
-**Start with a count, not a fix.** Run a pan over a dense VCF and a sparse GFF,
-log the cache key per read, and count how many distinct keys cover the same
+**First move is a count, not a fix:** run a pan over a dense VCF and a sparse
+GFF, log the cache key per read, and see how many distinct keys cover the same
 bytes. If the answer is "almost none", close this entry and remove the caveat
 from [docs/caching.md](../../docs/caching.md).

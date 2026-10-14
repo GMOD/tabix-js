@@ -44,7 +44,7 @@ const cached = new TabixIndexedFile({
 
 Over HTTP, pass a filehandle from
 [`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle),
-which merges the scattered block reads of a query into a few requests.
+which merges the scattered block reads of a query into a few requests:
 
 - A query fetches the index once, then reads each BGZF block that the index
   points to as a separate byte range. The cache reads in 256 KiB chunks, so
@@ -89,10 +89,10 @@ await file.getLines('chr1', 200, 300, {
 })
 ```
 
-`onProgress` ticks once per chunk, where a chunk is a run of BGZF blocks that
-the index lists for the query.
+`onProgress` ticks once per chunk, the run of BGZF blocks the index resolves a
+query to.
 
-- A chunk already in the cache ticks immediately.
+- Chunks already cached tick instantly.
 - `totalBytes` comes from the index and is known up front, enough to draw a
   determinate progress bar.
 
@@ -133,7 +133,7 @@ opening the file directly.
 `getLines` looks up a region's BGZF chunks in the index and decompresses each
 chunk in wasm. Index reads go through wasm too, since `.tbi` and `.csi` are
 bgzipped. The code after decompression is ordinary JS, which matches lines as
-bytes and decodes only the lines the query asked for.
+bytes and decodes only the ones you asked for.
 [docs/dataflow.md](docs/dataflow.md) has the diagram.
 
 `TabixIndexedFile` keeps decompressed chunks, so overlapping and adjacent
@@ -146,8 +146,8 @@ queries skip inflating them again.
 
 ## Decompressing on a worker pool
 
-Each BGZF block decompresses independently of the others, so a worker pool can
-spread decompression across threads.
+BGZF blocks inflate independently, so a worker pool can spread decompression
+across threads.
 
 ```typescript
 import { getSharedWorkerPool } from '@gmod/bgzf-filehandle'

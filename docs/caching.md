@@ -3,7 +3,7 @@
 `TabixIndexedFile` caches decompressed chunks, the unit the index returns for a
 query, so overlapping and adjacent queries reuse inflated bytes instead of
 fetching and inflating them again. Three constructor options bound that cache,
-and the table lists the question each one settles.
+and each answers a different question.
 
 | option                    | default | question                                     |
 | ------------------------- | ------- | -------------------------------------------- |
@@ -109,7 +109,7 @@ _keep_, and bound total memory in code that can see the whole process.
 
 ## Concurrent queries share a read
 
-When two queries need one chunk, the cache fetches and inflates it once, and the
+When two queries hit one chunk, the cache fetches and inflates it once, and the
 second query joins the first one's promise rather than starting its own.
 Aborting is per caller: the cache abandons a shared chunk only after every
 caller that joined it has aborted, so one cancelled query cannot drop a block
@@ -117,10 +117,10 @@ another still needs.
 
 ## A hit needs the same chunk span, not just the same bytes
 
-An entry's key is the _merged_ chunk span for a query, and the merge depends on
-the query: `blocksForRange` clamps to the lowest offset the linear index gives
-for that start, then joins what is left. Two overlapping pans can therefore
-decode the same bytes under two keys and miss each other.
+An entry's key is the _merged_ chunk span a query resolved to, and the merge
+depends on the query: `blocksForRange` clamps to the lowest offset the linear
+index gives for that start, then joins what is left. Two overlapping pans can
+therefore decode the same bytes under two keys and miss each other.
 
 tabix-js has not measured how often this happens; bam-js has measured it and set
 it aside. Before treating a low hit rate as a bug, check whether the spans

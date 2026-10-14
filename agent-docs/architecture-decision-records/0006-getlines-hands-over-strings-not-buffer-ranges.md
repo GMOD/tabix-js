@@ -49,7 +49,7 @@ The consumer got the speedup from the restructure alone, without the new API.
 
 ## Consequences
 
-The zero-copy contract stays out of the public API. A rule like "valid only
+The zero-copy contract stays out of the public surface. A rule like "valid only
 during the call" is fine in a benchmark and expensive in a published API,
 because the maintainers have to document and test it, and every future change to
 the read path has to honour it, in exchange for a speedup on one shape of input.

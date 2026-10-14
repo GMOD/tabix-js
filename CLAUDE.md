@@ -8,8 +8,8 @@ someone proposed from first principles and that then failed its benchmark. Read
 
 ## Validate index and query changes against htslib, not the unit tests
 
-`tabix`, `bgzip`, `htsfile` (htslib 1.21) and `samtools` are on PATH. The most
-useful check in this repo compares the library with htslib. For each
+`tabix`, `bgzip`, `htsfile` (htslib 1.21) and `samtools` are on PATH. The
+highest-value check in this repo compares the library with htslib. For each
 `test/data/*.gz` that has an index, run randomized regions through both
 `TabixIndexedFile.getLines` and `tabix <file> <ref>:<start+1>-<end>`, and
 compare the output.
@@ -31,10 +31,10 @@ Bias the region generator toward bin boundaries (multiples of 16384) and 1–2 b
 windows, where the binning math breaks. `~/src/gmod/bam-js` has a parallel
 `reg2bins`/`DataView` implementation to cross-check against.
 
-## Rank the read path above index parsing
+## Index parsing is not the bottleneck
 
 When ranking performance work, don't lead with `.tbi`/`.csi` parsing. tabix-js
-parses each ref's index lazily through `memoizeByRefId`, which already limits
+parses each ref's index lazily through `memoizeByRefId`, which already bounds
 the index cost to five refs, so index parsing rarely dominates a query. The cost
 is in the read path (chunk fetch, decompression and per-line scanning) and in
 retained memory.

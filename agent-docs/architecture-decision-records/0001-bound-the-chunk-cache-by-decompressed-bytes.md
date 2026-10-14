@@ -4,10 +4,10 @@ Status: Accepted
 
 ## Context
 
-`TabixIndexedFile` caches the result of `readChunk`, a `ReadChunk` whose
-`buffer` holds the chunk's fully **decompressed** bytes. The reader fetches
-compressed bytes and caches decompressed bytes, and the old cache conflated the
-two sizes:
+`TabixIndexedFile` caches the result of `readChunk` — a `ReadChunk`, whose
+`buffer` is the chunk's fully **decompressed** bytes. We fetch compressed and
+cache decompressed; those are different numbers, and the old cache conflated
+them:
 
 ```ts
 cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) })
@@ -37,7 +37,7 @@ is still waiting on.
 
 We kept the `entries.size > 1` guard from bam-js, so the cache still holds a
 single chunk larger than the whole budget. The caller needs that chunk for the
-query in flight, and dropping it would only force a second decompress.
+query in flight, and dropping it would only force a re-decompress.
 
 An eviction mid-query never causes a re-read, because `getLines` holds every
 chunk's promise in its `reads[]` array, and our `delete` is a plain `Map` delete
@@ -83,7 +83,7 @@ them. A single finest-level bin covers 16kb of sequence, and in a file with
 granularity sets the chunk size, not the merge policy, so bounding merges by
 estimated decompressed size would change nothing here.
 
-A smaller unit requires caching at BGZF block level rather than chunk level.
-`unzipChunkSlice` already computes the block boundaries (`cpositions` /
+The only way to a smaller unit is to cache at BGZF block level rather than chunk
+level. `unzipChunkSlice` already computes the block boundaries (`cpositions` /
 `dpositions`), but block-level caching changes the cache key and the read path,
 so it needs an ADR of its own.

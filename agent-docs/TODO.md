@@ -12,7 +12,7 @@ its table row: `metadata.category` is the table, `area` and `first_move` are the
 columns, and `order` is the row's position. This index has no generator, so add
 or remove a row here when you add or remove an entry.
 
-Most items need a measurement before any code.
+Most items are blocked on a measurement;
 [architecture-decision-records/](architecture-decision-records/) records several
 changes that looked obvious and proved wrong once measured.
 

@@ -36,14 +36,15 @@ Releases publish automatically via GitHub Actions using npm trusted publishing
 (OIDC, no stored token). The workflow requires `--provenance` and
 `id-token: write` permissions.
 
-The repo has no `prepublishOnly` script on purpose. `preversion` runs the checks
-locally and the publish job's `needs: test` runs them in CI, so a
-`prepublishOnly` would run lint/test/build a third time per release.
+There is deliberately no `prepublishOnly` script: `preversion` gates the local
+side and the publish job's `needs: test` gates CI, so a `prepublishOnly` would
+run lint/test/build a third time per release.
 
-This repo is already configured. To set up a new package, run
+This repo is already configured. To set up a new package:
 `npm trust github <pkg> --file publish.yml --repo GMOD/<repo>` (requires
 npm >=11.10.0 and 2FA).
 
 Once npm publish succeeds, the `release` job creates the GitHub release for the
-tag. `scripts/release-notes.sh` extracts the notes from that version's
-CHANGELOG.md section, so run it with a version to preview a release's notes.
+tag, taking its notes from that version's CHANGELOG.md section.
+`scripts/release-notes.sh` extracts the section, so run the script with a
+version to preview a release's notes.

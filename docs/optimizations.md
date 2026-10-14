@@ -3,8 +3,8 @@
 This doc explains why the query path looks the way it does, and
 [dataflow.md](dataflow.md) draws the path itself.
 
-Two costs dominate a query, network round trips and inflating more bytes than
-the answer needs, and most of the optimizations below reduce one or the other.
+Most of the query path exists because two things dominate a query: network round
+trips, and inflating more bytes than the answer needs.
 
 ## Reading the index
 
@@ -70,9 +70,8 @@ bytes fetched with no benefit.
 
 The read-ahead window therefore starts at one chunk and doubles each time the
 scan finishes a chunk without ending. A query that stops inside its first chunk
-issues exactly the reads a sequential scan would, and a long one reaches the
-6-chunk cap after three. Six is the HTTP/1.1 per-host connection limit browsers
-enforce.
+issues exactly the reads a sequential scan would; a long one reaches the 6-chunk
+cap after three. Six is the HTTP/1.1 per-host connection limit browsers enforce.
 
 ## Scanning lines
 
@@ -101,8 +100,8 @@ alone.
 
 ### `indexOf` beats a hand-written single pass
 
-The scan uses `Uint8Array.indexOf` on purpose, even though the scans overlap and
-a single pass would touch fewer bytes. V8 vectorizes `indexOf`, and in our
+The scan deliberately uses `Uint8Array.indexOf` even though the scans overlap
+and a single pass would touch fewer bytes. V8 vectorizes `indexOf`, and in our
 benchmark the single-pass replacement ran up to **2.96x slower** across nine
 real VCF/BED/GFF files (ADR 0003). The byte-count argument does not predict
 performance here.
@@ -127,11 +126,12 @@ files share one ceiling instead of each holding its own.
 
 ## The header
 
-`getHeader` and `getSkippedLines` return different results from the same leading
-blocks, so both use one memoized parse. The parse keeps only the parsed results,
-which matters for a VCF header that runs to megabytes. `getSkippedLines` finds
-the N-th newline by scanning bytes and decodes only up to it, instead of
-decoding and splitting the whole buffer to keep its first N lines.
+`getHeader` and `getSkippedLines` answer different questions from the same
+leading blocks, so both use one memoized parse. The parse keeps only the parsed
+results, which matters for a VCF header that runs to megabytes.
+`getSkippedLines` finds the N-th newline by scanning bytes and decodes only up
+to it, instead of decoding and splitting the whole buffer to keep its first N
+lines.
 
 ## Decompression
 
@@ -164,7 +164,7 @@ both arms of a node benchmark then run the in-process path and always report
 parity.
 
 [`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
-gives the full argument for why the call crosses the wasm boundary once per
+makes the full argument for why the call crosses the wasm boundary once per
 chunk rather than once per record.
 [bgzf-filehandle's optimizations doc](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/optimizations.md)
 covers the wasm side: one wasm call per chunk, how the pool splits a chunk's
@@ -218,7 +218,7 @@ decisions across its nine tabix-backed adapters:
   [caching.md](caching.md) covers the budget in full, with code.
 - **A coalescing range cache under the filehandle**, which fetches in 256KB
   aligned blocks and joins contiguous runs into one request. The range cache
-  works alongside the chunk merging above rather than replacing it: the range
+  composes with the chunk merging above rather than replacing it: the range
   cache dedups _bytes_, while the chunk cache dedups _decompression_. Keep the
   merge anyway, because for a consumer without such a layer the merge is the
   only step that turns a scattered bin set into a few requests
@@ -226,7 +226,7 @@ decisions across its nine tabix-backed adapters:
 - **Consuming lines through the callback**, not by collecting them. `getLines`
   passes each line to the callback as it decodes it, and a caller that pushes
   every line into an array to parse afterwards holds a copy of the whole region
-  as strings for no benefit.
+  as strings for no reason.
 - **Gating on `bytesForRegions`** before issuing a query at all, and treating
   the result as the upper bound that
   [the byte estimate section](#the-byte-estimate-stays-an-upper-bound)

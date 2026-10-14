@@ -22,8 +22,8 @@ vectorized), and a JS loop touching strictly fewer bytes still loses badly to
 it.
 
 We benchmarked on 2026-05-08 with `vitest bench` over nine real VCF/BED/GFF
-files. The single-pass replacement was up to **2.96× slower** on
-`volvox.test.vcf.gz` (a 45 KB VCF) and 1.27× slower on a 5.2 MB GFF, and net
+files. The single-pass replacement regressed up to **2.96× slower** on
+`volvox.test.vcf.gz` (a 45 KB VCF) and 1.27× slower on a 5.2 MB GFF, and was net
 worse across the suite. Two small files showed roughly 1.1×, far below the
 regressions.
 
