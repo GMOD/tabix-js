@@ -5,10 +5,9 @@ Status: Accepted (`DEFAULT_CHUNK_CACHE_BYTES` 100 MB → 1 GB; adds
 
 ## Context
 
-ADR 0001 bounded this cache by decompressed bytes rather than entry count,
-because a dense VCF has single index bins of 17 MB compressed / **120 MB
-decompressed** and an entry count does not bound memory. It set the budget at
-100 MB.
+ADR 0001 bounded this cache by decompressed bytes rather than entry count, with
+a budget of 100 MB, because a dense VCF has single index bins of 17 MB
+compressed / **120 MB decompressed** and an entry count does not bound memory.
 
 The 100 MB budget contradicts the 120 MB measurement: **one entry did not fit in
 the budget**, and nobody noticed for seven months. A budget below one query's

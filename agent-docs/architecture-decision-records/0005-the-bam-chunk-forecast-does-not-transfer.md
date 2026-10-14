@@ -33,16 +33,16 @@ actually read, on `tbi` fixtures, one region per row:
 **Do not port `chunksLikelyRead`.** We implemented it, measured it across every
 `.tbi` fixture in `test/data`, and reverted it.
 
-The port is correct. Written with `@gmod/bam`'s empty-prefix fallback, and with
-the floor dropped from `MAX_CONCURRENT_CHUNK_READS` to 1 (`getLines` starts its
-read-ahead at one and can return inside the first chunk, so one chunk is the
-least it ever reads), it is **safe**: over the whole fixture sweep, zero queries
-forecast under what they read.
+We wrote the port with `@gmod/bam`'s empty-prefix fallback and dropped the floor
+from `MAX_CONCURRENT_CHUNK_READS` to 1, the least `getLines` ever reads, since
+it starts its read-ahead at one and can return inside the first chunk. Over the
+whole fixture sweep zero queries forecast under what they read, so the port is
+correct and **safe**.
 
-The port does not pay off. Across that sweep exactly **one** row changed:
-`raw.g.vcf.gz` at a 10kb window went from 278kb to 150kb, exactly what the query
-reads. Every other row was unchanged, including both rows above where the
-over-report is worst.
+The port does not pay off, because exactly **one** row changed across that
+sweep: `raw.g.vcf.gz` at a 10kb window went from 278kb to 150kb, exactly what
+the query reads. Every other row was unchanged, including both rows above where
+the over-report is worst.
 
 ## Why it cannot help where it is needed
 

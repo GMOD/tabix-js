@@ -158,10 +158,10 @@ GFF that inflates 18.6x, the four-worker call spends 58% of its time in that
 copy. The copy is one reason the 1.83x is not higher, but it does not explain
 the 1.4x end-to-end figure.
 
-**A node benchmark cannot measure any of this.** `getSharedWorkerPool()`
-resolves to `undefined` under node, so both arms of a node benchmark run the
-in-process path and always report parity. Every number above comes from a
-browser.
+**A node benchmark cannot measure any of this**, so every number above comes
+from a browser. Under node `getSharedWorkerPool()` resolves to `undefined`, and
+both arms of a node benchmark then run the in-process path and always report
+parity.
 
 [`@gmod/bam`'s ADR 0022](https://github.com/GMOD/bam-js/blob/main/agent-docs/architecture-decision-records/0022-the-wasm-boundary-sits-at-the-bgzf-block.md)
 gives the full argument for why the call crosses the wasm boundary once per
@@ -183,8 +183,8 @@ never forecast less than a query read, but exactly one row changed on this
 corpus. It cannot help on the two kinds of file where a consumer's byte gate
 fires in practice:
 
-- A GFF whose first record spans the chromosome pins every linear-index entry to
-  offset 0, so the bound cuts nothing. Every NCBI RefSeq GFF opens that way.
+- A GFF whose first record spans the chromosome, as every NCBI RefSeq GFF's
+  does, pins every linear-index entry to offset 0, so the bound cuts nothing.
 - A dense VCF reads all of its few enormous chunks anyway.
 
 The forecast needs a long candidate chunk list of which a query reads a short

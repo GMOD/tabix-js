@@ -24,10 +24,11 @@ of chr1, the process peaked at **2027MB RSS** while panning 23 windows of 50kb.
 
 ## Decision
 
-Budget by decompressed bytes. `ByteBoundedChunkCache` implements the backing-
-store interface `AbortablePromiseCache` expects and evicts from the
-least-recently-used end until it is under budget. `chunkCacheSize` now means
-bytes, and defaults to 100MB, matching `bam-js`'s `DEFAULT_MAX_CACHE_BYTES`.
+`ByteBoundedChunkCache` budgets by decompressed bytes, evicting from the
+least-recently-used end until it is under budget, and implements the
+backing-store interface `AbortablePromiseCache` expects. `chunkCacheSize` now
+means bytes, and defaults to 100MB, matching `bam-js`'s
+`DEFAULT_MAX_CACHE_BYTES`.
 
 A chunk's size is unknown until its read settles, so `set` records the entry
 immediately and charges it to the budget on resolve. An unsettled entry counts
@@ -64,9 +65,9 @@ The byte budget still dominates the entry cache at every point on the curve in
 the table. To match the old 32 reads it needs ~400–500MB against the old cache's
 1600MB, the same I/O for a quarter of the memory.
 
-Ordinary files do not thrash. The same experiment on `ncbi_human.sorted.gff.gz`
-reads 19 chunks at every budget from 10MB up, while peak cache falls from 39.5MB
-to 10MB.
+On an ordinary file such as `ncbi_human.sorted.gff.gz`, the same experiment
+reads 19 chunks at every budget from 10MB up without thrashing, and peak cache
+falls from 39.5MB to 10MB.
 
 ## Limitations
 

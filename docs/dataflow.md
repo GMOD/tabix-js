@@ -15,14 +15,14 @@ one of them decompresses BGZF blocks. Index parsing and the line scan run in JS.
 through the wasm decompressor, unlike in `@gmod/bam`, where a `.bai` is raw
 bytes.
 
-The purple node is opt-in. With a `bgzfWorkerPool`, chunk decompression runs off
-the main thread, and without one the same code runs in-process. The pool takes
-over only the decompression, not the line scan, so the diagram draws the pool as
-one node on a dashed edge.
+The purple node is the optional `bgzfWorkerPool`, which runs chunk decompression
+off the main thread; without a pool the same code runs in-process. The pool
+takes over only the decompression, not the line scan, so the diagram draws the
+pool as one node on a dashed edge.
 [bam-js](https://github.com/GMOD/bam-js/blob/main/docs/dataflow.md) takes the
 same pool from the same `@gmod/bgzf-filehandle`.
 
-The diagram shows only the main path. It leaves out the header reads, the
+The diagram shows only the main path, leaving out the header reads, the
 read-ahead window that sets how far ahead of the scan to fetch, and the
 plain-gzip fallback `unzip` takes for non-BGZF input. The first two are in
 [optimizations.md](optimizations.md), which explains why each step of this path

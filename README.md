@@ -49,9 +49,9 @@ which merges the scattered block reads of a query into a few requests.
 - A query fetches the index once, then reads each BGZF block that the index
   points to as a separate byte range. The cache reads in 256 KiB chunks, so
   neighboring blocks share one request.
-- Overlapping queries re-read the same blocks. Over twenty half-overlapping
-  windows panned across the 3.4 MB test BED file, tabix-js reads 11 MB without
-  the cache, and with the cache it fetches each byte once.
+- Because overlapping queries re-read the same blocks, twenty half-overlapping
+  windows panned across the 3.4 MB test BED file read 11 MB without the cache,
+  and with the cache tabix-js fetches each byte once.
 
 A bare `url` uses `RemoteFile` from generic-filehandle2, which sends one request
 per read and caches nothing.
