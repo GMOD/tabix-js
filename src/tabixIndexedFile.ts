@@ -341,6 +341,16 @@ function firstLines(bytes: Uint8Array, count: number) {
     .slice(0, count)
 }
 
+// A NaN end loops forever in maxOffset, and a NaN start matches no line. An
+// infinite end stays allowed: it reads to the end of the sequence.
+function checkNotNaN(start: number, end: number) {
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    throw new TypeError(
+      `invalid start and end coordinates ${start} and ${end}. both must be numbers`,
+    )
+  }
+}
+
 function parseIntFromBytes(buffer: Uint8Array, start: number, end: number) {
   let val = 0
   for (let i = start; i < end; i++) {
@@ -626,6 +636,7 @@ export default class TabixIndexedFile {
   ) {
     const all: Chunk[] = []
     for (const { refName, start, end } of regions) {
+      checkNotNaN(start, end)
       const chunks = await this.index.blocksForRange(refName, start, end, opts)
       for (const chunk of chunks) {
         all.push(chunk)
@@ -667,6 +678,7 @@ export default class TabixIndexedFile {
     const metadata = await this.index.getMetadata(options)
     const start = s ?? 0
     const end = e ?? metadata.maxRefLength
+    checkNotNaN(start, end)
     if (start > end) {
       throw new TypeError(
         'invalid start and end coordinates. start must be less than or equal to end',

@@ -689,3 +689,22 @@ test('getSkippedLines reads nothing when the index counted none', async () => {
   expect(await f.getSkippedLines()).toEqual([])
   expect(filehandle.reads).toBe(0)
 })
+
+test('a NaN start or end throws instead of looping forever', async () => {
+  const f = new TabixIndexedFile({
+    path: new URL('data/volvox.test.vcf.gz', import.meta.url).pathname,
+    tbiPath: new URL('data/volvox.test.vcf.gz.tbi', import.meta.url).pathname,
+  })
+  const items = new RecordCollector()
+  await expect(
+    f.getLines('contigA', 1000, Number.NaN, items.callback),
+  ).rejects.toThrow(TypeError)
+  await expect(
+    f.getLines('contigA', Number.NaN, 4000, items.callback),
+  ).rejects.toThrow(/NaN and 4000/)
+  await expect(
+    f.bytesForRegions([{ refName: 'contigA', start: 1000, end: Number.NaN }]),
+  ).rejects.toThrow(TypeError)
+  await f.getLines('contigA', 0, Number.POSITIVE_INFINITY, items.callback)
+  expect(items.records.length).toBe(109)
+})
