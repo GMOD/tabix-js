@@ -23,14 +23,14 @@ Or build them yourself, then run the benchmarks as often as you like:
 ## How it works
 
 1. `scripts/build-both-branches.sh` builds each ref in a throwaway git worktree,
-   so your own checkout is never switched — but each ref is built as committed,
+   so the script never switches your checkout. It builds each ref as committed,
    so commit before benchmarking
-2. The builds land in `esm_branch1/` and `esm_branch2/`, alongside a
-   `branchname.txt` the benchmark labels each side with
+2. The script writes the builds to `esm_branch1/` and `esm_branch2/`, alongside
+   a `branchname.txt` that the benchmark reads to label each side
 3. `tabix.bench.ts` imports both builds and runs them side by side
 
-The two directories stick around afterwards, so a bare `pnpm benchonly` will
-compare whatever was built there last.
+The script leaves `esm_branch1/` and `esm_branch2/` in place, so a bare
+`pnpm benchonly` compares whatever the script last built there.
 
 ## Benchmark files
 

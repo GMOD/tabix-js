@@ -14,20 +14,21 @@
 | `csiUrl`                  | `string?`            | CSI index URL                                                                                                                                                                                                                                     |
 | `csiFilehandle`           | `GenericFilehandle?` | CSI index filehandle                                                                                                                                                                                                                              |
 | `chunkCacheSize`          | `number?`            | Chunk LRU cache budget, in _decompressed_ bytes (default 1 GiB). A retention bound, not a bound on peak memory. Size it to hold several queries: below one query's working set the hit rate drops to zero while the cache holds the memory anyway |
-| `chunkCacheIdleTimeoutMs` | `number?`            | Drop a cached chunk once nothing has read it for this long (default 3 minutes, `0` disables). The only thing that lowers the cache while nothing is happening, making the budget above a peak rather than a resting level                         |
+| `chunkCacheIdleTimeoutMs` | `number?`            | Drop a cached chunk once nothing has read it for this long (default 3 minutes, `0` disables). The only mechanism that shrinks an idle cache, so the budget above is a peak rather than a resting level                                            |
 | `chunkCacheBudget`        | `SharedBudget?`      | A `@gmod/shared-read-cache` budget shared with other files, so the ceiling applies to their sum rather than to each — see [caching.md](caching.md#chunkcachebudget-bounds-a-consumer-with-many-files)                                             |
-| `bgzfWorkerPool`          | `BgzfWorkerPool?`    | A `@gmod/bgzf-filehandle` pool to inflate this file's chunks on. Accepts the promise `getSharedWorkerPool()` returns, and `undefined` keeps the in-process path — see [the README](../README.md#decompressing-on-a-worker-pool)                   |
+| `bgzfWorkerPool`          | `BgzfWorkerPool?`    | A `@gmod/bgzf-filehandle` pool to inflate this file's chunks on. Accepts the promise `getSharedWorkerPool()` returns; with `undefined`, decompression runs in-process. See [the README](../README.md#decompressing-on-a-worker-pool)              |
 
-Every method taking `opts?` takes `signal` and `onProgress`, the latter
-reporting the `.tbi`/`.csi` download when that call triggers it — a whole-file
-read, so it streams real byte progress rather than chunk steps.
+Every method that takes `opts?` accepts `signal` and `onProgress`. `onProgress`
+reports the `.tbi`/`.csi` download when that call triggers it, and the index
+download is a whole-file read, so it reports byte-level progress rather than one
+step per chunk.
 
 ## `clearChunkCache()`
 
 Drops every decompressed chunk this file holds, and stops the idle sweep until
-something is cached again. For a consumer that knows it is finished with a file
-— a closed track — where `chunkCacheIdleTimeoutMs` is for one the user has
-merely wandered away from.
+the cache holds something again. Call it when a consumer knows it is finished
+with a file, such as a closed track; `chunkCacheIdleTimeoutMs` covers a file the
+user has only stopped looking at.
 
 ## `getLines(refName, start, end, opts)`
 
@@ -54,23 +55,24 @@ The header as raw bytes.
 ## `getSkippedLines(opts?): Promise<string[]>`
 
 The leading lines the index's skip count covers (`tabix -S N`), or `[]` when it
-records none. This is where a file with an uncommented header row keeps it, as
-PLINK `.ld`, bedGraph and BED deflines routinely do.
+records none. `getSkippedLines` returns the uncommented header row of a file
+that has one, as PLINK `.ld`, bedGraph and BED deflines routinely do.
 
-Separate from `getHeader` because htslib treats the two differently: a line is
-not data when the index's skip count covers it **or** it starts with the meta
-character, but `tabix -H` prints only the latter.
+`getSkippedLines` is separate from `getHeader` because htslib treats the two
+differently: a line is not data when the index's skip count covers it **or** it
+starts with the meta character, but `tabix -H` prints only the latter.
 
 ## `getHeaderLines(opts?): Promise<string[]>`
 
-The file's header lines however the file keeps them: the commented block when
-there is one, otherwise the rows the index counted, dropping empty lines.
+The file's header lines in whichever form the file stores them: the commented
+block when there is one, otherwise the rows the index counted, dropping empty
+lines.
 
-Usually the one you want. `getHeader` alone cannot tell a file that has no
-header from one whose header is not commented — both come back as the empty
-string — so callers fall back to an assumed column layout and quietly mis-name
-columns. A single read of the leading blocks yields both forms, shared with
-`getHeader` and `getSkippedLines`.
+Use this method in most cases. `getHeader` alone cannot tell a file that has no
+header from one whose header is not commented, because it returns the empty
+string for both, so callers fall back to an assumed column layout and mis-name
+columns with no error. A single read of the leading blocks gives both forms, and
+`getHeader` and `getSkippedLines` share that read.
 
 ## `getReferenceSequenceNames(opts?): Promise<string[]>`
 

@@ -43,15 +43,15 @@ const cached = new TabixIndexedFile({
 ```
 
 Over HTTP, pass a filehandle from
-[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle).
-It turns the scattered block reads of a query into a few requests:
+[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle),
+which merges the scattered block reads of a query into a few requests.
 
-- A query fetches the index once, then reads each BGZF block it points at as a
-  separate byte range. The cache reads in 256 KiB chunks, so neighboring blocks
-  share one request.
-- Overlapping queries re-read the same blocks. Panning twenty half-overlapping
-  windows across the 3.4 MB test BED file reads 11 MB without the cache. With
-  it, each byte is fetched once.
+- A query fetches the index once, then reads each BGZF block that the index
+  points to as a separate byte range. The cache reads in 256 KiB chunks, so
+  neighboring blocks share one request.
+- Overlapping queries re-read the same blocks. Over twenty half-overlapping
+  windows panned across the 3.4 MB test BED file, tabix-js reads 11 MB without
+  the cache, and with the cache it fetches each byte once.
 
 A bare `url` uses `RemoteFile` from generic-filehandle2, which sends one request
 per read and caches nothing.
@@ -89,12 +89,12 @@ await file.getLines('chr1', 200, 300, {
 })
 ```
 
-`onProgress` ticks once per chunk, the run of BGZF blocks the index resolves a
-query to.
+`onProgress` ticks once per chunk, where a chunk is a run of BGZF blocks that
+the index lists for the query.
 
-- Chunks already cached tick instantly.
-- The index supplies `totalBytes` up front, enough for a determinate progress
-  bar.
+- A chunk already in the cache ticks immediately.
+- `totalBytes` comes from the index and is known up front, enough to draw a
+  determinate progress bar.
 
 Notes:
 
@@ -109,14 +109,14 @@ Notes:
 
 ### GAF
 
-Reads `tabix -p gaf` indexes of sorted GAF (e.g. from `vg gamsort`):
+tabix-js reads `tabix -p gaf` indexes of sorted GAF (e.g. from `vg gamsort`):
 
 - `refName` is ignored; `getReferenceSequenceNames()` returns `[]`
 - `start`/`end` are node ids: a read matches when its lowest-to-highest node
   range `[min, max]` touches any of `start..end-1`, the same reads as
   `tabix file.gaf.gz "{x}:start-end"` (no `+1`)
 - The callback gets `min` and `max + 1`
-- Reads whose path is a stable sequence name (no `>`/`<`) are skipped
+- `getLines` skips reads whose path is a stable sequence name (no `>`/`<`)
 
 ### Without NPM (CDN)
 
@@ -130,13 +130,14 @@ opening the file directly.
 
 ## How a query flows
 
-`getLines` turns a region into BGZF chunks through the index and decompresses
-each one in wasm, index reads included, since `.tbi` and `.csi` are bgzipped
-too. The rest is ordinary JS: it matches lines as bytes and decodes only the
-ones you asked for. [docs/dataflow.md](docs/dataflow.md) has the diagram.
+`getLines` looks up a region's BGZF chunks in the index and decompresses each
+chunk in wasm. Index reads go through wasm too, since `.tbi` and `.csi` are
+bgzipped. The code after decompression is ordinary JS, which matches lines as
+bytes and decodes only the lines the query asked for.
+[docs/dataflow.md](docs/dataflow.md) has the diagram.
 
-The file holds on to decompressed chunks, so overlapping and adjacent queries
-skip inflating again.
+`TabixIndexedFile` keeps decompressed chunks, so overlapping and adjacent
+queries skip inflating them again.
 
 - The cache holds up to 1GB per file and drops chunks after three idle minutes.
 - A consumer holding one file per track should bound them together with a shared
@@ -145,8 +146,8 @@ skip inflating again.
 
 ## Decompressing on a worker pool
 
-BGZF blocks inflate independently, so that decompression can spread across
-threads.
+Each BGZF block decompresses independently of the others, so a worker pool can
+spread decompression across threads.
 
 ```typescript
 import { getSharedWorkerPool } from '@gmod/bgzf-filehandle'
@@ -158,16 +159,17 @@ const file = new TabixIndexedFile({
 })
 ```
 
-Safe to pass unconditionally:
+You can pass the pool unconditionally:
 
 - `getSharedWorkerPool()` returns `undefined` under node, or anywhere the host
-  forbids Workers, which keeps the in-process path.
-- No cross-origin isolation is needed.
+  forbids Workers, and tabix-js then decompresses in-process.
+- The pool needs no cross-origin isolation.
 - tabix-js never creates a pool on its own, so the consumer controls the thread
   budget.
 
 On a multi-sample VCF the pool speeds up end-to-end queries by about 1.4x.
-Per-line byte scanning and string decoding set that ceiling, not decompression.
+Per-line byte scanning and string decoding limit that speedup, not
+decompression.
 
 Worker counts, lifecycle and benchmarks are in
 [bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md).

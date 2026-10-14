@@ -7,14 +7,14 @@ description:
 
 # Todo
 
-One file per item under [todo/](todo/). Each carries its table row in its own
-frontmatter: `metadata.category` picks the table, `area` and `first_move` are
-the columns, `order` is where it sits. This index has no generator, so add or
-remove a row here when you add or remove an entry.
+Each item has one file under [todo/](todo/), and the file's frontmatter holds
+its table row: `metadata.category` is the table, `area` and `first_move` are the
+columns, and `order` is the row's position. This index has no generator, so add
+or remove a row here when you add or remove an entry.
 
-Most items are blocked on a measurement rather than on typing;
-[architecture-decision-records/](architecture-decision-records/) is full of
-changes that were obvious, unmeasured, and wrong.
+Most items need a measurement before any code.
+[architecture-decision-records/](architecture-decision-records/) records several
+changes that looked obvious and proved wrong once measured.
 
 ## Needs a visual call
 

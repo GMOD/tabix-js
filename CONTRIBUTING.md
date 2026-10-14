@@ -25,9 +25,10 @@ same commit:
 dot -Tsvg docs/img/dataflow.dot -o docs/img/dataflow.svg
 ```
 
-No automated check catches this — graphviz is not a dependency and different
-versions emit different SVG bytes, so a staleness check would fail on toolchain
-drift rather than on a stale diagram.
+Re-rendering is a manual step, because graphviz is not a dependency and
+different graphviz versions emit different SVG bytes. An automated comparison
+would fail whenever the graphviz version changed, even with an up-to-date
+diagram.
 
 ## Publishing
 
@@ -35,15 +36,14 @@ Releases publish automatically via GitHub Actions using npm trusted publishing
 (OIDC, no stored token). The workflow requires `--provenance` and
 `id-token: write` permissions.
 
-There is deliberately no `prepublishOnly` script: `preversion` gates the local
-side and the publish job's `needs: test` gates CI, so adding one just runs
-lint/test/build a third time per release.
+The repo has no `prepublishOnly` script on purpose. `preversion` runs the checks
+locally and the publish job's `needs: test` runs them in CI, so a
+`prepublishOnly` would run lint/test/build a third time per release.
 
-This repo is already configured. To set up a new package:
+This repo is already configured. To set up a new package, run
 `npm trust github <pkg> --file publish.yml --repo GMOD/<repo>` (requires
 npm >=11.10.0 and 2FA).
 
 Once npm publish succeeds, the `release` job creates the GitHub release for the
-tag, taking its notes from that version's CHANGELOG.md section — which
-`scripts/release-notes.sh` extracts, so run that with a version to preview a
-release's notes.
+tag. `scripts/release-notes.sh` extracts the notes from that version's
+CHANGELOG.md section, so run it with a version to preview a release's notes.

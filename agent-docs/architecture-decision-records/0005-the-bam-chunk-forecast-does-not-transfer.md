@@ -10,16 +10,16 @@ offers. `getLines` reads far fewer than that on a sparse file: it walks the
 chunks in order and `return`s at the first record whose start is past the query
 end, so what it reads is a **prefix**.
 
-`@gmod/bam` had exactly this shape and fixed it. Its `estimatedBytesForRegions`
+`@gmod/bam` had the same over-count and fixed it. Its `estimatedBytesForRegions`
 runs `chunksLikelyRead` first, which cuts the chunk list at the linear-index
 entry one window past the query, and its ADR 0017 measured the difference at
 **5.6x** — 43.5MB reported against the 7.8MB a 380bp window actually reads. The
-number matters because it is what a consumer's "too much data" banner reads, and
-a reader cannot answer an inflated one by zooming: every window narrower than a
-linear-index interval resolves to the same chunks and the same number.
+forecast matters because a consumer's "too much data" banner shows it, and a
+user cannot get under an inflated forecast by zooming in: every window narrower
+than a linear-index interval maps to the same chunks and the same number.
 
-The over-report is real here too. Forecast against bytes actually read, `tbi`
-fixtures, one region per row:
+tabix-js over-reports too. The table compares the forecast with the bytes
+actually read, on `tbi` fixtures, one region per row:
 
 | fixture                  | window | all chunks | actually read | ratio |
 | ------------------------ | ------ | ---------- | ------------- | ----- |
@@ -30,24 +30,24 @@ fixtures, one region per row:
 
 ## Decision
 
-**Do not port `chunksLikelyRead`.** It was implemented, measured across every
-`.tbi` fixture in `test/data`, and reverted.
+**Do not port `chunksLikelyRead`.** We implemented it, measured it across every
+`.tbi` fixture in `test/data`, and reverted it.
 
-It is not that the port is wrong. Written with `@gmod/bam`'s empty-prefix
-fallback, and with the floor dropped from `MAX_CONCURRENT_CHUNK_READS` to 1
-(`getLines` starts its read-ahead at one and can return inside the first chunk,
-so one chunk is the least it ever reads), it is **safe**: over the whole fixture
-sweep, zero queries forecast under what they read.
+The port is correct. Written with `@gmod/bam`'s empty-prefix fallback, and with
+the floor dropped from `MAX_CONCURRENT_CHUNK_READS` to 1 (`getLines` starts its
+read-ahead at one and can return inside the first chunk, so one chunk is the
+least it ever reads), it is **safe**: over the whole fixture sweep, zero queries
+forecast under what they read.
 
-It simply does not pay. Across that sweep exactly **one** row moved —
-`raw.g.vcf.gz` at a 10kb window, 278kb down to 150kb, landing exactly on what
-the query reads. Every other row was unchanged, including both rows above where
-the over-report is worst.
+The port does not pay off. Across that sweep exactly **one** row changed:
+`raw.g.vcf.gz` at a 10kb window went from 278kb to 150kb, exactly what the query
+reads. Every other row was unchanged, including both rows above where the
+over-report is worst.
 
 ## Why it cannot help where it is needed
 
-**The linear index is pinned by a long feature, and that is the normal case for
-GFF.** `ncbi_human.sorted.gff.gz` opens with
+**A long feature pins the linear index, and that is the normal case for GFF.**
+`ncbi_human.sorted.gff.gz` opens with
 
 ```
 NC_000001.11  RefSeq  region  1  248956422  ...
@@ -55,48 +55,49 @@ NC_000001.11  RefSeq  region  1  248956422  ...
 
 a feature spanning the whole chromosome, at file offset 0. The linear index
 entry for a window is the smallest offset of any record overlapping it, so that
-one feature pins **every** entry on the reference to 0. The bound then lands at
-or before the query's own first chunk, orders nothing, and the fallback
+one feature pins **every** entry on the reference to 0. The bound then falls at
+or before the query's first chunk, so the prefix is empty, and the fallback
 correctly returns every chunk. Every NCBI RefSeq GFF begins with that record, so
 this is the representative case rather than a bad fixture.
 
-**On a dense VCF there is nothing to forecast away.** `1kg.chr1.subset.vcf.gz`
-already measures 1.00x: its bins hold few, enormous chunks and the query reads
-all of them.
+**A dense VCF has no over-report to remove.** `1kg.chr1.subset.vcf.gz` already
+measures 1.00x: its bins hold few, enormous chunks and the query reads all of
+them.
 
-Those two shapes are where a consumer's byte gate actually fires, and the
-forecast is powerless on both.
+A consumer's byte gate fires in practice on these two kinds of file, a GFF with
+a chromosome-spanning feature and a dense VCF, and the forecast changes neither.
 
 ## Why `@gmod/bam` differs
 
-Not a difference in the forecast — a difference in what `blocksForRange`
-returns. On a deep BAM pileup a narrow window inherits every chunk of every
-overlapping bin at every level, which is how ADR 0017 gets 90 chunks and 43.5MB
-for a 380bp window against 6 chunks read. Tabix bins over VCF/GFF hold far fewer
-chunks, and the scan's own early return already keeps the read short. The
-premise the forecast needs — _a long ordered list of candidate chunks, of which
-a short prefix is read_ — is a BAM property, not a tabix one.
+`@gmod/bam` and tabix-js forecast the same way, and differ in what
+`blocksForRange` returns. On a deep BAM pileup, `blocksForRange` returns every
+chunk of every overlapping bin at every level for a narrow window, which is how
+bam's ADR 0017 counts 90 chunks and 43.5MB for a 380bp window against 6 chunks
+read. Tabix bins over VCF/GFF hold far fewer chunks, and the early return in
+`getLines` already keeps the read short. The forecast needs _a long ordered list
+of candidate chunks, of which a short prefix is read_, and that list is a
+property of BAM files, not of tabix ones.
 
 ## This has been tried before, and the earlier attempt failed differently
 
-The first port measured **wrong**, not merely useless: on the 1000 Genomes SV
+The first port measured **wrong**, not merely useless. On the 1000 Genomes SV
 callset, whose 1.4Mb deletions pin the linear-index entry at the data start, it
-forecast 0.04MB against the 0.22MB the query read. Under-forecasting is the
-dangerous direction, since a consumer gate that believes it will let a query
-through that it should have stopped.
+forecast 0.04MB against the 0.22MB the query read. An under-forecast is the
+dangerous direction, because a consumer gate that trusts it lets through a query
+it should have stopped.
 
-That is what motivated the empty-prefix fallback now in `@gmod/bam`'s
-`chunksLikelyRead`, and this attempt carried it — which is why this one is safe
-where that one was not. Recording both outcomes so the next person does not have
-to rediscover either: **it is safe now, and it still does not pay.**
+The under-forecast on the SV callset motivated the empty-prefix fallback now in
+`@gmod/bam`'s `chunksLikelyRead`. The second attempt included the fallback,
+which is why it is safe where the first was not. This ADR records both outcomes
+so the next person does not have to rediscover either: **the port is safe now,
+and it still does not pay off.**
 
 ## If someone picks this up anyway
 
-Only with a fixture where the linear index is not pinned — meaning no
-chromosome-spanning feature — and where `blocksForRange` returns a long chunk
-list. If you cannot name such a file that a consumer actually loads, there is
-nothing here to win.
+Start only from a fixture with no chromosome-spanning feature to pin the linear
+index, and where `blocksForRange` returns a long chunk list. If you cannot name
+such a file that a consumer actually loads, the port has nothing to gain.
 
-The harness is a `bytesForRegions`-vs-`getLines` comparison with a counting
-filehandle, taking both arms from one process so they cannot drift; the check
-that matters is `likely >= actual` on every row.
+The harness compares `bytesForRegions` with `getLines` through a counting
+filehandle, and runs both arms in one process so the two stay comparable. The
+check that matters is `likely >= actual` on every row.

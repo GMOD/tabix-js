@@ -4,24 +4,23 @@ Status: Accepted
 
 ## Context
 
-`TabixIndexedFile` caches the result of `readChunk` — a `ReadChunk`, whose
-`buffer` is the chunk's fully **decompressed** bytes. We fetch compressed and
-cache decompressed; those are different numbers, and the old cache conflated
-them:
+`TabixIndexedFile` caches the result of `readChunk`, a `ReadChunk` whose
+`buffer` holds the chunk's fully **decompressed** bytes. The reader fetches
+compressed bytes and caches decompressed bytes, and the old cache conflated the
+two sizes:
 
 ```ts
 cache: new LRU({ maxSize: Math.floor(chunkCacheSize / (1 << 16)) })
 ```
 
 `maxSize` in quick-lru is an **item count**, and the divisor is the max BGZF
-_block_ size. So a `chunkCacheSize` of 5MB became "80 entries" — but an entry is
-a whole chunk, which spans many blocks and is held inflated. quick-lru also
-keeps between `maxSize` and `2 × maxSize` items by design, so the real ceiling
-was 160 chunks of unbounded size.
+_block_ size. So a `chunkCacheSize` of 5MB became "80 entries", but an entry is
+a whole chunk, which spans many blocks and which the cache stores inflated.
+quick-lru also keeps between `maxSize` and `2 × maxSize` items by design, so the
+real ceiling was 160 chunks of unbounded size.
 
-How badly that misses is easy to underestimate. On
-`test/data/1kg.chr1.subset.vcf.gz` — 213MB of samples packed into ~600kb of chr1
-— panning 23 windows of 50kb peaked at **2027MB RSS**.
+On `test/data/1kg.chr1.subset.vcf.gz`, which packs 213MB of samples into ~600kb
+of chr1, the process peaked at **2027MB RSS** while panning 23 windows of 50kb.
 
 ## Decision
 
@@ -31,20 +30,21 @@ least-recently-used end until it is under budget. `chunkCacheSize` now means
 bytes, and defaults to 100MB, matching `bam-js`'s `DEFAULT_MAX_CACHE_BYTES`.
 
 A chunk's size is unknown until its read settles, so `set` records the entry
-immediately and charges it to the budget on resolve. Unsettled entries are free,
-which is the behaviour we want: they are reads a query is currently waiting on.
+immediately and charges it to the budget on resolve. An unsettled entry counts
+as zero bytes, which is the behaviour we want, because it is a read that a query
+is still waiting on.
 
-The `entries.size > 1` guard is kept from bam-js — a single chunk larger than
-the whole budget is still cached, because the caller needs it for the query in
-flight and dropping it only buys a re-decompress.
+We kept the `entries.size > 1` guard from bam-js, so the cache still holds a
+single chunk larger than the whole budget. The caller needs that chunk for the
+query in flight, and dropping it would only force a second decompress.
 
-Evicting mid-query never causes a re-read: `getLines` holds every chunk's
-promise in its `reads[]` array, and our `delete` is a plain `Map` delete that
-does not touch `AbortablePromiseCache`'s abort path.
+An eviction mid-query never causes a re-read, because `getLines` holds every
+chunk's promise in its `reads[]` array, and our `delete` is a plain `Map` delete
+that does not touch `AbortablePromiseCache`'s abort path.
 
 ## Consequences
 
-Panning the dense VCF above, 23 windows of 50kb:
+A pan of 23 windows of 50kb across the dense VCF above gave these results:
 
 | cache               | reads | fetched | peak cache | peak RSS |
 | ------------------- | ----- | ------- | ---------- | -------- |
@@ -56,34 +56,33 @@ Panning the dense VCF above, 23 windows of 50kb:
 | byte 250MB          | 34    | 250MB   | 249MB      |          |
 | byte 500MB          | 32    | 218MB   | 497MB      |          |
 
-Two things to read off it. The budget **does** thrash once the working set
-exceeds it — 32 reads become 52, and bytes fetched double. And the minimum-entry
-floor and the budget are the same dial: they trace one curve, so there is no
-second knob to tune.
+The budget **does** thrash once the working set exceeds it: 32 reads become 52,
+and bytes fetched double. The minimum-entry floor and the budget trace one
+curve, so the floor is not a second parameter to tune.
 
-But the byte budget dominates the entry cache at every point on that curve. To
-match the old 32 reads it needs ~400–500MB against the old 1600MB — the same I/O
-for a quarter of the memory.
+The byte budget still dominates the entry cache at every point on the curve in
+the table. To match the old 32 reads it needs ~400–500MB against the old cache's
+1600MB, the same I/O for a quarter of the memory.
 
-On ordinary files none of this bites. The same experiment on
-`ncbi_human.sorted.gff.gz` reads 19 chunks at every budget from 10MB up, while
-peak cache falls from 39.5MB to 10MB.
+Ordinary files do not thrash. The same experiment on `ncbi_human.sorted.gff.gz`
+reads 19 chunks at every budget from 10MB up, while peak cache falls from 39.5MB
+to 10MB.
 
-## What this does not fix
+## Limitations
 
-The cache unit is one index chunk, and on dense files that unit is simply too
-big for any budget to work well.
+The cache unit is one index chunk, and on dense files that unit is too big for
+any budget to work well.
 
-It is tempting to blame `optimizeChunks`, which merges spans up to 5MB
-_compressed_ — at this file's 7–8× ratio that would be 40MB inflated. **That is
+`optimizeChunks` looks like the cause, since it merges spans up to 5MB
+_compressed_, which at this file's 7–8× ratio would be 40MB inflated. **It is
 not the cause.** The raw `.tbi` chunks for chr1 are already 17.65MB and 17.15MB
 compressed before `optimizeChunks` sees them, so the 5MB limit cannot reach
 them. A single finest-level bin covers 16kb of sequence, and in a file with
-213MB across 600kb of coordinates that bin holds ~120MB decompressed. It is
-index granularity, not merge policy — bounding merges by estimated decompressed
-size would change nothing here.
+213MB across 600kb of coordinates that bin holds ~120MB decompressed. The index
+granularity sets the chunk size, not the merge policy, so bounding merges by
+estimated decompressed size would change nothing here.
 
-The only way to a smaller unit is to cache at BGZF block level rather than chunk
-level. `unzipChunkSlice` already computes the block boundaries (`cpositions` /
-`dpositions`), so the information is there, but it changes the cache key and the
-read path and wants its own ADR.
+A smaller unit requires caching at BGZF block level rather than chunk level.
+`unzipChunkSlice` already computes the block boundaries (`cpositions` /
+`dpositions`), but block-level caching changes the cache key and the read path,
+so it needs an ADR of its own.
