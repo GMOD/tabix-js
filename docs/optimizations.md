@@ -1,10 +1,7 @@
 # Optimizations
 
-This doc explains why the query path looks the way it does, and
-[dataflow.md](dataflow.md) draws the path itself.
-
-Most of the query path exists because two things dominate a query: network round
-trips, and inflating more bytes than the answer needs.
+Two things dominate a query: network round trips, and inflating more bytes than
+the answer needs. [dataflow.md](dataflow.md) draws the path itself.
 
 ## Reading the index
 
@@ -108,21 +105,9 @@ performance here.
 
 ## The chunk cache
 
-The cache counts decompressed bytes rather than entries, and we size it above
-one query. The reader fetches compressed bytes and caches decompressed ones, so
-an entry count does not bound memory: a single bin of `1kg.chr1.subset.vcf.gz`
-is 17MB compressed and 120MB inflated.
-
-A cache sized below one query's working set caches _nothing_. The cache evicts
-each entry before the next pan can reuse it, so the hit rate is zero and every
-pan pays for the inflate again. On the 1kg fixture, a six-window pan took 17
-refills out of 17 at 100MB against 0 at 800MB, and 2596ms against 600ms (ADRs
-0001 and 0002).
-
-The cache also shares reads already in flight, so concurrent queries hitting one
-chunk inflate it once. A three minute idle timeout makes the 1GB default a peak
-under panning rather than a resting level, and `chunkCacheBudget` lets many
-files share one ceiling instead of each holding its own.
+The cache counts decompressed bytes, is sized above one query, and shares reads
+already in flight, so concurrent queries hitting one chunk inflate it once.
+[caching.md](caching.md) has the sizing measurements (ADRs 0001 and 0002).
 
 ## The header
 
@@ -208,14 +193,10 @@ decisions across its nine tabix-backed adapters:
   the fan-out costs one pass over the compressed bytes and needs no cross-origin
   isolation. Expect less than the 1.95x `@gmod/bam` measures, for the reason in
   [Decompression](#decompression) above.
-- **One `chunkCacheBudget` per JS context**, likewise. `chunkCacheSize` is per
-  file, so it does not bound the total for a consumer that opens one file per
-  track. On the BAM side, three deep tracks retained 1109MB while every cache
-  stayed well under its 1GB ceiling. A shared budget also lets tracks nobody is
-  looking at give up their space to the one the user is panning, whereas
-  dividing the ceiling by the track count can put each file below one query's
-  working set (see [The chunk cache](#the-chunk-cache) above).
-  [caching.md](caching.md) covers the budget in full, with code.
+- **One `chunkCacheBudget` per JS context**, likewise, because `chunkCacheSize`
+  is per file. On the BAM side, three deep tracks retained 1109MB while every
+  cache stayed well under its 1GB ceiling. [caching.md](caching.md) covers the
+  budget in full, with code.
 - **A coalescing range cache under the filehandle**, which fetches in 256KB
   aligned blocks and joins contiguous runs into one request. The range cache
   composes with the chunk merging above rather than replacing it: the range

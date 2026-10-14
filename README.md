@@ -42,19 +42,11 @@ const cached = new TabixIndexedFile({
 })
 ```
 
-Over HTTP, pass a filehandle from
-[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle),
-which merges the scattered block reads of a query into a few requests:
-
-- A query fetches the index once, then reads each BGZF block that the index
-  points to as a separate byte range. The cache reads in 256 KiB chunks, so
-  neighboring blocks share one request.
-- Because overlapping queries re-read the same blocks, twenty half-overlapping
-  windows panned across the 3.4 MB test BED file read 11 MB without the cache,
-  and with the cache tabix-js fetches each byte once.
-
-A bare `url` uses `RemoteFile` from generic-filehandle2, which sends one request
-per read and caches nothing.
+A bare `url` sends one request per read and caches nothing.
+[`@gmod/range-cache-filehandle`](https://github.com/GMOD/range-cache-filehandle)
+merges neighboring blocks into one request and fetches each byte once. Without
+it, twenty half-overlapping windows panned across the 3.4 MB test BED file read
+11 MB.
 
 ### getLines
 
@@ -90,11 +82,7 @@ await file.getLines('chr1', 200, 300, {
 ```
 
 `onProgress` ticks once per chunk, the run of BGZF blocks the index resolves a
-query to.
-
-- Chunks already cached tick instantly.
-- `totalBytes` comes from the index and is known up front, enough to draw a
-  determinate progress bar.
+query to. `totalBytes` comes from the index and is known up front.
 
 Notes:
 
@@ -124,25 +112,19 @@ tabix-js reads `tabix -p gaf` indexes of sorted GAF (e.g. from `vg gamsort`):
 <script src="https://unpkg.com/@gmod/tabix/dist/tabix-bundle.js"></script>
 ```
 
-See [example/index.html](example/index.html) for a working demo. It fetches the
-VCF over HTTP, so serve the directory (e.g. `npx serve example`) rather than
-opening the file directly.
+See [example/index.html](example/index.html) for a demo; serve the directory
+(e.g. `npx serve example`) rather than opening the file directly.
 
 ## How a query flows
 
-`getLines` looks up a region's BGZF chunks in the index and decompresses each
-chunk in wasm. Index reads go through wasm too, since `.tbi` and `.csi` are
-bgzipped. The code after decompression is ordinary JS, which matches lines as
-bytes and decodes only the ones you asked for.
-[docs/dataflow.md](docs/dataflow.md) has the diagram.
+`getLines` looks up a region's BGZF chunks in the index, decompresses each chunk
+in wasm, and scans the bytes for matching lines in JS; see
+[docs/dataflow.md](docs/dataflow.md).
 
-`TabixIndexedFile` keeps decompressed chunks, so overlapping and adjacent
-queries skip inflating them again.
-
-- The cache holds up to 1GB per file and drops chunks after three idle minutes.
-- A consumer holding one file per track should bound them together with a shared
-  `chunkCacheBudget` rather than shrinking each file's ceiling. See
-  [docs/caching.md](docs/caching.md).
+`TabixIndexedFile` caches decompressed chunks, up to 1GB per file, and drops
+them after three idle minutes. A consumer holding one file per track should
+bound them together with a shared `chunkCacheBudget` rather than shrinking each
+file's ceiling; see [docs/caching.md](docs/caching.md).
 
 ## Decompressing on a worker pool
 
@@ -159,36 +141,25 @@ const file = new TabixIndexedFile({
 })
 ```
 
-You can pass the pool unconditionally:
+You can pass the pool unconditionally: `getSharedWorkerPool()` returns
+`undefined` under node, or anywhere the host forbids Workers, and tabix-js then
+decompresses in-process. The pool needs no cross-origin isolation, and tabix-js
+never creates one itself, so the consumer controls the thread budget.
 
-- `getSharedWorkerPool()` returns `undefined` under node, or anywhere the host
-  forbids Workers, and tabix-js then decompresses in-process.
-- The pool needs no cross-origin isolation.
-- tabix-js never creates a pool on its own, so the consumer controls the thread
-  budget.
-
-On a multi-sample VCF the pool speeds up end-to-end queries by about 1.4x.
-Per-line byte scanning and string decoding limit that speedup, not
-decompression.
-
-Worker counts, lifecycle and benchmarks are in
+On a multi-sample VCF the pool speeds up end-to-end queries by about 1.4x; see
+[docs/optimizations.md](docs/optimizations.md) and
 [bgzf-filehandle's worker pool docs](https://github.com/GMOD/bgzf-filehandle/blob/main/docs/worker-pool.md).
-The end-to-end numbers, and how to confirm a pool engages in production, are in
-jbrowse-components'
-[BGZF_WORKER_POOL.md](https://github.com/GMOD/jbrowse-components/blob/main/agent-docs/reference/BGZF_WORKER_POOL.md).
 
 ## Docs
 
 - [docs/api.md](docs/api.md) — every constructor arg and method
 - [docs/dataflow.md](docs/dataflow.md) — a query end to end, diagrammed
-- [docs/optimizations.md](docs/optimizations.md) — why each step of that path
-  looks the way it does, and what measured it
-- [docs/caching.md](docs/caching.md) — sizing the decompressed-chunk cache, and
-  bounding many files together
+- [docs/optimizations.md](docs/optimizations.md) — why each step looks the way
+  it does
+- [docs/caching.md](docs/caching.md) — sizing the decompressed-chunk cache
 - [agent-docs/architecture-decision-records/](agent-docs/architecture-decision-records/)
   — the measurements behind those decisions
-- [agent-docs/TODO.md](agent-docs/TODO.md) — what is worth doing next, and what
-  has to be measured before it
+- [agent-docs/TODO.md](agent-docs/TODO.md) — what is worth doing next
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 
 ## Academic Use

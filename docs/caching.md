@@ -1,9 +1,8 @@
 # Caching
 
 `TabixIndexedFile` caches decompressed chunks, the unit the index returns for a
-query, so overlapping and adjacent queries reuse inflated bytes instead of
-fetching and inflating them again. Three constructor options bound that cache,
-and each answers a different question.
+query, so overlapping and adjacent queries reuse inflated bytes. Three
+constructor options bound that cache.
 
 | option                    | default | question                                     |
 | ------------------------- | ------- | -------------------------------------------- |
@@ -18,14 +17,12 @@ a file; the idle timeout covers a file the user has stopped looking at.
 ## `chunkCacheSize` never refuses a read
 
 The cache accepts a chunk of any size, never evicts a read in flight, and drops
-only a value it has already returned. The worst a budget can cost you is
-therefore a re-read, which can make a query slower but never makes one fail or
-come back short.
+only a value it has already returned, so the worst a budget can cost is a
+re-read.
 
-An unbounded cache is the permissive setting rather than the safe one, which is
-why the option has a default at all. A cache with no ceiling grows for the life
-of the file, and before the cache had a bound we measured **2GB RSS** while
-panning a dense VCF.
+The option has a default because a cache with no ceiling grows for the life of
+the file. Before the cache had a bound we measured **2GB RSS** while panning a
+dense VCF.
 
 ## The unit changed in v3.5.2, and a pinned value did not
 
@@ -93,12 +90,11 @@ cover them all. bam-js measured that sum: six tracks browsing six windows
 retained 1442MB while every cache stayed under its own ceiling.
 
 **Group members by unit.** A budget's total is a sum over its members, so the
-total means nothing unless every member weighs the same thing. `@gmod/bam` and
-this library both weigh decompressed bytes and can share a budget. `@gmod/cram`
-weighs decoded _records_ and `@gmod/bbi` weighs entries, so a budget holding a
-tabix cache and a cram cache adds bytes to records and bounds neither. `sizeOf`
-is opaque by design, so the budget cannot check the units for you; give each
-unit a separate budget.
+total means nothing unless every member weighs the same thing. `@gmod/bam`,
+`@gmod/cram` and this library all weigh bytes and can share a budget.
+`@gmod/bbi` weighs entries, so a budget holding a tabix cache and a bbi cache
+adds bytes to entries and bounds neither. `sizeOf` is opaque by design, so the
+budget cannot check the units for you; give each unit a separate budget.
 
 ## None of these bound peak memory
 
