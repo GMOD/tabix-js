@@ -1,3 +1,15 @@
+## [3.11.0](https://github.com/GMOD/tabix-js/compare/v3.10.2...v3.11.0) (2026-10-15)
+
+### Other Changes
+
+- Reword ([9749984](https://github.com/GMOD/tabix-js/commit/9749984088573993ba4626e803f68a8e6d69cf23))
+- Rewrite AI-writing tropes in README, docs and agent-docs ([a665abe](https://github.com/GMOD/tabix-js/commit/a665abeacc2f32eb17d55e7e8a99f2be60b2969c))
+- Fold short verdict sentences into their neighbours ([6d59168](https://github.com/GMOD/tabix-js/commit/6d59168faba486a57a4ac6cc85b35dc25c1ed22f))
+- Restore wording the tropes rewrite changed without a trope ([357a060](https://github.com/GMOD/tabix-js/commit/357a06001614f23fbe7b3eacbaef908da709c1c2))
+- Trim wordiness in README and docs ([fc87fb4](https://github.com/GMOD/tabix-js/commit/fc87fb4e97ec45ebbd2f47cae6f8e6ff7d9bbc2f))
+- Skip inflating a chunk every waiter has abandoned ([78964d5](https://github.com/GMOD/tabix-js/commit/78964d54c3b23eb67e37a4959ed7b2b6c4169ff7))
+- Scan pooled chunks in segments instead of joining them ([6cad6a4](https://github.com/GMOD/tabix-js/commit/6cad6a4f65efac94efd83cd7913ad6e652a85855))
+
 ## [3.10.2](https://github.com/GMOD/tabix-js/compare/v3.10.1...v3.10.2) (2026-10-11)
 
 ### Bug Fixes
