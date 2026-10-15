@@ -4,7 +4,7 @@ import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
 import TBI from './tbi.ts'
-import { optimizeChunks } from './util.ts'
+import { optimizeChunks, throwIfAborted } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
@@ -1007,6 +1007,11 @@ export default class TabixIndexedFile {
       c.minv.blockPosition,
       opts,
     )
+    // LocalFile cannot cancel a read already under way, so a chunk every waiter
+    // has abandoned still arrives here. The signal is the cache's shared one,
+    // which fires only once nobody wants the bytes, so skip the inflate.
+    // SYNC: ~/src/gmod/bam-js/src/bamFile.ts _readChunkFeatures
+    throwIfAborted(opts.signal)
     // Awaited rather than stored resolved: the pool is commonly handed over as
     // the pending promise from getSharedWorkerPool(), and awaiting an
     // already-settled promise costs a microtask.
