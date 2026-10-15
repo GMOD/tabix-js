@@ -1,15 +1,15 @@
-import { unzip, unzipChunkSlice } from '@gmod/bgzf-filehandle'
+import { unzip, unzipChunkSegments } from '@gmod/bgzf-filehandle'
 import { SharedReadCache } from '@gmod/shared-read-cache'
 import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
 import TBI from './tbi.ts'
-import { optimizeChunks, throwIfAborted } from './util.ts'
+import { forEachLinePiece, optimizeChunks, throwIfAborted } from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
 import type { Options } from './indexFile.ts'
-import type { BgzfWorkerPool, ChunkSlice } from '@gmod/bgzf-filehandle'
+import type { BgzfWorkerPool, ChunkSegments } from '@gmod/bgzf-filehandle'
 import type { Budget } from '@gmod/shared-read-cache'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
@@ -80,7 +80,7 @@ interface GetLinesOpts {
 // returns them: cpositions/dpositions are Float64Arrays, which is what the
 // wasm decompressor produces, and only indexed reads and `.length` are used
 // here. Taken from the package rather than restated so the two can't drift.
-type ReadChunk = ChunkSlice
+type ReadChunk = ChunkSegments
 
 function resolveFilehandle(
   filehandle?: GenericFilehandle,
@@ -370,6 +370,7 @@ interface GafQuery {
  */
 function scanGafChunk(
   buffer: Uint8Array,
+  base: number,
   cpositions: ArrayLike<number>,
   dpositions: ArrayLike<number>,
   minvDataPosition: number,
@@ -385,7 +386,7 @@ function scanGafChunk(
     const lineStart = blockStart
     blockStart = n + 1
 
-    const target = lineStart + minvDataPosition
+    const target = lineStart + base + minvDataPosition
     while (pos < dpositions.length && target >= dpositions[pos]!) {
       pos++
     }
@@ -448,7 +449,7 @@ function scanGafChunk(
           cpositions,
           dpositions,
           pos,
-          lineStart,
+          lineStart + base,
           minvDataPosition,
         ),
         min,
@@ -595,7 +596,13 @@ export default class TabixIndexedFile {
       maxSize: chunkCacheSize,
       // decompressed bytes, not entry count: we fetch compressed and cache
       // decompressed, and an entry is a whole chunk
-      sizeOf: read => read.buffer.byteLength,
+      sizeOf: read => {
+        let bytes = 0
+        for (const segment of read.segments) {
+          bytes += segment.byteLength
+        }
+        return bytes
+      },
       cacheKey: chunk => chunk.toString(),
       idleTimeoutMs: chunkCacheIdleTimeoutMs,
       budget: chunkCacheBudget,
@@ -738,124 +745,138 @@ export default class TabixIndexedFile {
 
     for (let ci = 0, cl = chunks.length; ci < cl; ci++) {
       const c = chunks[ci]!
-      const { buffer, cpositions, dpositions } = await reads[ci]!
+      const { segments, cpositions, dpositions } = await reads[ci]!
       downloadedBytes += c.fetchedSize()
       onProgress?.(downloadedBytes, totalBytes)
       const minvDataPosition = c.minv.dataPosition
 
       if (gaf) {
         if (
-          scanGafChunk(buffer, cpositions, dpositions, minvDataPosition, gaf)
+          forEachLinePiece(segments, (buffer, base) =>
+            scanGafChunk(
+              buffer,
+              base,
+              cpositions,
+              dpositions,
+              minvDataPosition,
+              gaf,
+            ),
+          )
         ) {
           return
         }
-      } else {
-        let blockStart = 0
-        let pos = 0
+      } else if (
+        forEachLinePiece(segments, (buffer, base) => {
+          let blockStart = 0
+          let pos = 0
 
-        while (blockStart < buffer.length) {
-          const n = buffer.indexOf(NEWLINE, blockStart)
-          if (n === -1) {
-            break
-          }
-
-          const target = blockStart + minvDataPosition
-          while (pos < dpositions.length && target >= dpositions[pos]!) {
-            pos++
-          }
-
-          // skip meta lines
-          if (
-            metaCharCode !== undefined &&
-            buffer[blockStart] === metaCharCode
-          ) {
-            blockStart = n + 1
-            continue
-          }
-
-          // find tab positions. Columns past the end of the line all get `n`
-          // rather than breaking out, which would leave stale offsets from the
-          // previous line in the tail of the array.
-          tabs[0] = blockStart - 1
-          for (let i = 0; i < maxColumn; i++) {
-            const prev = tabs[i]!
-            const tabPos = prev < n ? buffer.indexOf(TAB, prev + 1) : -1
-            tabs[i + 1] = tabPos === -1 || tabPos >= n ? n : tabPos
-          }
-
-          // compare ref name bytes directly
-          const refStart = tabs[refCol - 1]! + 1
-          const refEnd = tabs[refCol]!
-          const refLen = refEnd - refStart
-          if (refLen !== regionRefNameBytes.length) {
-            blockStart = n + 1
-            continue
-          }
-          let isRefMatch = true
-          for (let i = 0; i < refLen; i++) {
-            if (buffer[refStart + i] !== regionRefNameBytes[i]) {
-              isRefMatch = false
+          while (blockStart < buffer.length) {
+            const n = buffer.indexOf(NEWLINE, blockStart)
+            if (n === -1) {
               break
             }
-          }
-          if (!isRefMatch) {
+
+            const target = blockStart + base + minvDataPosition
+            while (pos < dpositions.length && target >= dpositions[pos]!) {
+              pos++
+            }
+
+            // skip meta lines
+            if (
+              metaCharCode !== undefined &&
+              buffer[blockStart] === metaCharCode
+            ) {
+              blockStart = n + 1
+              continue
+            }
+
+            // find tab positions. Columns past the end of the line all get `n`
+            // rather than breaking out, which would leave stale offsets from the
+            // previous line in the tail of the array.
+            tabs[0] = blockStart - 1
+            for (let i = 0; i < maxColumn; i++) {
+              const prev = tabs[i]!
+              const tabPos = prev < n ? buffer.indexOf(TAB, prev + 1) : -1
+              tabs[i + 1] = tabPos === -1 || tabPos >= n ? n : tabPos
+            }
+
+            // compare ref name bytes directly
+            const refStart = tabs[refCol - 1]! + 1
+            const refEnd = tabs[refCol]!
+            const refLen = refEnd - refStart
+            if (refLen !== regionRefNameBytes.length) {
+              blockStart = n + 1
+              continue
+            }
+            let isRefMatch = true
+            for (let i = 0; i < refLen; i++) {
+              if (buffer[refStart + i] !== regionRefNameBytes[i]) {
+                isRefMatch = false
+                break
+              }
+            }
+            if (!isRefMatch) {
+              blockStart = n + 1
+              continue
+            }
+
+            // parse start coordinate
+            const startCoordinate =
+              parseIntFromBytes(
+                buffer,
+                tabs[startCol - 1]! + 1,
+                tabs[startCol]!,
+              ) + coordinateOffset
+
+            if (startCoordinate >= end) {
+              return true
+            }
+
+            // parse end coordinate
+            let endCoordinate: number
+            if (endCol === 0 || endCol === startCol) {
+              endCoordinate = startCoordinate + 1
+            } else if (isVCF) {
+              endCoordinate = getVcfEnd(
+                buffer,
+                startCoordinate,
+                tabs[3]! + 1,
+                tabs[4]!,
+                tabs[endCol - 1]! + 1,
+                tabs[endCol]!,
+                tabs[5]!,
+              )
+            } else {
+              endCoordinate = parseIntFromBytes(
+                buffer,
+                tabs[endCol - 1]! + 1,
+                tabs[endCol]!,
+              )
+            }
+
+            if (endCoordinate > start) {
+              // trim a CRLF terminator, matching htslib's line reader
+              const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
+              const line = decoder.decode(buffer.subarray(blockStart, lineEnd))
+              callback(
+                line,
+                calculateFileOffset(
+                  cpositions,
+                  dpositions,
+                  pos,
+                  blockStart + base,
+                  minvDataPosition,
+                ),
+                startCoordinate,
+                endCoordinate,
+              )
+            }
             blockStart = n + 1
-            continue
           }
-
-          // parse start coordinate
-          const startCoordinate =
-            parseIntFromBytes(
-              buffer,
-              tabs[startCol - 1]! + 1,
-              tabs[startCol]!,
-            ) + coordinateOffset
-
-          if (startCoordinate >= end) {
-            return
-          }
-
-          // parse end coordinate
-          let endCoordinate: number
-          if (endCol === 0 || endCol === startCol) {
-            endCoordinate = startCoordinate + 1
-          } else if (isVCF) {
-            endCoordinate = getVcfEnd(
-              buffer,
-              startCoordinate,
-              tabs[3]! + 1,
-              tabs[4]!,
-              tabs[endCol - 1]! + 1,
-              tabs[endCol]!,
-              tabs[5]!,
-            )
-          } else {
-            endCoordinate = parseIntFromBytes(
-              buffer,
-              tabs[endCol - 1]! + 1,
-              tabs[endCol]!,
-            )
-          }
-
-          if (endCoordinate > start) {
-            // trim a CRLF terminator, matching htslib's line reader
-            const lineEnd = buffer[n - 1] === CARRIAGE_RETURN ? n - 1 : n
-            const line = decoder.decode(buffer.subarray(blockStart, lineEnd))
-            callback(
-              line,
-              calculateFileOffset(
-                cpositions,
-                dpositions,
-                pos,
-                blockStart,
-                minvDataPosition,
-              ),
-              startCoordinate,
-              endCoordinate,
-            )
-          }
-          blockStart = n + 1
-        }
+          return false
+        })
+      ) {
+        return
       }
 
       // every line in this chunk was still inside the query, so the next chunk
@@ -1016,6 +1037,6 @@ export default class TabixIndexedFile {
     // the pending promise from getSharedWorkerPool(), and awaiting an
     // already-settled promise costs a microtask.
     const pool = await this.bgzfWorkerPool
-    return unzipChunkSlice(ret, c, pool)
+    return unzipChunkSegments(ret, c, pool)
   }
 }

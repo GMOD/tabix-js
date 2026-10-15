@@ -34,7 +34,7 @@ digraph tabixjs {
   blocks  [label="blocksForRange"]
   cache   [label="chunkCache" fillcolor="#fff8c5" color="#9a6700"]
   readchk [label="read chunk range" fillcolor="#dafbe1" color="#1a7f37"]
-  slice   [label="unzipChunkSlice" fillcolor="#ffd8b5" color="#bc4c00"]
+  slice   [label="unzipChunkSegments" fillcolor="#ffd8b5" color="#bc4c00"]
   pool    [label="worker pool" fillcolor="#fbefff" color="#8250df"]
   scan    [label="scan lines"]
   out     [label="lineCallback" fillcolor="#ddf4ff" color="#0969da"]

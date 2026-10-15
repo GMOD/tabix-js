@@ -143,6 +143,30 @@ GFF that inflates 18.6x, the four-worker call spends 58% of its time in that
 copy. The copy is one reason the 1.83x is not higher, but it does not explain
 the 1.4x end-to-end figure.
 
+### The scan reads chunks in segments, so the copy is gone
+
+`readChunk` returns bgzf-filehandle's `unzipChunkSegments`, one buffer per
+worker, and the chunk cache holds those segments. `forEachLinePiece` hands the
+scan each segment's complete lines as a view, with the piece's offset in the
+joined chunk, and copies only a line that straddles two segments. The scan loop
+itself is unchanged.
+
+Cold `getLines` in headless Chrome on an i9-12900K, four workers, against the
+joined build, both on bgzf-filehandle 6.8.0. The GFF rows are min (median) of
+40, the rest the range of two runs of 15:
+
+| query                          | lines   | segments vs joined |
+| ------------------------------ | ------- | ------------------ |
+| volvox.test.vcf contigA:0-50kb | 109     | 1.40-1.44x         |
+| raw.g.vcf ctgA:0-50kb          | 29,883  | 1.05-1.10x         |
+| ncbi_human GFF, 1Mb            | 2,785   | 1.26x (1.21x)      |
+| out.sorted GFF, 1Mb            | 2,785   | 1.30x (1.23x)      |
+| out.sorted GFF, whole file     | 350,741 | 1.11x (0.98x)      |
+| chr22_nanopore BED, 2Mb        | 220     | 1.16-1.17x         |
+
+The whole-file row is parity: decoding 350,000 line strings dominates it, and
+its median sits 20-25% above its min.
+
 **A node benchmark cannot measure any of this**, so every number above comes
 from a browser. Under node `getSharedWorkerPool()` resolves to `undefined`, and
 both arms of a node benchmark then run the in-process path and always report

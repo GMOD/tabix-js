@@ -288,3 +288,64 @@ export function memoizeByRefId<T>(
     return result
   }
 }
+
+export function concatUint8Array(args: Uint8Array[]) {
+  let total = 0
+  for (const entry of args) {
+    total += entry.length
+  }
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const entry of args) {
+    merged.set(entry, offset)
+    offset += entry.length
+  }
+  return merged
+}
+
+const NEWLINE = 10
+
+/**
+ * Hand `visit` the chunk's lines as pieces that each end on a newline, with
+ * each piece's offset in the joined chunk. A piece is a view into one segment,
+ * except a line that straddles two, which is copied into a piece of its own. A
+ * trailing partial line is dropped, as a scan of the joined chunk drops it.
+ * Returns true as soon as `visit` does.
+ */
+export function forEachLinePiece(
+  segments: Uint8Array[],
+  visit: (buffer: Uint8Array, base: number) => boolean,
+) {
+  let base = 0
+  let carry: Uint8Array | undefined
+  let carryAt = 0
+  for (const segment of segments) {
+    let from = 0
+    if (carry) {
+      const nl = segment.indexOf(NEWLINE)
+      if (nl === -1) {
+        carry = concatUint8Array([carry, segment])
+        base += segment.length
+        continue
+      }
+      if (
+        visit(concatUint8Array([carry, segment.subarray(0, nl + 1)]), carryAt)
+      ) {
+        return true
+      }
+      from = nl + 1
+      carry = undefined
+    }
+    const last = segment.lastIndexOf(NEWLINE)
+    if (last >= from && visit(segment.subarray(from, last + 1), base + from)) {
+      return true
+    }
+    const tail = Math.max(from, last + 1)
+    if (tail < segment.length) {
+      carry = segment.slice(tail)
+      carryAt = base + tail
+    }
+    base += segment.length
+  }
+  return false
+}
