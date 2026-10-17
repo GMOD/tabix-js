@@ -1,3 +1,12 @@
+## [3.12.0](https://github.com/GMOD/tabix-js/compare/v3.11.0...v3.12.0) (2026-10-17)
+
+### Other Changes
+
+- Bump deps ([c2a19d2](https://github.com/GMOD/tabix-js/commit/c2a19d2415eb9d20dfe8165d1593493c834e1320))
+- Count the sweep's timer, not LocalFile's idle-close timer, in the clear test ([033c988](https://github.com/GMOD/tabix-js/commit/033c988ec8a42d563121ec29030de18f279c7b4e))
+- Skip the header read for a file whose first data line opens it ([a22eefb](https://github.com/GMOD/tabix-js/commit/a22eefb1daf572ff07feb7dc04ede6e2eb110a9b))
+- Take a TBI's first data line from its bin chunks, so old indexes keep their header ([778e120](https://github.com/GMOD/tabix-js/commit/778e120bb7fc6fa7bd5dcaa710df12c485770d37))
+
 ## [3.11.0](https://github.com/GMOD/tabix-js/compare/v3.10.2...v3.11.0) (2026-10-15)
 
 ### Other Changes
