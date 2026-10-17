@@ -896,6 +896,15 @@ export default class TabixIndexedFile {
    */
   private async readHeaderBytes(opts: Options) {
     const { firstDataLine, maxBlockSize } = await this.getMetadata(opts)
+    // A file whose first data line opens it has no header to read. htslib
+    // fills a contig's leading index windows with that contig's first record,
+    // so this holds for its indexes; standalone tabix 0.2 left them at 0.
+    if (
+      firstDataLine?.blockPosition === 0 &&
+      firstDataLine.dataPosition === 0
+    ) {
+      return new Uint8Array(0)
+    }
 
     const maxFetch = (firstDataLine?.blockPosition ?? 0) + maxBlockSize
     // TODO: what if we don't have a firstDataLine, and the header actually
