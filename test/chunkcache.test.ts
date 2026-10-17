@@ -324,12 +324,15 @@ test('clearChunkCache drops everything, and stops the sweep', async () => {
     const { f } = open(file, undefined, 60_000)
     await count(f, ref, st, e)
     expect(f.chunkCache.size).toBeGreaterThan(0)
-    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    // LocalFile keeps an idle-close timer of its own, so count the sweep's
+    // timer as the one clearing removes
+    const withSweep = vi.getTimerCount()
+    expect(withSweep).toBeGreaterThan(0)
 
     f.clearChunkCache()
     expect(f.chunkCache.size).toBe(0)
     // an emptied cache must not leave a timer ticking over nothing
-    expect(vi.getTimerCount()).toBe(0)
+    expect(vi.getTimerCount()).toBe(withSweep - 1)
   } finally {
     vi.useRealTimers()
   }
