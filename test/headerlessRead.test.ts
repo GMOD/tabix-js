@@ -15,19 +15,21 @@ class CountingFile extends LocalFile {
   }
 }
 
-function open(path: string) {
-  const data = new CountingFile(path)
-  const index = path.endsWith('.csi') ? 'csi' : 'tbi'
-  const dataPath = path.replace(/\.(tbi|csi)$/, '')
-  const file = new TabixIndexedFile({
-    filehandle: new CountingFile(dataPath),
-    ...(index === 'csi' ? { csiFilehandle: data } : { tbiFilehandle: data }),
-  })
-  return { file, dataPath }
+function firstBlock(path: string) {
+  const fd = fs.openSync(path, 'r')
+  try {
+    const head = Buffer.alloc(18)
+    fs.readSync(fd, head, 0, 18, 0)
+    const block = Buffer.alloc(head.readUInt16LE(16) + 1)
+    fs.readSync(fd, block, 0, block.length, 0)
+    return gunzipSync(block)
+  } finally {
+    fs.closeSync(fd)
+  }
 }
 
-describe('the header of a file that opens on a data line', () => {
-  it('is read without touching the file', async () => {
+describe('getHeader', () => {
+  it('reads nothing of a file that opens on a data line', async () => {
     const data = new CountingFile('test/data/chr22_nanopore_subset.bed.gz')
     const file = new TabixIndexedFile({
       filehandle: data,
@@ -47,21 +49,32 @@ describe('the header of a file that opens on a data line', () => {
     expect(await file.getHeader()).toMatch(/^#/)
     expect(data.reads).toBeGreaterThan(0)
   })
+
+  // standalone tabix 0.2.5 leaves a contig's index windows before its first
+  // record at 0, so its linear index reads 0:0 under this file's header
+  it('keeps the header of a file standalone tabix 0.2 indexed', async () => {
+    const file = new TabixIndexedFile({ path: 'test/data/tabix_0.2.5.vcf.gz' })
+    expect(await file.getHeader()).toMatch(/#CHROM\tPOS.*sampleB\n$/)
+  })
 })
 
-// The skip trusts the index's first data line. On every fixture it sits at
-// 0:0 exactly when the file's first line is a data line.
+// The header skip trusts the index's first data line, so check it against
+// every indexed fixture: 0:0 exactly when the file's first line is data.
 const indexes = fs
   .readdirSync('test/data')
   .filter(f => /\.(tbi|csi)$/.test(f))
   .map(f => `test/data/${f}`)
   .filter(f => fs.existsSync(f.replace(/\.(tbi|csi)$/, '')))
 
-describe.each(indexes)('%s', path => {
+describe.each(indexes)('%s', index => {
   it('puts the first data line at 0:0 only when the file opens on one', async () => {
-    const { file, dataPath } = open(path)
+    const path = index.replace(/\.(tbi|csi)$/, '')
+    const file = new TabixIndexedFile({
+      path,
+      ...(index.endsWith('.csi') ? { csiPath: index } : { tbiPath: index }),
+    })
     const { firstDataLine, metaChar, skipLines = 0 } = await file.getMetadata()
-    const text = gunzipSync(fs.readFileSync(dataPath))
+    const text = firstBlock(path)
     const opensOnData =
       text.length > 0 &&
       skipLines === 0 &&

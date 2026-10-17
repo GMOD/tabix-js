@@ -91,12 +91,11 @@ export default class TabixIndex extends IndexFile {
     // SYNC: ~/src/gmod/bam-js/src/bai.ts _parse — two-pass structure
     // First pass: record per-refId byte offsets and find firstDataLine.
     //
-    // Only the linear index is consulted. Its entry for a window is the
-    // smallest virtual offset of any record overlapping that window, so the
-    // minimum over the linear index is already the minimum over the bin chunks
-    // — walking the chunks too only re-derives it. Checked against every .tbi
-    // in test/data: same answer on all 23, and no ref has bins without a
-    // linear index.
+    // firstDataLine is the smallest chunk start, which is where the first
+    // record begins. The linear index gives the same answer for htslib's
+    // indexes but not for standalone tabix 0.2's, which leaves a contig's
+    // windows before its first record at 0 and so makes a file with a header
+    // look like one without (test/data/tabix_0.2.5.vcf.gz).
     let curr = 36 + nameSectionLength
     let firstDataLine: VirtualOffset | undefined
     const offsets: number[] = []
@@ -115,12 +114,20 @@ export default class TabixIndex extends IndexFile {
             'tabix index contains too many bins, please use a CSI index',
           )
         }
+        if (bin <= maxBinNumber) {
+          for (let k = 0; k < chunkCount; k++) {
+            firstDataLine = minVirtualOffset(
+              bytes,
+              curr + 16 * k,
+              1,
+              firstDataLine,
+            )
+          }
+        }
         curr += 16 * chunkCount
       }
       const linearCount = dataView.getInt32(curr, true)
-      curr += 4
-      firstDataLine = minVirtualOffset(bytes, curr, linearCount, firstDataLine)
-      curr += 8 * linearCount
+      curr += 4 + 8 * linearCount
     }
 
     function getIndices(refId: number): RefIndex | undefined {
