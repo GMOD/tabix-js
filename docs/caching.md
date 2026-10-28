@@ -114,9 +114,10 @@ another still needs.
 ## A chunk inside a cached one reads from it
 
 An entry's key is the _merged_ chunk span a query resolved to, and the merge
-depends on the query: `blocksForRange` drops the chunks below the linear index's
-floor for that start, then joins what is left. Two overlapping pans can
-therefore resolve to two spans over the same bytes.
+depends on the query: `blocksForRange` drops the chunks ending below the linear
+index's floor for that start, joins what is left, and starts the first chunk at
+the floor of the query's 128kb window. Two overlapping pans can therefore
+resolve to two spans over the same bytes.
 
 A chunk the cache doesn't hold reads from the smallest cached or in-flight chunk
 that contains it, unless that container overlaps a neighbouring chunk of the

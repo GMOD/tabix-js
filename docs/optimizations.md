@@ -58,6 +58,53 @@ them or dropping them before the merge. The merged chunk is the cache key, and
 cutting it at a point that moves with the query end made pans read up to 79%
 more.
 
+### Start the first chunk at the floor of its 128kb window
+
+`optimizeChunks` drops a chunk that ends below the linear-index floor and keeps
+one that straddles it. htslib reads a straddling chunk from the floor of the
+query's 16kb window (`min_off` in `hts_itr_query`). `blocksForRange` moves its
+start up to the floor of the eight leaf windows holding the query start: 128kb
+in TBI, and the `loffset` walk in CSI.
+
+- **Where it helps:** htslib folds every bin under 64KB compressed into its
+  parent, so in a file of moderate density one chunk covers a whole 1Mb bin, and
+  without the clamp every query reads all of it. `test/data/folded_bins.bed.gz`
+  has such a bin. The other fixtures have none, and the clamp changed no chunk
+  in about a thousand windows over them.
+- **What it saves**, as median bytes over 50 cold 10kb windows on a 20Mb
+  pangenome graph's BEDs from gfa-to-tabix, one read each:
+
+  | file                    | before  | after   | htslib `tabix` |
+  | ----------------------- | ------- | ------- | -------------- |
+  | segments                | 118.8KB | 59.7KB  | 12.3KB         |
+  | links                   | 204.7KB | 104.4KB | 10.9KB         |
+  | segments, megabase rows | 1,490KB | 1,490KB | 724KB          |
+
+  Megabase-long rows pin the floor near the start of the file, for htslib too.
+  The rest of the gap to htslib lies past the query, because we fetch a chunk to
+  its end and htslib stops reading at the first record past the query.
+
+- **Why 128kb and not htslib's 16kb:** the merged chunk is the cache key, and
+  the 16kb floor changes it at every 16kb of a pan. Bytes over a warm pan of 40
+  10kb windows stepping 5kb, from five starts:
+
+  | file                    | before  | 16kb floor | 128kb floor |
+  | ----------------------- | ------- | ---------- | ----------- |
+  | segments                | 597KB   | 3,722KB    | 635KB       |
+  | links                   | 1,038KB | 6,315KB    | 1,094KB     |
+  | segments, megabase rows | 9,329KB | 11,017KB   | 11,017KB    |
+
+  The 128kb floor still adds a request each time a pan crosses a 128kb edge,
+  from 5 requests to 10 on each of the first two rows. On the megabase-row file
+  each crossing refetches a 1.5MB chunk and saves nothing.
+
+- **Risk:** the clamp trusts a linear-index entry to skip records inside a
+  chunk, where the drop trusts it only to discard whole chunks. An index whose
+  entry lies past a record overlapping its window would lose that record. htslib
+  trusts the same entries at a finer grain, and the clamp never passes the entry
+  for the query's own 16kb window. Tabix 0.2 writes zero for an empty window,
+  and a zero entry lowers the floor, which is safe.
+
 ### Read-ahead is adaptive, not fixed
 
 Each chunk is a separate range request, so a long scan pays one round trip per
