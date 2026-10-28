@@ -1,3 +1,15 @@
+## [3.13.0](https://github.com/GMOD/tabix-js/compare/v3.12.0...v3.13.0) (2026-10-28)
+
+### Documentation
+
+- Describe reading a chunk from a cached chunk that contains it ([7cc1176](https://github.com/GMOD/tabix-js/commit/7cc117689540e75856ffaad44e71738b0f07e406))
+- Measure the clamp's pans with containment reuse ([9df4c0f](https://github.com/GMOD/tabix-js/commit/9df4c0ff62787f3a464cb806077a79b69d26a871))
+
+### Performance Improvements
+
+- Read a chunk from a cached chunk that contains it ([ce243a5](https://github.com/GMOD/tabix-js/commit/ce243a512c95b15fa424596047b4b335b0b7fef3))
+- Start a query's first chunk at the floor of its 128kb window ([c42c118](https://github.com/GMOD/tabix-js/commit/c42c118916f125278c6c204702f08b06642c33aa))
+
 ## [3.12.0](https://github.com/GMOD/tabix-js/compare/v3.11.0...v3.12.0) (2026-10-17)
 
 ### Other Changes
