@@ -94,9 +94,18 @@ in TBI, and the `loffset` walk in CSI.
   | links                   | 1,038KB | 6,315KB    | 1,094KB     |
   | segments, megabase rows | 9,329KB | 11,017KB   | 11,017KB    |
 
-  The 128kb floor still adds a request each time a pan crosses a 128kb edge,
-  from 5 requests to 10 on each of the first two rows. On the megabase-row file
-  each crossing refetches a 1.5MB chunk and saves nothing.
+  Those pans ran before a chunk could read from a cached chunk containing it
+  ([below](#a-chunk-inside-a-cached-one-reads-from-it)). With that reuse, a pan
+  that crosses a 128kb edge reads its later start from the chunk it already
+  holds. On real files, median cold bytes over 60 windows and bytes over five
+  warm pans:
+
+  | file                | main, cold | clamp, cold | main, pan | reuse + clamp, pan |
+  | ------------------- | ---------- | ----------- | --------- | ------------------ |
+  | hg38 GFF3, chr1     | 97.4KB     | 82.7KB      | 362KB     | 286KB              |
+  | HPRC MC links, chr1 | 142.6KB    | 117.7KB     | 736KB     | 435KB              |
+  | NA12878 VCF, chr1   | 11.6KB     | 11.6KB      | 927KB     | 510KB              |
+  | C. elegans chrI BED | 165.4KB    | 165.4KB     | 4,893KB   | 2,795KB            |
 
 - **Risk:** the clamp trusts a linear-index entry to skip records inside a
   chunk, where the drop trusts it only to discard whole chunks. An index whose
