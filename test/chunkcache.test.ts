@@ -375,3 +375,20 @@ test('two files can share one budget', async () => {
   // really caching, not just holding the one entry a member keeps regardless
   expect(a.chunkCache.size + b.chunkCache.size).toBeGreaterThan(2)
 })
+
+// out.bed.gz's ctgA:0-1000 resolves to a chunk inside the one ctgA:0-1Mb merged
+// into, so a zoom from the wide view to the narrow one reads no new bytes
+test('a chunk inside a cached one reads from it, with the same lines', async () => {
+  const lines = async (f: TabixIndexedFile, s: number, e: number) => {
+    const out: string[] = []
+    await f.getLines('ctgA', s, e, { lineCallback: line => out.push(line) })
+    return out
+  }
+  const { filehandle, f } = open('out.bed.gz')
+  await lines(f, 0, 1_000_000)
+  const before = filehandle.reads
+  const narrow = await lines(f, 0, 1000)
+  expect(filehandle.reads).toBe(before)
+  expect(narrow.length).toBeGreaterThan(0)
+  expect(narrow).toEqual(await lines(open('out.bed.gz').f, 0, 1000))
+})
