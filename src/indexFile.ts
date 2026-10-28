@@ -1,9 +1,9 @@
 import { unzip } from '@gmod/bgzf-filehandle'
 import { SharedReadCache } from '@gmod/shared-read-cache'
 
+import Chunk from './chunk.ts'
 import { optimizeChunks } from './util.ts'
 
-import type Chunk from './chunk.ts'
 import type VirtualOffset from './virtualOffset.ts'
 import type { GenericFilehandle } from 'generic-filehandle2'
 
@@ -215,7 +215,8 @@ export default abstract class IndexFile {
       }
     }
 
-    const merged = optimizeChunks(chunks, this.lowestOffset(ba, min, indexData))
+    const lowest = this.lowestOffset(ba, min, indexData)
+    const merged = optimizeChunks(chunks, lowest)
     const past = maxOffset(
       ba.binIndex,
       max,
@@ -228,6 +229,25 @@ export default abstract class IndexFile {
         n--
       }
       merged.length = n
+    }
+
+    // Start the first chunk at the floor of the eight leaf windows holding the
+    // query start (128kb in TBI). htslib uses the query's own leaf, but the
+    // merged chunk is the cache key, and that floor changed it at every 16kb of
+    // a pan, which read 6x the bytes (docs/optimizations.md).
+    const span = 2 ** (indexData.minShift + 3)
+    let floor =
+      lowest && this.lowestOffset(ba, Math.floor(min / span) * span, indexData)
+    if (floor && lowest && floor.compareTo(lowest) > 0) {
+      floor = lowest
+    }
+    for (
+      let i = 0;
+      floor && i < merged.length && merged[i]!.minv.compareTo(floor) < 0;
+      i++
+    ) {
+      const c = merged[i]!
+      merged[i] = new Chunk(floor, c.maxv, c.bin, c.endPosition)
     }
     return merged
   }
