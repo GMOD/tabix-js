@@ -467,6 +467,11 @@ export default class TabixIndexedFile {
   private filehandle: GenericFilehandle
   private index: IndexFile
   public chunkCache: SharedReadCache<Chunk, ReadChunk>
+
+  // Every chunk handed to the cache, by key, so a later chunk lying inside one
+  // can read it instead of fetching its own span. An entry the cache has
+  // dropped is pruned when found.
+  private requested = new Map<string, Chunk>()
   /**
    * The parsed header, as a shared read — see {@link getParsedHeader}. One
    * entry, never evicted, which is what a memo is.
@@ -620,6 +625,42 @@ export default class TabixIndexedFile {
    */
   clearChunkCache() {
     this.chunkCache.clear()
+    this.requested.clear()
+  }
+
+  /**
+   * Swaps each chunk for the smallest cached or in-flight chunk that contains
+   * it, so a pan whose chunk starts later in an entry already read reuses it.
+   * The scan reads the container from its own start, and skips the lines before
+   * the query as it does at any chunk's start. A container that would overlap
+   * a neighbouring chunk stays unused, since the overlap would yield its lines
+   * twice. See docs/optimizations.md.
+   */
+  private withCachedContainers(chunks: Chunk[]) {
+    const out: Chunk[] = []
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]!
+      const prev = out[out.length - 1]
+      const next = chunks[i + 1]
+      let best: Chunk | undefined
+      if (!this.chunkCache.has(chunk)) {
+        for (const [key, held] of this.requested) {
+          if (!this.chunkCache.has(held)) {
+            this.requested.delete(key)
+          } else if (
+            held.minv.compareTo(chunk.minv) <= 0 &&
+            held.maxv.compareTo(chunk.maxv) >= 0 &&
+            (!prev || held.minv.compareTo(prev.maxv) >= 0) &&
+            (!next || held.maxv.compareTo(next.minv) <= 0) &&
+            (!best || held.fetchedSize() < best.fetchedSize())
+          ) {
+            best = held
+          }
+        }
+      }
+      out.push(best ?? chunk)
+    }
+    return out
   }
 
   /**
@@ -683,7 +724,9 @@ export default class TabixIndexedFile {
       return
     }
 
-    const chunks = await this.index.blocksForRange(refName, start, end, options)
+    const chunks = this.withCachedContainers(
+      await this.index.blocksForRange(refName, start, end, options),
+    )
 
     const isVCF = metadata.format === 'VCF'
     const refCol = metadata.columnNumbers.ref || 0
@@ -733,6 +776,7 @@ export default class TabixIndexedFile {
     const ensureReadsStarted = (count: number) => {
       while (reads.length < Math.min(count, chunks.length)) {
         const c = chunks[reads.length]!
+        this.requested.set(c.toString(), c)
         const read = this.chunkCache.get(c, signal)
         void read.catch(() => {
           // a prefetch the early return skips is never awaited, so swallow its
