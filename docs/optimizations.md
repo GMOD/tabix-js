@@ -105,6 +105,26 @@ performance here.
 
 ## The chunk cache
 
+### A chunk inside a cached one reads from it
+
+`getLines` swaps each chunk the cache doesn't hold for the smallest cached or
+in-flight chunk containing it, when that container overlaps no neighbouring
+chunk of the query. The scan reads the container from its own start and skips
+the lines before the query, as it does at any chunk's start.
+
+Bytes read on real files, as median of cold 10kb windows (60 on the first two
+files, 100 on the others) and total over five warm pans of 40 10kb windows
+stepping 5kb:
+
+| file                     | cold, main | cold, this | pan, main | pan, this |
+| ------------------------ | ---------- | ---------- | --------- | --------- |
+| RefSeq hg38 GFF3, chr1   | 97.4KB     | 97.4KB     | 362KB     | 362KB     |
+| HPRC v2.1 MC graph links | 142.6KB    | 142.6KB    | 736KB     | 736KB     |
+| NA12878 VCF, chr1        | 11.6KB     | 11.6KB     | 927KB     | 510KB     |
+| C. elegans chrI BED      | 165.4KB    | 165.4KB    | 4,893KB   | 2,952KB   |
+
+Every window returned the lines htslib's `tabix` returns.
+
 The cache counts decompressed bytes, is sized above one query, and shares reads
 already in flight, so concurrent queries hitting one chunk inflate it once.
 [caching.md](caching.md) has the sizing measurements (ADRs 0001 and 0002).

@@ -111,16 +111,18 @@ Aborting is per caller: the cache abandons a shared chunk only after every
 caller that joined it has aborted, so one cancelled query cannot drop a block
 another still needs.
 
-## A hit needs the same chunk span, not just the same bytes
+## A chunk inside a cached one reads from it
 
 An entry's key is the _merged_ chunk span a query resolved to, and the merge
-depends on the query: `blocksForRange` clamps to the lowest offset the linear
-index gives for that start, then joins what is left. Two overlapping pans can
-therefore decode the same bytes under two keys and miss each other.
+depends on the query: `blocksForRange` drops the chunks below the linear index's
+floor for that start, then joins what is left. Two overlapping pans can
+therefore resolve to two spans over the same bytes.
 
-tabix-js has not measured how often this happens; bam-js has measured it and set
-it aside. Before treating a low hit rate as a bug, check whether the spans
-matched.
+A chunk the cache doesn't hold reads from the smallest cached or in-flight chunk
+that contains it, unless that container overlaps a neighbouring chunk of the
+same query, whose lines it would then yield twice. A zoom into a cached view and
+a pan that resolves to a later start inside a cached chunk both read nothing new
+([optimizations.md](optimizations.md#a-chunk-inside-a-cached-one-reads-from-it)).
 
 ## Further reading
 
