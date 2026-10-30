@@ -165,25 +165,23 @@ export function clampChunkEnds(
 }
 
 /**
- * The smallest of `current` and the `count` packed virtual offsets starting at
- * `offset`, allocating at most one VirtualOffset rather than one per entry.
- *
- * The index first pass exists only to find this minimum, and it visits every
- * linear-index entry in the file to do it — 301k of them on
- * test/data/failing_tabix.vcf.gz.tbi against 19k bin chunks. Building a
- * VirtualOffset per entry to compare and discard it is the bulk of that pass.
+ * The smallest of `current` and the `count` virtual offsets starting at
+ * `offset`, `stride` bytes apart, allocating at most one VirtualOffset rather
+ * than one per entry. The index first pass exists only to find this minimum,
+ * over every chunk start in the file.
  */
 export function minVirtualOffset(
   bytes: Uint8Array,
   offset: number,
   count: number,
   current: VirtualOffset | undefined,
+  stride = 8,
 ) {
   let minBlock = current ? current.blockPosition : Infinity
   let minData = current ? current.dataPosition : 0
   let found = false
   for (let i = 0; i < count; i++) {
-    const p = offset + i * 8
+    const p = offset + i * stride
     const block =
       bytes[p + 7]! * 0x1_00_00_00_00_00 +
       bytes[p + 6]! * 0x1_00_00_00_00 +

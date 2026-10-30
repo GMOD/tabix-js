@@ -115,14 +115,13 @@ export default class TabixIndex extends IndexFile {
           )
         }
         if (bin <= maxBinNumber) {
-          for (let k = 0; k < chunkCount; k++) {
-            firstDataLine = minVirtualOffset(
-              bytes,
-              curr + 16 * k,
-              1,
-              firstDataLine,
-            )
-          }
+          firstDataLine = minVirtualOffset(
+            bytes,
+            curr,
+            chunkCount,
+            firstDataLine,
+            16,
+          )
         }
         curr += 16 * chunkCount
       }

@@ -16,12 +16,16 @@ pans away can't abort the index read that concurrent queries depend on.
 `getIndices(refId)` is separately LRU-memoized so repeated lookups don't re-walk
 the parsed bytes.
 
-### One allocation for the linear-index scan
+### One allocation for the first-data-line scan
 
-The index parse visits every linear-index entry in the file to find the minimum
-virtual offset: 301k of them on `test/data/failing_tabix.vcf.gz.tbi`, against
-19k bin chunks. `minVirtualOffset` therefore compares packed offsets in place
-and allocates at most one `VirtualOffset` instead of one per entry.
+The index parse visits every chunk start in the file to find the first data
+line. `minVirtualOffset` compares packed offsets in place and allocates at most
+one `VirtualOffset` instead of one per chunk.
+
+TBI takes the minimum over chunk starts rather than over the linear index, which
+is longer (15,196 entries against 1,932 chunks on
+`test/data/ncbi_human.sorted.gff.gz.tbi`). Standalone tabix 0.2 also leaves a
+contig's leading windows at 0, which would hide a header.
 
 ## Choosing and fetching chunks
 
