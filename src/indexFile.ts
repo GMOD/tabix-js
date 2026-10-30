@@ -234,20 +234,21 @@ export default abstract class IndexFile {
     // Start the first chunk at the floor of the eight leaf windows holding the
     // query start (128kb in TBI). htslib uses the query's own leaf, but the
     // merged chunk is the cache key, and that floor changed it at every 16kb of
-    // a pan, which read 6x the bytes (docs/optimizations.md).
-    const span = 2 ** (indexData.minShift + 3)
-    let floor =
-      lowest && this.lowestOffset(ba, Math.floor(min / span) * span, indexData)
-    if (floor && lowest && floor.compareTo(lowest) > 0) {
-      floor = lowest
-    }
-    for (
-      let i = 0;
-      floor && i < merged.length && merged[i]!.minv.compareTo(floor) < 0;
-      i++
-    ) {
-      const c = merged[i]!
-      merged[i] = new Chunk(floor, c.maxv, c.bin, c.endPosition)
+    // a pan, which read 6x the bytes (docs/optimizations.md). Every chunk
+    // ends past `lowest` and the chunks are disjoint, so only the first can
+    // start below the floor.
+    const first = merged[0]
+    if (first && lowest) {
+      const span = 2 ** (indexData.minShift + 3)
+      const window = this.lowestOffset(
+        ba,
+        Math.floor(min / span) * span,
+        indexData,
+      )
+      const floor = window && window.compareTo(lowest) < 0 ? window : lowest
+      if (first.minv.compareTo(floor) < 0) {
+        merged[0] = new Chunk(floor, first.maxv, first.bin, first.endPosition)
+      }
     }
     return merged
   }
