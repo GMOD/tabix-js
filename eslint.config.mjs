@@ -8,9 +8,7 @@ export default defineConfig(
     ignores: [
       'webpack.config.js',
       'dist/*',
-      'benchmarks/*',
       'esm/*',
-      'esm_*/*',
       'profile*',
       'example/*',
       'eslint.config.mjs',
