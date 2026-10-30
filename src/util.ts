@@ -308,13 +308,14 @@ const NEWLINE = 10
  * each piece's offset in the joined chunk. A piece is a view into one segment,
  * except a line that straddles two, which is copied into a piece of its own. A
  * trailing partial line is dropped, as a scan of the joined chunk drops it.
- * Returns true as soon as `visit` does.
+ * Returns true as soon as `visit` does. `base` is where the first segment
+ * starts in the joined chunk, for segments that `sliceSegments` cut from it.
  */
 export function forEachLinePiece(
   segments: Uint8Array[],
+  base: number,
   visit: (buffer: Uint8Array, base: number) => boolean,
 ) {
-  let base = 0
   let carry: Uint8Array | undefined
   let carryAt = 0
   for (const segment of segments) {
@@ -346,4 +347,47 @@ export function forEachLinePiece(
     base += segment.length
   }
   return false
+}
+
+/** Views of the bytes `[from, to)` of the segments joined, without copying. */
+export function sliceSegments(
+  segments: Uint8Array[],
+  from: number,
+  to: number,
+) {
+  const out: Uint8Array[] = []
+  let at = 0
+  for (const segment of segments) {
+    const lo = Math.max(from - at, 0)
+    const hi = Math.min(to - at, segment.length)
+    if (lo < hi) {
+      out.push(segment.subarray(lo, hi))
+    }
+    at += segment.length
+  }
+  return out
+}
+
+/**
+ * Where the virtual offset `v` falls in a chunk decompressed by
+ * `unzipChunkSegments`, as an offset into its segments joined. Block 0 is
+ * trimmed to the chunk's minv, whose data position `dpositions[0]` holds.
+ */
+export function chunkBufferOffset(
+  cpositions: ArrayLike<number>,
+  dpositions: ArrayLike<number>,
+  v: VirtualOffset,
+) {
+  let lo = 0
+  let hi = cpositions.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1
+    if (cpositions[mid]! <= v.blockPosition) {
+      lo = mid
+    } else {
+      hi = mid - 1
+    }
+  }
+  const blockStart = lo === 0 ? 0 : dpositions[lo]!
+  return blockStart - dpositions[0]! + v.dataPosition
 }

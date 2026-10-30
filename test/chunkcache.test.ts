@@ -4,6 +4,8 @@ import { expect, test, vi } from 'vitest'
 
 import TabixIndexedFile from '../src/tabixIndexedFile.ts'
 
+import type IndexFile from '../src/indexFile.ts'
+
 // lets queued microtasks and timers run, so a joining caller reaches the
 // in-flight read before we abort the owner
 function tick() {
@@ -391,4 +393,46 @@ test('a chunk inside a cached one reads from it, with the same lines', async () 
   expect(filehandle.reads).toBe(before)
   expect(narrow.length).toBeGreaterThan(0)
   expect(narrow).toEqual(await lines(open('out.bed.gz').f, 0, 1000))
+})
+
+// An index can leave a line that overlaps the query out of the query's chunks.
+// The cached container holds such lines before the wanted chunk, so a warm
+// query that scanned the whole container returned lines a cold one did not.
+test('a chunk read from a container returns what a cold read does', async () => {
+  const run = async (f: TabixIndexedFile) => {
+    const out: string[] = []
+    await f.getLines('ctgA', 0, 1_000_000, {
+      lineCallback: (line, fileOffset) => out.push(`${fileOffset} ${line}`),
+    })
+    return out
+  }
+  const indexOf = (file: TabixIndexedFile) => {
+    // @ts-expect-error reaching into the index to offer it chunks
+    const index: IndexFile = file.index
+    return index
+  }
+  const { filehandle, f } = open('out.bed.gz')
+  const [container] = await indexOf(f).blocksForRange('ctgA', 0, 1_000_000)
+  const meta = await indexOf(f).parse()
+  const leaves = Object.entries(meta.indices(meta.refNameToId.ctgA!)!.binIndex)
+    .filter(([bin]) => +bin >= 4681)
+    .flatMap(([, chunks]) => chunks)
+    .filter(
+      c =>
+        c.minv.compareTo(container!.minv) > 0 &&
+        c.maxv.compareTo(container!.maxv) < 0 &&
+        c.minv.blockPosition !== c.maxv.blockPosition,
+    )
+  const inner = leaves[Math.floor(leaves.length / 2)]!
+  await run(f)
+
+  const cold = open('out.bed.gz').f
+  for (const file of [f, cold]) {
+    vi.spyOn(indexOf(file), 'blocksForRange').mockResolvedValue([inner])
+  }
+  const before = filehandle.reads
+  const warm = await run(f)
+  expect(filehandle.reads).toBe(before)
+  expect(warm.length).toBeGreaterThan(0)
+  expect(warm).toEqual(await run(cold))
 })

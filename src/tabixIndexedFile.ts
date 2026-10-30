@@ -4,7 +4,13 @@ import { LocalFile, RemoteFile } from 'generic-filehandle2'
 
 import CSI from './csi.ts'
 import TBI from './tbi.ts'
-import { forEachLinePiece, optimizeChunks, throwIfAborted } from './util.ts'
+import {
+  chunkBufferOffset,
+  forEachLinePiece,
+  optimizeChunks,
+  sliceSegments,
+  throwIfAborted,
+} from './util.ts'
 
 import type Chunk from './chunk.ts'
 import type IndexFile from './indexFile.ts'
@@ -631,10 +637,10 @@ export default class TabixIndexedFile {
   /**
    * Swaps each chunk for the smallest cached or in-flight chunk that contains
    * it, so a pan whose chunk starts later in an entry already read reuses it.
-   * The scan reads the container from its own start, and skips the lines before
-   * the query as it does at any chunk's start. A container that would overlap
-   * a neighbouring chunk stays unused, since the overlap would yield its lines
-   * twice. See docs/optimizations.md.
+   * The scan reads only the wanted chunk's span of the container, so a query
+   * returns the same lines whatever the cache holds. A container that would
+   * overlap a neighbouring chunk stays unused, since the overlap would yield
+   * its lines twice. See docs/optimizations.md.
    *
    * `has` builds a string key, so the loop calls it only on a chunk that
    * already contains this one, and a sweep prunes dropped entries once they
@@ -734,9 +740,8 @@ export default class TabixIndexedFile {
       return
     }
 
-    const chunks = this.withCachedContainers(
-      await this.index.blocksForRange(refName, start, end, options),
-    )
+    const wanted = await this.index.blocksForRange(refName, start, end, options)
+    const chunks = this.withCachedContainers(wanted)
 
     const isVCF = metadata.format === 'VCF'
     const refCol = metadata.columnNumbers.ref || 0
@@ -799,14 +804,25 @@ export default class TabixIndexedFile {
 
     for (let ci = 0, cl = chunks.length; ci < cl; ci++) {
       const c = chunks[ci]!
-      const { segments, cpositions, dpositions } = await reads[ci]!
+      const read = await reads[ci]!
+      const { cpositions, dpositions } = read
       downloadedBytes += c.fetchedSize()
       onProgress?.(downloadedBytes, totalBytes)
       const minvDataPosition = c.minv.dataPosition
 
+      // in a container, scan only the bytes a read of the wanted chunk holds
+      const want = wanted[ci]!
+      let segments = read.segments
+      let from = 0
+      if (want !== c) {
+        from = chunkBufferOffset(cpositions, dpositions, want.minv)
+        const to = chunkBufferOffset(cpositions, dpositions, want.maxv) + 1
+        segments = sliceSegments(segments, from, to)
+      }
+
       if (gaf) {
         if (
-          forEachLinePiece(segments, (buffer, base) =>
+          forEachLinePiece(segments, from, (buffer, base) =>
             scanGafChunk(
               buffer,
               base,
@@ -820,7 +836,7 @@ export default class TabixIndexedFile {
           return
         }
       } else if (
-        forEachLinePiece(segments, (buffer, base) => {
+        forEachLinePiece(segments, from, (buffer, base) => {
           let blockStart = 0
           let pos = 0
 

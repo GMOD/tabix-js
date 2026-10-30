@@ -169,8 +169,22 @@ performance here.
 
 `getLines` swaps each chunk the cache doesn't hold for the smallest cached or
 in-flight chunk containing it, when that container overlaps no neighbouring
-chunk of the query. The scan reads the container from its own start and skips
-the lines before the query, as it does at any chunk's start.
+chunk of the query.
+
+The scan then reads only the swapped chunk's own span of the container, so a
+warm query visits the same lines as a cold one and returns the same result. The
+first version scanned the whole container from its start. The lines before the
+span were filtered out, but scanning them made warm pans slower than with no
+reuse at all. Warm pans of 10kb windows stepping 5kb, best of five runs:
+
+| fixture, ms/query                     | whole container | own span |
+| ------------------------------------- | --------------- | -------- |
+| `ncbi_human.sorted.gff.gz`, chr1@50Mb | 15.9            | 4.3      |
+| `raw.g.vcf.gz`                        | 1.9             | 0.7      |
+| `out.bed.gz`                          | 0.7             | 0.4      |
+
+Where a container adds few lines, as on the GFF at 150Mb or on
+`1kg.chr1.subset.vcf.gz`, the two differ by less than run-to-run noise.
 
 Bytes read on real files, as median of cold 10kb windows (60 on the first two
 files, 100 on the others) and total over five warm pans of 40 10kb windows

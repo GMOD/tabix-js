@@ -18,7 +18,7 @@ import type {
 function linesOf(segments: Uint8Array[]) {
   const out: [number, string][] = []
   const decoder = new TextDecoder()
-  forEachLinePiece(segments, (buffer, base) => {
+  forEachLinePiece(segments, 0, (buffer, base) => {
     expect(buffer.at(-1)).toBe(10)
     let start = 0
     for (
@@ -73,7 +73,7 @@ test('pieces give the joined chunk its lines and offsets', () => {
 test('a visit that returns true stops the walk', () => {
   const bytes = new TextEncoder().encode('one\ntwo\nthree\n')
   let visits = 0
-  const stopped = forEachLinePiece(split(bytes, [2, 6, 9]), () => {
+  const stopped = forEachLinePiece(split(bytes, [2, 6, 9]), 0, () => {
     visits++
     return true
   })
