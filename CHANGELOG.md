@@ -1,3 +1,22 @@
+## [3.13.1](https://github.com/GMOD/tabix-js/compare/v3.13.0...v3.13.1) (2026-10-30)
+
+### Bug Fixes
+
+- Scan only the wanted chunk's span of a cached container ([21f7f30](https://github.com/GMOD/tabix-js/commit/21f7f30bcac648302c44895b9a9f10d7386e3cb7))
+
+### Documentation
+
+- Time the container-span scan on an idle host ([5cbacfd](https://github.com/GMOD/tabix-js/commit/5cbacfd1b54ed1b6cf6bdd5d3be8ea491bb10002))
+
+### Performance Improvements
+
+- Compare before building cache keys in the containment scan ([da6ee6a](https://github.com/GMOD/tabix-js/commit/da6ee6a5266c026ad9b32b4028165c2c6ef34ad3))
+
+### Refactoring
+
+- Clamp only the first chunk to the 128kb floor ([a9c2b14](https://github.com/GMOD/tabix-js/commit/a9c2b1417db87c92c73ef0075619733baca38436))
+- Take a TBI bin's chunk starts in one minVirtualOffset call ([a7ca5c9](https://github.com/GMOD/tabix-js/commit/a7ca5c9570162480913362a33d7e5b20c7be71b6))
+
 ## [3.13.0](https://github.com/GMOD/tabix-js/compare/v3.12.0...v3.13.0) (2026-10-28)
 
 ### Documentation
