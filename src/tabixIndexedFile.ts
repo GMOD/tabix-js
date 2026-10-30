@@ -469,8 +469,8 @@ export default class TabixIndexedFile {
   public chunkCache: SharedReadCache<Chunk, ReadChunk>
 
   // Every chunk handed to the cache, by key, so a later chunk lying inside one
-  // can read it instead of fetching its own span. An entry the cache has
-  // dropped is pruned when found.
+  // can read it instead of fetching its own span. withCachedContainers prunes
+  // the entries the cache has dropped.
   private requested = new Map<string, Chunk>()
   /**
    * The parsed header, as a shared read — see {@link getParsedHeader}. One
@@ -635,8 +635,19 @@ export default class TabixIndexedFile {
    * the query as it does at any chunk's start. A container that would overlap
    * a neighbouring chunk stays unused, since the overlap would yield its lines
    * twice. See docs/optimizations.md.
+   *
+   * `has` builds a string key, so the loop calls it only on a chunk that
+   * already contains this one, and a sweep prunes dropped entries once they
+   * outnumber the cache.
    */
   private withCachedContainers(chunks: Chunk[]) {
+    if (this.requested.size > 2 * this.chunkCache.size) {
+      for (const [key, held] of this.requested) {
+        if (!this.chunkCache.has(held)) {
+          this.requested.delete(key)
+        }
+      }
+    }
     const out: Chunk[] = []
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]!
@@ -644,15 +655,14 @@ export default class TabixIndexedFile {
       const next = chunks[i + 1]
       let best: Chunk | undefined
       if (!this.chunkCache.has(chunk)) {
-        for (const [key, held] of this.requested) {
-          if (!this.chunkCache.has(held)) {
-            this.requested.delete(key)
-          } else if (
+        for (const held of this.requested.values()) {
+          if (
             held.minv.compareTo(chunk.minv) <= 0 &&
             held.maxv.compareTo(chunk.maxv) >= 0 &&
             (!prev || held.minv.compareTo(prev.maxv) >= 0) &&
             (!next || held.maxv.compareTo(next.minv) <= 0) &&
-            (!best || held.fetchedSize() < best.fetchedSize())
+            (!best || held.fetchedSize() < best.fetchedSize()) &&
+            this.chunkCache.has(held)
           ) {
             best = held
           }
