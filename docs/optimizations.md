@@ -175,16 +175,19 @@ The scan then reads only the swapped chunk's own span of the container, so a
 warm query visits the same lines as a cold one and returns the same result. The
 first version scanned the whole container from its start. The lines before the
 span were filtered out, but scanning them made warm pans slower than with no
-reuse at all. Warm pans of 10kb windows stepping 5kb, best of five runs:
+reuse at all. Warm pans of 10kb windows stepping 5kb, each tree in its own
+process pinned to one core, median of four alternating runs of best-of-five:
 
-| fixture, ms/query                     | whole container | own span |
-| ------------------------------------- | --------------- | -------- |
-| `ncbi_human.sorted.gff.gz`, chr1@50Mb | 15.9            | 4.3      |
-| `raw.g.vcf.gz`                        | 1.9             | 0.7      |
-| `out.bed.gz`                          | 0.7             | 0.4      |
+| fixture, ms/query                      | whole container | own span |
+| -------------------------------------- | --------------- | -------- |
+| `ncbi_human.sorted.gff.gz`, chr1@50Mb  | 2.40            | 0.98     |
+| `raw.g.vcf.gz`                         | 0.45            | 0.14     |
+| `out.bed.gz`                           | 0.112           | 0.086    |
+| `chr22_nanopore_subset.bed.gz`         | 0.41            | 0.39     |
+| `ncbi_human.sorted.gff.gz`, chr1@150Mb | 1.65            | 1.63     |
+| `1kg.chr1.subset.vcf.gz`, 2kb windows  | 15.8            | 15.9     |
 
-Where a container adds few lines, as on the GFF at 150Mb or on
-`1kg.chr1.subset.vcf.gz`, the two differ by less than run-to-run noise.
+In the last two pans a container adds few lines, and the two differ by under 2%.
 
 Bytes read on real files, as median of cold 10kb windows (60 on the first two
 files, 100 on the others) and total over five warm pans of 40 10kb windows
