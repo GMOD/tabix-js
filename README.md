@@ -157,10 +157,7 @@ On a multi-sample VCF the pool speeds up end-to-end queries by about 1.4x; see
 - [docs/optimizations.md](docs/optimizations.md) — why each step looks the way
   it does
 - [docs/caching.md](docs/caching.md) — sizing the decompressed-chunk cache
-- [agent-docs/architecture-decision-records/](agent-docs/architecture-decision-records/)
-  — the measurements behind those decisions
 - [agent-docs/TODO.md](agent-docs/TODO.md) — what is worth doing next
-- [CONTRIBUTING.md](CONTRIBUTING.md) — development and release steps
 
 ## Academic Use
 
